@@ -1,0 +1,4256 @@
+From 692dde6548ababf375d8aa4e46fcc641720792c5 Mon Sep 17 00:00:00 2001
+From: JJ <gzookeeperlee1015@gmail.com>
+Date: Mon, 9 Nov 2026 18:58:57 +0900
+Subject: [PATCH] =?UTF-8?q?feat:=20=EC=96=B4=EB=8C=91=ED=84=B0=20=EA=B5=AC?=
+ =?UTF-8?q?=ED=98=84=20=E2=80=94=20SessionRunner,=20:agent,=20:vision,=20:?=
+ =?UTF-8?q?voice,=20:overlay,=20:app,=20=EC=84=9C=EB=B2=84=20Gemini?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01GM4991eXsCXuQnUgTUYMWS
+---
+ .github/workflows/ci.yml                      |  37 +++
+ .gitignore                                    |   3 +
+ README.md                                     |  14 +
+ agent/README.md                               |   7 +
+ agent/src/main/AndroidManifest.xml            |   4 +
+ .../kr/kiosklens/agent/FakeGuideAgent.kt      |  29 ++
+ .../kr/kiosklens/agent/RemoteGuideAgent.kt    | 110 +++++++
+ .../kotlin/kr/kiosklens/agent/package-info.kt |   2 -
+ .../kr/kiosklens/agent/remote/DtoMapper.kt    |  95 ++++++
+ .../kotlin/kr/kiosklens/agent/remote/Json.kt  | 101 ++++++
+ .../kiosklens/agent/RemoteGuideAgentTest.kt   | 233 ++++++++++++++
+ app/README.md                                 |  18 ++
+ app/build.gradle.kts                          |  27 +-
+ app/src/debug/AndroidManifest.xml             |   5 +
+ app/src/main/AndroidManifest.xml              |  11 +-
+ .../kotlin/kr/kiosklens/app/MainActivity.kt   | 181 ++++++++++-
+ .../kiosklens/app/camera/CameraController.kt  |  69 ++++
+ .../kiosklens/app/camera/ImageProxyFrame.kt   |  19 ++
+ .../kr/kiosklens/app/di/AndroidLogger.kt      |  11 +
+ .../kiosklens/app/di/CaptionSpeechOutput.kt   |   9 +
+ .../main/kotlin/kr/kiosklens/app/di/Graph.kt  |  16 +
+ .../kr/kiosklens/app/ui/MockScreenView.kt     |  29 ++
+ .../kotlin/kr/kiosklens/app/ui/UiTexts.kt     |  32 ++
+ app/src/main/res/values/strings.xml           |   7 +
+ app/src/main/res/values/themes.xml            |   8 +
+ .../kr/kiosklens/app/di/GraphFactory.kt       |  36 +++
+ .../kr/kiosklens/app/di/GraphFactory.kt       |  44 +++
+ .../kotlin/kr/kiosklens/app/UiTextsTest.kt    |  34 ++
+ docs/decisions.md                             |  12 +
+ domain/README.md                              |   4 +
+ .../kiosklens/domain/runner/SessionRunner.kt  | 193 +++++++++++
+ .../domain/runner/SessionRunnerTest.kt        | 190 +++++++++++
+ gradle/libs.versions.toml                     |  10 +
+ overlay/README.md                             |   7 +
+ overlay/src/main/AndroidManifest.xml          |   2 +
+ .../kr/kiosklens/overlay/FakeOverlay.kt       |  17 +
+ .../kr/kiosklens/overlay/HighlightHolder.kt   |  20 ++
+ .../kr/kiosklens/overlay/ViewOverlay.kt       |  69 ++++
+ .../kr/kiosklens/overlay/package-info.kt      |   2 -
+ .../overlay/style/PulseBorderPainter.kt       |  34 ++
+ .../kr/kiosklens/overlay/style/PulseCurve.kt  |  20 ++
+ .../kiosklens/overlay/tracking/BoxSmoother.kt |  49 +++
+ .../overlay/transform/CoordinateMapper.kt     |  63 ++++
+ .../kr/kiosklens/overlay/OverlayTest.kt       | 125 +++++++
+ server/.env.example                           |   5 +-
+ server/README.md                              |  11 +
+ server/app/llm.py                             |  54 ++++
+ server/app/main.py                            |   4 +-
+ server/app/settings.py                        |   6 +-
+ server/scripts/evaluate.py                    |   8 +-
+ server/tests/test_api.py                      |  39 +++
+ vision/README.md                              |   8 +
+ vision/build.gradle.kts                       |   2 +
+ vision/src/main/AndroidManifest.xml           |   2 +
+ .../kiosklens/vision/VisionScreenAnalyzer.kt  | 128 ++++++++
+ .../vision/classify/ElementClassifier.kt      |  42 +++
+ .../vision/fake/FakeScreenAnalyzer.kt         |  38 +++
+ .../kr/kiosklens/vision/fake/SampleScreens.kt |  32 ++
+ .../kr/kiosklens/vision/filter/TextFilter.kt  |  39 +++
+ .../kr/kiosklens/vision/ocr/MlKitOcrEngine.kt |  60 ++++
+ .../kr/kiosklens/vision/ocr/OcrEngine.kt      |  16 +
+ .../kr/kiosklens/vision/package-info.kt       |   2 -
+ .../vision/pipeline/ElementBuilder.kt         |  54 ++++
+ .../kiosklens/vision/pipeline/FrameSampler.kt |  37 +++
+ .../vision/pipeline/ImageProxyThumbnail.kt    |  34 ++
+ .../kiosklens/vision/pipeline/ScreenDiffer.kt |  75 +++++
+ .../kr/kiosklens/vision/pipeline/TextNorm.kt  |   8 +
+ .../kotlin/kr/kiosklens/vision/VisionTest.kt  | 304 ++++++++++++++++++
+ voice/README.md                               |   6 +
+ voice/src/main/AndroidManifest.xml            |   9 +
+ .../kotlin/kr/kiosklens/voice/EchoGuard.kt    |  24 ++
+ .../kr/kiosklens/voice/fake/FakeSpeech.kt     |  51 +++
+ .../kotlin/kr/kiosklens/voice/package-info.kt |   2 -
+ .../kiosklens/voice/stt/AndroidSpeechInput.kt | 124 +++++++
+ .../kr/kiosklens/voice/stt/SttMapping.kt      |  44 +++
+ .../voice/tts/AndroidSpeechOutput.kt          |  86 +++++
+ .../kr/kiosklens/voice/tts/SpeechSplit.kt     |  11 +
+ .../kotlin/kr/kiosklens/voice/VoiceTest.kt    | 121 +++++++
+ 78 files changed, 3472 insertions(+), 22 deletions(-)
+ create mode 100644 .github/workflows/ci.yml
+ create mode 100644 agent/src/main/AndroidManifest.xml
+ create mode 100644 agent/src/main/kotlin/kr/kiosklens/agent/FakeGuideAgent.kt
+ create mode 100644 agent/src/main/kotlin/kr/kiosklens/agent/RemoteGuideAgent.kt
+ delete mode 100644 agent/src/main/kotlin/kr/kiosklens/agent/package-info.kt
+ create mode 100644 agent/src/main/kotlin/kr/kiosklens/agent/remote/DtoMapper.kt
+ create mode 100644 agent/src/main/kotlin/kr/kiosklens/agent/remote/Json.kt
+ create mode 100644 agent/src/test/kotlin/kr/kiosklens/agent/RemoteGuideAgentTest.kt
+ create mode 100644 app/src/debug/AndroidManifest.xml
+ create mode 100644 app/src/main/kotlin/kr/kiosklens/app/camera/CameraController.kt
+ create mode 100644 app/src/main/kotlin/kr/kiosklens/app/camera/ImageProxyFrame.kt
+ create mode 100644 app/src/main/kotlin/kr/kiosklens/app/di/AndroidLogger.kt
+ create mode 100644 app/src/main/kotlin/kr/kiosklens/app/di/CaptionSpeechOutput.kt
+ create mode 100644 app/src/main/kotlin/kr/kiosklens/app/di/Graph.kt
+ create mode 100644 app/src/main/kotlin/kr/kiosklens/app/ui/MockScreenView.kt
+ create mode 100644 app/src/main/kotlin/kr/kiosklens/app/ui/UiTexts.kt
+ create mode 100644 app/src/main/res/values/themes.xml
+ create mode 100644 app/src/mock/kotlin/kr/kiosklens/app/di/GraphFactory.kt
+ create mode 100644 app/src/real/kotlin/kr/kiosklens/app/di/GraphFactory.kt
+ create mode 100644 app/src/test/kotlin/kr/kiosklens/app/UiTextsTest.kt
+ create mode 100644 domain/src/main/kotlin/kr/kiosklens/domain/runner/SessionRunner.kt
+ create mode 100644 domain/src/test/kotlin/kr/kiosklens/domain/runner/SessionRunnerTest.kt
+ create mode 100644 overlay/src/main/AndroidManifest.xml
+ create mode 100644 overlay/src/main/kotlin/kr/kiosklens/overlay/FakeOverlay.kt
+ create mode 100644 overlay/src/main/kotlin/kr/kiosklens/overlay/HighlightHolder.kt
+ create mode 100644 overlay/src/main/kotlin/kr/kiosklens/overlay/ViewOverlay.kt
+ delete mode 100644 overlay/src/main/kotlin/kr/kiosklens/overlay/package-info.kt
+ create mode 100644 overlay/src/main/kotlin/kr/kiosklens/overlay/style/PulseBorderPainter.kt
+ create mode 100644 overlay/src/main/kotlin/kr/kiosklens/overlay/style/PulseCurve.kt
+ create mode 100644 overlay/src/main/kotlin/kr/kiosklens/overlay/tracking/BoxSmoother.kt
+ create mode 100644 overlay/src/main/kotlin/kr/kiosklens/overlay/transform/CoordinateMapper.kt
+ create mode 100644 overlay/src/test/kotlin/kr/kiosklens/overlay/OverlayTest.kt
+ create mode 100644 vision/src/main/AndroidManifest.xml
+ create mode 100644 vision/src/main/kotlin/kr/kiosklens/vision/VisionScreenAnalyzer.kt
+ create mode 100644 vision/src/main/kotlin/kr/kiosklens/vision/classify/ElementClassifier.kt
+ create mode 100644 vision/src/main/kotlin/kr/kiosklens/vision/fake/FakeScreenAnalyzer.kt
+ create mode 100644 vision/src/main/kotlin/kr/kiosklens/vision/fake/SampleScreens.kt
+ create mode 100644 vision/src/main/kotlin/kr/kiosklens/vision/filter/TextFilter.kt
+ create mode 100644 vision/src/main/kotlin/kr/kiosklens/vision/ocr/MlKitOcrEngine.kt
+ create mode 100644 vision/src/main/kotlin/kr/kiosklens/vision/ocr/OcrEngine.kt
+ delete mode 100644 vision/src/main/kotlin/kr/kiosklens/vision/package-info.kt
+ create mode 100644 vision/src/main/kotlin/kr/kiosklens/vision/pipeline/ElementBuilder.kt
+ create mode 100644 vision/src/main/kotlin/kr/kiosklens/vision/pipeline/FrameSampler.kt
+ create mode 100644 vision/src/main/kotlin/kr/kiosklens/vision/pipeline/ImageProxyThumbnail.kt
+ create mode 100644 vision/src/main/kotlin/kr/kiosklens/vision/pipeline/ScreenDiffer.kt
+ create mode 100644 vision/src/main/kotlin/kr/kiosklens/vision/pipeline/TextNorm.kt
+ create mode 100644 vision/src/test/kotlin/kr/kiosklens/vision/VisionTest.kt
+ create mode 100644 voice/src/main/AndroidManifest.xml
+ create mode 100644 voice/src/main/kotlin/kr/kiosklens/voice/EchoGuard.kt
+ create mode 100644 voice/src/main/kotlin/kr/kiosklens/voice/fake/FakeSpeech.kt
+ delete mode 100644 voice/src/main/kotlin/kr/kiosklens/voice/package-info.kt
+ create mode 100644 voice/src/main/kotlin/kr/kiosklens/voice/stt/AndroidSpeechInput.kt
+ create mode 100644 voice/src/main/kotlin/kr/kiosklens/voice/stt/SttMapping.kt
+ create mode 100644 voice/src/main/kotlin/kr/kiosklens/voice/tts/AndroidSpeechOutput.kt
+ create mode 100644 voice/src/main/kotlin/kr/kiosklens/voice/tts/SpeechSplit.kt
+ create mode 100644 voice/src/test/kotlin/kr/kiosklens/voice/VoiceTest.kt
+
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+new file mode 100644
+index 0000000..072e966
+--- /dev/null
++++ b/.github/workflows/ci.yml
+@@ -0,0 +1,37 @@
++name: ci
++on:
++  pull_request:
++  push:
++    branches: [main]
++
++jobs:
++  pure-modules:
++    name: 순수 모듈 테스트 (:core-model · :domain)
++    runs-on: ubuntu-latest
++    steps:
++      - uses: actions/checkout@v4
++      - uses: actions/setup-java@v4
++        with: { distribution: temurin, java-version: 17 }
++      - uses: gradle/actions/setup-gradle@v4
++      - run: ./gradlew :core-model:test :domain:test
++
++  android:
++    name: Android 모듈 테스트 · mock 빌드
++    runs-on: ubuntu-latest
++    steps:
++      - uses: actions/checkout@v4
++      - uses: actions/setup-java@v4
++        with: { distribution: temurin, java-version: 17 }
++      - uses: gradle/actions/setup-gradle@v4
++      - name: Android API 37 플랫폼
++        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37" "build-tools;37.0.0" || true
++      - run: ./gradlew :vision:testDebugUnitTest :voice:testDebugUnitTest :agent:testDebugUnitTest :overlay:testDebugUnitTest :app:testMockDebugUnitTest :app:assembleMockDebug
++
++  server:
++    name: 서버 테스트
++    runs-on: ubuntu-latest
++    steps:
++      - uses: actions/checkout@v4
++      - uses: actions/setup-python@v5
++        with: { python-version: "3.12" }
++      - run: cd server && pip install -r requirements-dev.txt && KL_SKIP_APP_INIT=1 pytest -q
+diff --git a/.gitignore b/.gitignore
+index 4cd063a..f8d2454 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -6,3 +6,6 @@ local.properties
+ .DS_Store
+ .kotlin/
+ captures/
++*.apk
++*.aab
++.env
+diff --git a/README.md b/README.md
+index fe83303..28dcec4 100644
+--- a/README.md
++++ b/README.md
+@@ -50,6 +50,20 @@ cd server && pip install -r requirements-dev.txt && KL_SKIP_APP_INIT=1 pytest -q
+ 
+ 필요한 것: JDK 17 이상 · Android SDK **API 37** 플랫폼 (SDK Manager에서 설치) · `local.properties`에 `sdk.dir` (Android Studio로 열면 자동 생성) · 서버는 Python 3.9 이상
+ 
++## 구현 현황
++
++| 모듈 | 상태 | JVM 테스트 |
++|---|---|---|
++| `:core-model` · `:domain` (+`SessionRunner`) | 구현 완료 | 35개 |
++| `:agent` | 구현 완료 (직접 JSON, Gemini 지원 서버와 연동 확인) | 18개 |
++| `:vision` | 구현 완료 (ML Kit는 기기에서 확인 필요) | 22개 |
++| `:voice` | 구현 완료 (실제 STT/TTS는 기기에서 확인 필요) | 10개 |
++| `:overlay` | 구현 완료 (View 기반) | 17개 |
++| `:app` | 조립 · 화면 · 카메라 (mock/real) | 5개 |
++| `server/` | Gemini 제공자 추가 | 92개 |
++
++이 환경에서는 Android SDK가 없어 **Android 전용 파일(ML Kit · CameraX · SpeechRecognizer · TextToSpeech · View · Activity)은 컴파일하지 못했다.** 첫 `./gradlew :app:assembleMockDebug`에서 오류가 나면 그 파일들부터 보면 된다.
++
+ ## 협업 규칙 (5일 계획 9장)
+ 
+ | 항목 | 규칙 |
+diff --git a/agent/README.md b/agent/README.md
+index a37f86c..b7497f2 100644
+--- a/agent/README.md
++++ b/agent/README.md
+@@ -60,3 +60,10 @@ val json = Json {
+ - `http://`(로컬 서버)에 붙으려면 debug 빌드에 cleartext 허용(`networkSecurityConfig`)이 필요
+ - 앱 키는 저장소에 올리지 말고 `local.properties` → `BuildConfig` 필드로 주입하는 방식을 추천
+ - 키 없이 서버 띄우기: `cd server && APP_KEY=dev LLM_PROVIDER=fake uvicorn app.main:app --port 8080`
++
++## 구현 현황 (이 PR)
++
++- [x] `RemoteGuideAgent`(HttpURLConnection · 6초 · 1회 재시도 · 400/401 재시도 없음 · 429 `Retry-After`) · `FakeGuideAgent` · `DtoMapper`(보내기 전 길이 정리 포함)
++- [x] **JSON은 `kotlinx.serialization` 대신 작은 직접 구현**(`remote/Json.kt`)으로 처리했다 (외부 의존 0, 계약 필드가 적음). 바꾸고 싶으면 `DtoMapper`만 고치면 되고 테스트가 그대로 보증한다.
++- [x] 테스트 18개: `testdata/contract/*.json` 왕복, 로컬 HTTP 서버로 401 · 400 · 429 · 502 · 시간 초과 · 연결 실패 · 깨진 응답, `Tap.targetId` 방어, 길이 제한
++- 서버: **무료 Gemini 지원 추가** (`LLM_PROVIDER=gemini`, `GEMINI_API_KEY`) — [server/README.md](../server/README.md)
+diff --git a/agent/src/main/AndroidManifest.xml b/agent/src/main/AndroidManifest.xml
+new file mode 100644
+index 0000000..19d2638
+--- /dev/null
++++ b/agent/src/main/AndroidManifest.xml
+@@ -0,0 +1,4 @@
++<?xml version="1.0" encoding="utf-8"?>
++<manifest xmlns:android="http://schemas.android.com/apk/res/android">
++    <uses-permission android:name="android.permission.INTERNET" />
++</manifest>
+diff --git a/agent/src/main/kotlin/kr/kiosklens/agent/FakeGuideAgent.kt b/agent/src/main/kotlin/kr/kiosklens/agent/FakeGuideAgent.kt
+new file mode 100644
+index 0000000..cc8654c
+--- /dev/null
++++ b/agent/src/main/kotlin/kr/kiosklens/agent/FakeGuideAgent.kt
+@@ -0,0 +1,29 @@
++package kr.kiosklens.agent
++
++import kr.kiosklens.core.model.ElementKind
++import kr.kiosklens.core.model.GuideAction
++import kr.kiosklens.core.model.GuideRequest
++import kr.kiosklens.core.model.GuideResponse
++import kr.kiosklens.core.port.GuideAgent
++
++/**
++ * 서버 없이 쓰는 가짜 (mock 플레이버 · 테스트용). 규칙은 항상 같다.
++ * 말이 없으면 되묻기 / 누를 만한 글자가 없으면 UNKNOWN / 그 밖에는 목표와 글자가 가장 겹치는 BUTTON_LIKE로 TAP.
++ */
++class FakeGuideAgent : GuideAgent {
++    val requests = mutableListOf<GuideRequest>()
++
++    override suspend fun next(request: GuideRequest): Result<GuideResponse> {
++        requests += request
++        val goal = request.utterance?.takeIf { it.isNotBlank() } ?: request.goal.orEmpty()
++        if (goal.isBlank()) return Result.success(GuideResponse("", GuideAction.AskUser("무엇을 도와드릴까요?")))
++        val buttons = request.snapshot.elements.filter { it.kind == ElementKind.BUTTON_LIKE }
++        if (buttons.isEmpty()) {
++            return Result.success(GuideResponse(goal, GuideAction.Unknown("버튼을 찾지 못했어요. 화면이 잘 보이게 비춰 주세요.")))
++        }
++        val best = buttons.maxByOrNull { e -> overlap(e.text, goal) }!!
++        return Result.success(GuideResponse(goal, GuideAction.Tap(best.id, best.text)))
++    }
++
++    private fun overlap(a: String, b: String): Int = a.count { it.isLetterOrDigit() && b.contains(it) }
++}
+diff --git a/agent/src/main/kotlin/kr/kiosklens/agent/RemoteGuideAgent.kt b/agent/src/main/kotlin/kr/kiosklens/agent/RemoteGuideAgent.kt
+new file mode 100644
+index 0000000..6e5d302
+--- /dev/null
++++ b/agent/src/main/kotlin/kr/kiosklens/agent/RemoteGuideAgent.kt
+@@ -0,0 +1,110 @@
++package kr.kiosklens.agent
++
++import java.io.IOException
++import java.net.HttpURLConnection
++import java.net.URL
++import kotlinx.coroutines.CancellationException
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.delay
++import kotlinx.coroutines.runInterruptible
++import kr.kiosklens.agent.remote.DtoMapper
++import kr.kiosklens.core.model.GuideAction
++import kr.kiosklens.core.model.GuideRequest
++import kr.kiosklens.core.model.GuideResponse
++import kr.kiosklens.core.port.GuideAgent
++import kr.kiosklens.core.port.Logger
++
++/** 서버 주소와 앱 키. LLM 키는 절대 여기 없다 (서버에만). */
++data class AgentConfig(
++    /** 예: "https://kiosk-lens.example.com" (끝의 / 는 있어도 없어도 됨) */
++    val baseUrl: String,
++    val appKey: String,
++    val timeoutMs: Int = 6_000,
++    /** 첫 시도 뒤 다시 시도하는 횟수 (계약: 1회) */
++    val retries: Int = 1,
++    /** 429의 Retry-After를 기다리는 최대 시간 */
++    val maxRetryWaitMs: Long = 5_000,
++)
++
++/** 서버가 준 상태 코드. 앱은 이 코드로 안내 문구를 고른다 (message는 개발자용). */
++class GuideHttpException(val status: Int, val code: String?, val retryAfterMs: Long? = null) : IOException("HTTP $status ${code.orEmpty()}")
++
++/**
++ * POST /v1/guide/next (계약 v1, docs/contract.md 3장).
++ * - 예외 대신 [Result.failure]
++ * - 400 · 401은 다시 시도하지 않는다. 429는 Retry-After만큼 기다렸다 1회. 502 · 504 · 500 · 네트워크 오류는 바로 1회.
++ * - 성공해도 TAP의 targetId가 요청 화면에 없으면 [GuideAction.Unknown]으로 바꾼다.
++ * - 로그에는 상태 코드와 시간만 남긴다 (발화 · 화면 글자 금지).
++ */
++class RemoteGuideAgent(
++    private val config: AgentConfig,
++    private val logger: Logger,
++    private val nowMs: () -> Long = System::currentTimeMillis,
++) : GuideAgent {
++
++    override suspend fun next(request: GuideRequest): Result<GuideResponse> {
++        val sent = DtoMapper.sanitize(request)
++        val body = DtoMapper.requestJson(sent).toByteArray(Charsets.UTF_8)
++        var last: Throwable? = null
++        for (attempt in 0..config.retries) {
++            val t0 = nowMs()
++            try {
++                val resp = runInterruptible(Dispatchers.IO) { post(body) }
++                logger.d("KL_PERF", "agent attempt=$attempt status=200 ms=${nowMs() - t0}")
++                return Result.success(guard(resp, sent))
++            } catch (e: CancellationException) {
++                throw e
++            } catch (e: GuideHttpException) {
++                logger.w("KL_PERF", "agent attempt=$attempt status=${e.status} code=${e.code} ms=${nowMs() - t0}")
++                last = e
++                if (e.status == 400 || e.status == 401 || e.status == 403) break        // 다시 해도 같다
++                if (e.status == 429) e.retryAfterMs?.let { delay(it.coerceAtMost(config.maxRetryWaitMs)) }
++            } catch (e: DtoMapper.BadResponse) {
++                logger.w("KL_PERF", "agent attempt=$attempt bad_response ms=${nowMs() - t0}")
++                last = e
++            } catch (e: IOException) {                                                   // 시간 초과 · 연결 실패
++                logger.w("KL_PERF", "agent attempt=$attempt io=${e.javaClass.simpleName} ms=${nowMs() - t0}")
++                last = e
++            } catch (e: Exception) {
++                logger.e("KL_PERF", "agent attempt=$attempt unexpected", e)
++                last = e
++                break
++            }
++        }
++        return Result.failure(last ?: IOException("unknown"))
++    }
++
++    /** 모르는 버튼을 가리키면 안 된다: 요청 화면에 없는 targetId는 UNKNOWN으로. */
++    private fun guard(resp: GuideResponse, sent: GuideRequest): GuideResponse {
++        val a = resp.action
++        if (a is GuideAction.Tap && sent.snapshot.findElement(a.targetId) == null) {
++            return resp.copy(action = GuideAction.Unknown("버튼을 찾지 못했어요. 화면이 잘 보이게 비춰 주세요."))
++        }
++        return resp
++    }
++
++    private fun post(body: ByteArray): GuideResponse {
++        val url = URL(config.baseUrl.trimEnd('/') + "/v1/guide/next")
++        val c = url.openConnection() as HttpURLConnection
++        try {
++            c.requestMethod = "POST"
++            c.connectTimeout = config.timeoutMs
++            c.readTimeout = config.timeoutMs
++            c.doOutput = true
++            c.setRequestProperty("Content-Type", "application/json; charset=utf-8")
++            c.setRequestProperty("Accept", "application/json")
++            c.setRequestProperty("X-App-Key", config.appKey)
++            c.outputStream.use { it.write(body) }
++            val status = c.responseCode
++            if (status != 200) {
++                val text = runCatching { c.errorStream?.use { it.readBytes().toString(Charsets.UTF_8) } }.getOrNull().orEmpty()
++                val wait = c.getHeaderField("Retry-After")?.toDoubleOrNull()?.let { (it * 1000).toLong() }
++                throw GuideHttpException(status, DtoMapper.errorCode(text), wait)
++            }
++            val text = c.inputStream.use { it.readBytes().toString(Charsets.UTF_8) }
++            return DtoMapper.parseResponse(text)
++        } finally {
++            c.disconnect()
++        }
++    }
++}
+diff --git a/agent/src/main/kotlin/kr/kiosklens/agent/package-info.kt b/agent/src/main/kotlin/kr/kiosklens/agent/package-info.kt
+deleted file mode 100644
+index 4a33645..0000000
+--- a/agent/src/main/kotlin/kr/kiosklens/agent/package-info.kt
++++ /dev/null
+@@ -1,2 +0,0 @@
+-// :agent 모듈 자리. 담당 파트가 포트 구현과 Fake를 여기에 추가합니다.
+-package kr.kiosklens.agent
+diff --git a/agent/src/main/kotlin/kr/kiosklens/agent/remote/DtoMapper.kt b/agent/src/main/kotlin/kr/kiosklens/agent/remote/DtoMapper.kt
+new file mode 100644
+index 0000000..e0aa5cc
+--- /dev/null
++++ b/agent/src/main/kotlin/kr/kiosklens/agent/remote/DtoMapper.kt
+@@ -0,0 +1,95 @@
++package kr.kiosklens.agent.remote
++
++import kr.kiosklens.core.model.ElementKind
++import kr.kiosklens.core.model.GuideAction
++import kr.kiosklens.core.model.GuideRequest
++import kr.kiosklens.core.model.GuideResponse
++import kr.kiosklens.core.model.ScreenSnapshot
++import kr.kiosklens.core.model.ScrollDir
++import kr.kiosklens.core.model.UiElement
++
++/** 계약 v1 (docs/contract.md 3장) 의 JSON ↔ :core-model 변환. 이미지는 어디에도 없다. */
++object DtoMapper {
++
++    /** 서버가 400으로 거절하는 기준에 맞춰 보내기 전에 정리한다 (3.6). */
++    fun sanitize(r: GuideRequest): GuideRequest {
++        val seen = HashSet<String>()
++        val els = r.snapshot.elements.asSequence()
++            .filter { it.text.isNotBlank() && it.id.isNotEmpty() && it.rect.isValid }
++            .map { it.copy(id = it.id.take(UiElement.MAX_ID_LENGTH), text = it.text.trim().take(UiElement.MAX_TEXT_LENGTH)) }
++            .filter { seen.add(it.id) }
++            .take(ScreenSnapshot.MAX_ELEMENTS)
++            .toList()
++        return r.copy(
++            utterance = r.utterance?.trim()?.take(GuideRequest.MAX_UTTERANCE_LENGTH)?.ifEmpty { null },
++            goal = r.goal?.trim()?.takeLast(GuideRequest.MAX_GOAL_LENGTH)?.ifEmpty { null },
++            snapshot = r.snapshot.copy(elements = els),
++            history = r.history.takeLast(GuideRequest.MAX_HISTORY),
++        )
++    }
++
++    fun requestJson(raw: GuideRequest): String {
++        val r = sanitize(raw)
++        val sb = StringBuilder(512)
++        sb.append('{')
++        sb.append("\"sessionId\":").append(Json.quote(r.sessionId))
++        sb.append(",\"utterance\":").append(r.utterance?.let { Json.quote(it) } ?: "null")
++        sb.append(",\"goal\":").append(r.goal?.let { Json.quote(it) } ?: "null")
++        val s = r.snapshot
++        sb.append(",\"snapshot\":{")
++        sb.append("\"screenId\":").append(Json.quote(s.screenId))
++        sb.append(",\"frameId\":").append(s.frameId)
++        sb.append(",\"timestampMs\":").append(s.timestampMs)
++        sb.append(",\"stableFrames\":").append(s.stableFrames)
++        sb.append(",\"elements\":[")
++        s.elements.forEachIndexed { i, e ->
++            if (i > 0) sb.append(',')
++            sb.append("{\"id\":").append(Json.quote(e.id))
++            sb.append(",\"text\":").append(Json.quote(e.text))
++            sb.append(",\"rect\":{\"left\":").append(num(e.rect.left)).append(",\"top\":").append(num(e.rect.top))
++                .append(",\"right\":").append(num(e.rect.right)).append(",\"bottom\":").append(num(e.rect.bottom)).append('}')
++            sb.append(",\"confidence\":").append(num(e.confidence.coerceIn(0f, 1f)))
++            sb.append(",\"kind\":").append(Json.quote(e.kind.name)).append('}')
++        }
++        sb.append("]}")
++        sb.append(",\"history\":[")
++        r.history.forEachIndexed { i, h ->
++            if (i > 0) sb.append(',')
++            sb.append("{\"screenId\":").append(Json.quote(h.screenId))
++            sb.append(",\"action\":").append(Json.quote(h.action.name))
++            sb.append(",\"targetText\":").append(h.targetText?.let { Json.quote(it) } ?: "null").append('}')
++        }
++        sb.append("]}")
++        return sb.toString()
++    }
++
++    private fun num(f: Float): String = if (f.isNaN() || f.isInfinite()) "0" else f.toString()
++
++    class BadResponse(message: String) : Exception(message)
++
++    /** 모르는 필드(source 등)는 무시한다. 형식이 틀리면 [BadResponse]. */
++    fun parseResponse(body: String): GuideResponse {
++        val root = Json.parseOrNull(body) as? Map<*, *> ?: throw BadResponse("JSON 객체가 아님")
++        val a = root["action"] as? Map<*, *> ?: throw BadResponse("action 없음")
++        fun str(k: String): String = (a[k] as? String)?.takeIf { it.isNotBlank() } ?: throw BadResponse("$k 없음")
++        val action: GuideAction = when (val type = a["type"] as? String) {
++            "TAP" -> GuideAction.Tap(str("targetId"), str("guideText"))
++            "SCROLL" -> GuideAction.Scroll(
++                runCatching { ScrollDir.valueOf(str("direction")) }.getOrElse { throw BadResponse("direction 오류") },
++                str("guideText"),
++            )
++            "WAIT" -> GuideAction.Wait(str("guideText"))
++            "ASK_USER" -> GuideAction.AskUser(str("question"))
++            "DONE" -> GuideAction.Done(str("guideText"))
++            "UNKNOWN" -> GuideAction.Unknown(str("reason"))
++            else -> throw BadResponse("모르는 type: $type")
++        }
++        return GuideResponse(goal = (root["goal"] as? String).orEmpty(), action = action)
++    }
++
++    /** 오류 본문에서 code만 꺼낸다 (message는 개발자용이라 어르신께 읽지 않는다). */
++    fun errorCode(body: String): String? =
++        (((Json.parseOrNull(body) as? Map<*, *>)?.get("error")) as? Map<*, *>)?.get("code") as? String
++
++    fun hasKind(e: UiElement, k: ElementKind) = e.kind == k
++}
+diff --git a/agent/src/main/kotlin/kr/kiosklens/agent/remote/Json.kt b/agent/src/main/kotlin/kr/kiosklens/agent/remote/Json.kt
+new file mode 100644
+index 0000000..60723aa
+--- /dev/null
++++ b/agent/src/main/kotlin/kr/kiosklens/agent/remote/Json.kt
+@@ -0,0 +1,101 @@
++package kr.kiosklens.agent.remote
++
++// 외부 라이브러리 없이 쓰는 작은 JSON 도구 (파싱 결과: Map / List / String / Double / Boolean / null).
++// 계약 v1의 요청 · 응답은 필드가 적어서 직접 다룬다. 나중에 kotlinx.serialization으로 바꿔도 DtoMapper만 고치면 된다.
++
++/** 외부 라이브러리 없이 쓰는 아주 작은 JSON 도구. (파싱 결과: Map / List / String / Double / Boolean / null) */
++object Json {
++    class JsonException(msg: String) : Exception(msg)
++
++    fun parse(s: String): Any? {
++        val p = Parser(s)
++        p.ws()
++        val v = p.value()
++        p.ws()
++        if (p.i != s.length) throw JsonException("뒤에 남은 글자")
++        return v
++    }
++
++    fun parseOrNull(s: String): Any? = try { parse(s) } catch (e: Exception) { null }
++
++    /** 문자열 안에서 처음 나오는 JSON 객체({...})를 꺼내 파싱한다. 앞뒤 설명이 붙어도 된다. */
++    @Suppress("UNCHECKED_CAST")
++    fun firstObject(raw: String): Map<String, Any?>? {
++        var start = raw.indexOf('{')
++        while (start != -1) {
++            var depth = 0; var inStr = false; var esc = false
++            for (i in start until raw.length) {
++                val c = raw[i]
++                if (inStr) { if (esc) esc = false else if (c == '\\') esc = true else if (c == '"') inStr = false; continue }
++                if (c == '"') inStr = true
++                else if (c == '{') depth++
++                else if (c == '}') { depth--; if (depth == 0) {
++                    val v = parseOrNull(raw.substring(start, i + 1))
++                    if (v is Map<*, *>) return v as Map<String, Any?>
++                    break
++                } }
++            }
++            start = raw.indexOf('{', start + 1)
++        }
++        return null
++    }
++
++    fun quote(s: String): String {
++        val sb = StringBuilder("\"")
++        for (c in s) when (c) {
++            '"' -> sb.append("\\\""); '\\' -> sb.append("\\\\"); '\n' -> sb.append("\\n"); '\r' -> sb.append("\\r"); '\t' -> sb.append("\\t")
++            else -> if (c < ' ') sb.append(String.format("\\u%04x", c.code)) else sb.append(c)
++        }
++        return sb.append('"').toString()
++    }
++
++    private class Parser(val s: String) {
++        var i = 0
++        fun ws() { while (i < s.length && s[i].isWhitespace()) i++ }
++        fun value(): Any? {
++            ws()
++            if (i >= s.length) throw JsonException("끝")
++            return when (val c = s[i]) {
++                '{' -> obj()
++                '[' -> arr()
++                '"' -> str()
++                't' -> lit("true", true)
++                'f' -> lit("false", false)
++                'n' -> lit("null", null)
++                else -> if (c == '-' || c.isDigit()) num() else throw JsonException("예상 밖 글자 $c")
++            }
++        }
++        fun lit(w: String, v: Any?): Any? { if (!s.startsWith(w, i)) throw JsonException("글자 오류"); i += w.length; return v }
++        fun num(): Double { val st = i; if (s[i] == '-') i++; while (i < s.length && (s[i].isDigit() || s[i] in ".eE+-")) i++; return s.substring(st, i).toDoubleOrNull() ?: throw JsonException("숫자 오류") }
++        fun str(): String {
++            i++; val sb = StringBuilder()
++            while (i < s.length) {
++                val c = s[i++]
++                when (c) {
++                    '"' -> return sb.toString()
++                    '\\' -> { if (i >= s.length) throw JsonException("끝"); when (val e = s[i++]) {
++                        'n' -> sb.append('\n'); 't' -> sb.append('\t'); 'r' -> sb.append('\r'); 'b' -> sb.append('\b'); 'f' -> sb.append('\u000c')
++                        'u' -> { if (i + 4 > s.length) throw JsonException("유니코드"); sb.append(s.substring(i, i + 4).toInt(16).toChar()); i += 4 }
++                        else -> sb.append(e) } }
++                    else -> sb.append(c)
++                }
++            }
++            throw JsonException("문자열이 안 닫힘")
++        }
++        fun arr(): List<Any?> {
++            i++; val out = ArrayList<Any?>(); ws()
++            if (i < s.length && s[i] == ']') { i++; return out }
++            while (true) { out.add(value()); ws(); if (i >= s.length) throw JsonException("끝"); if (s[i] == ',') { i++; continue }; if (s[i] == ']') { i++; return out }; throw JsonException("배열 오류") }
++        }
++        fun obj(): Map<String, Any?> {
++            i++; val out = LinkedHashMap<String, Any?>(); ws()
++            if (i < s.length && s[i] == '}') { i++; return out }
++            while (true) {
++                ws(); if (i >= s.length || s[i] != '"') throw JsonException("키 오류"); val k = str(); ws()
++                if (i >= s.length || s[i] != ':') throw JsonException("콜론"); i++
++                out[k] = value(); ws(); if (i >= s.length) throw JsonException("끝")
++                if (s[i] == ',') { i++; continue }; if (s[i] == '}') { i++; return out }; throw JsonException("객체 오류")
++            }
++        }
++    }
++}
+diff --git a/agent/src/test/kotlin/kr/kiosklens/agent/RemoteGuideAgentTest.kt b/agent/src/test/kotlin/kr/kiosklens/agent/RemoteGuideAgentTest.kt
+new file mode 100644
+index 0000000..84b958d
+--- /dev/null
++++ b/agent/src/test/kotlin/kr/kiosklens/agent/RemoteGuideAgentTest.kt
+@@ -0,0 +1,233 @@
++package kr.kiosklens.agent
++
++import com.sun.net.httpserver.HttpServer
++import java.io.File
++import java.net.InetSocketAddress
++import java.util.concurrent.CopyOnWriteArrayList
++import java.util.concurrent.atomic.AtomicInteger
++import kotlinx.coroutines.runBlocking
++import kr.kiosklens.agent.remote.DtoMapper
++import kr.kiosklens.agent.remote.Json
++import kr.kiosklens.core.model.ActionType
++import kr.kiosklens.core.model.ElementKind
++import kr.kiosklens.core.model.GuideAction
++import kr.kiosklens.core.model.GuideRequest
++import kr.kiosklens.core.model.HistoryItem
++import kr.kiosklens.core.model.NormRect
++import kr.kiosklens.core.model.ScreenSnapshot
++import kr.kiosklens.core.model.UiElement
++import kr.kiosklens.core.port.Logger
++import org.junit.After
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertTrue
++import org.junit.Assert.assertNull
++import org.junit.Test
++
++@Suppress("UNCHECKED_CAST")
++class RemoteGuideAgentTest {
++    private val quiet = object : Logger {
++        override fun d(tag: String, message: String) {}
++        override fun w(tag: String, message: String, error: Throwable?) {}
++        override fun e(tag: String, message: String, error: Throwable?) {}
++    }
++    private val contractDir = generateSequence(File(".").absoluteFile) { it.parentFile }
++        .map { File(it, "testdata/contract") }.first { it.isDirectory }
++
++    private fun contract(name: String) = File(contractDir, name).readText()
++
++    /** testdata/contract/request_*.json → GuideRequest */
++    private fun requestFrom(name: String): GuideRequest {
++        val m = Json.parse(contract(name)) as Map<String, Any?>
++        val s = m["snapshot"] as Map<String, Any?>
++        return GuideRequest(
++            sessionId = m["sessionId"] as String, utterance = m["utterance"] as String?, goal = m["goal"] as String?,
++            snapshot = ScreenSnapshot(
++                s["screenId"] as String, (s["frameId"] as Double).toLong(), (s["timestampMs"] as Double).toLong(),
++                (s["elements"] as List<Map<String, Any?>>).map { e ->
++                    val r = e["rect"] as Map<String, Double>
++                    UiElement(e["id"] as String, e["text"] as String,
++                        NormRect(r["left"]!!.toFloat(), r["top"]!!.toFloat(), r["right"]!!.toFloat(), r["bottom"]!!.toFloat()),
++                        (e["confidence"] as Double).toFloat(), ElementKind.valueOf(e["kind"] as String))
++                }, (s["stableFrames"] as Double).toInt()),
++            history = (m["history"] as List<Map<String, Any?>>).map { HistoryItem(it["screenId"] as String, ActionType.valueOf(it["action"] as String), it["targetText"] as String?) },
++        )
++    }
++
++    private class Stub(val handler: (Int, String, Map<String, String>) -> Triple<Int, String, Map<String, String>>) {
++        val hits = AtomicInteger()
++        val bodies = CopyOnWriteArrayList<String>()
++        val headers = CopyOnWriteArrayList<Map<String, String>>()
++        val server: HttpServer = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0).apply {
++            createContext("/v1/guide/next") { ex ->
++                val body = ex.requestBody.readBytes().toString(Charsets.UTF_8)
++                val h = ex.requestHeaders.entries.associate { it.key.lowercase() to it.value.first() }
++                bodies += body; headers += h
++                val (code, text, extra) = handler(hits.incrementAndGet(), body, h)
++                extra.forEach { (k, v) -> ex.responseHeaders.add(k, v) }
++                ex.responseHeaders.add("Content-Type", "application/json")
++                val b = text.toByteArray(Charsets.UTF_8)
++                ex.sendResponseHeaders(code, b.size.toLong()); ex.responseBody.use { it.write(b) }
++            }
++            start()
++        }
++        val url get() = "http://127.0.0.1:${server.address.port}"
++        fun stop() = server.stop(0)
++    }
++
++    private val stubs = mutableListOf<Stub>()
++    @After fun tearDown() { stubs.forEach { it.stop() } }
++    private fun stub(h: (Int, String, Map<String, String>) -> Triple<Int, String, Map<String, String>>) = Stub(h).also { stubs += it }
++    private fun agent(s: Stub, retries: Int = 1, timeoutMs: Int = 2000) =
++        RemoteGuideAgent(AgentConfig(s.url + "/", "KEY123", timeoutMs, retries, 50), quiet)
++    private fun ok(name: String) = Triple(200, contract(name), emptyMap<String, String>())
++
++    // ---------- 왕복: 서버와 같은 예시 파일 ----------
++
++    @Test fun `요청 JSON이 contract 예시와 의미가 같다`() {
++        for (n in listOf("request_first.json", "request_after_screen_change.json")) {
++            val req = requestFrom(n)
++            val mine = Json.parse(DtoMapper.requestJson(req))
++            val theirs = Json.parse(contract(n))
++            assertEquals(n, theirs, mine)
++        }
++    }
++
++    @Test fun `contract 응답 예시를 모두 읽는다`() {
++        val expect = mapOf(
++            "response_tap.json" to ActionType.TAP, "response_scroll.json" to ActionType.SCROLL, "response_wait.json" to ActionType.WAIT,
++            "response_ask_user.json" to ActionType.ASK_USER, "response_done.json" to ActionType.DONE, "response_unknown.json" to ActionType.UNKNOWN,
++        )
++        for ((n, t) in expect) {
++            val r = DtoMapper.parseResponse(contract(n))
++            val got = when (r.action) { is GuideAction.Tap -> ActionType.TAP; is GuideAction.Scroll -> ActionType.SCROLL; is GuideAction.Wait -> ActionType.WAIT
++                is GuideAction.AskUser -> ActionType.ASK_USER; is GuideAction.Done -> ActionType.DONE; is GuideAction.Unknown -> ActionType.UNKNOWN }
++            assertEquals(n, t, got)
++        }
++        val tap = DtoMapper.parseResponse(contract("response_tap.json"))
++        assertEquals("따뜻한 아메리카노 한 잔 주세요", tap.goal)
++        assertEquals(GuideAction.Tap("e4", "아메리카노"), tap.action)
++    }
++
++    // ---------- 통신 ----------
++
++    @Test fun `앱 키 헤더와 본문을 보내고 TAP을 받는다`() = runBlocking {
++        val s = stub { _, _, _ -> ok("response_tap.json") }
++        val r = agent(s).next(requestFrom("request_first.json"))
++        assertEquals(GuideAction.Tap("e4", "아메리카노"), r.getOrThrow().action)
++        assertEquals("KEY123", s.headers.single()["x-app-key"])
++        assertTrue(s.headers.single()["content-type"]!!.startsWith("application/json"))
++    }
++
++    @Test fun `이미지나 모르는 최상위 필드는 보내지 않는다`() {
++        val keys = (Json.parse(DtoMapper.requestJson(requestFrom("request_first.json"))) as Map<String, Any?>).keys
++        assertEquals(setOf("sessionId", "utterance", "goal", "snapshot", "history"), keys)
++    }
++
++    @Test fun `401은 다시 시도하지 않고 failure`() = runBlocking {
++        val s = stub { _, _, _ -> Triple(401, contract("error_401.json"), emptyMap()) }
++        val r = agent(s).next(requestFrom("request_first.json"))
++        assertTrue(r.isFailure)
++        val e = r.exceptionOrNull() as GuideHttpException
++        assertEquals(401, e.status); assertEquals("unauthorized", e.code)
++        assertEquals(1, s.hits.get())
++    }
++
++    @Test fun `400도 다시 시도하지 않는다`() = runBlocking {
++        val s = stub { _, _, _ -> Triple(400, """{"error":{"code":"invalid_request","message":"x","requestId":"r"}}""", emptyMap()) }
++        assertTrue(agent(s).next(requestFrom("request_first.json")).isFailure)
++        assertEquals(1, s.hits.get())
++    }
++
++    @Test fun `502는 1회 다시 시도해서 성공한다`() = runBlocking {
++        val s = stub { n, _, _ -> if (n == 1) Triple(502, """{"error":{"code":"llm_error","message":"x","requestId":"r"}}""", emptyMap()) else ok("response_tap.json") }
++        assertTrue(agent(s).next(requestFrom("request_first.json")).isSuccess)
++        assertEquals(2, s.hits.get())
++    }
++
++    @Test fun `계속 실패하면 재시도는 1회뿐이다`() = runBlocking {
++        val s = stub { _, _, _ -> Triple(500, """{"error":{"code":"internal","message":"x","requestId":"r"}}""", emptyMap()) }
++        assertTrue(agent(s).next(requestFrom("request_first.json")).isFailure)
++        assertEquals(2, s.hits.get())
++    }
++
++    @Test fun `429는 Retry-After 뒤에 1회 다시 시도한다`() = runBlocking {
++        val t0 = System.currentTimeMillis()
++        val s = stub { n, _, _ -> if (n == 1) Triple(429, """{"error":{"code":"rate_limited","message":"x","requestId":"r"}}""", mapOf("Retry-After" to "0.05")) else ok("response_tap.json") }
++        assertTrue(agent(s).next(requestFrom("request_first.json")).isSuccess)
++        assertEquals(2, s.hits.get())
++        assertTrue(System.currentTimeMillis() - t0 >= 40)
++    }
++
++    @Test fun `시간 초과는 예외 없이 failure`() = runBlocking {
++        val s = stub { _, _, _ -> Thread.sleep(600); ok("response_tap.json") }
++        val r = agent(s, retries = 0, timeoutMs = 150).next(requestFrom("request_first.json"))
++        assertTrue(r.isFailure)
++    }
++
++    @Test fun `서버에 연결할 수 없어도 예외 없이 failure`() = runBlocking {
++        val r = RemoteGuideAgent(AgentConfig("http://127.0.0.1:1", "k", 300, 1, 10), quiet).next(requestFrom("request_first.json"))
++        assertTrue(r.isFailure)
++    }
++
++    @Test fun `깨진 응답은 failure`() = runBlocking {
++        val s = stub { _, _, _ -> Triple(200, """{"goal":"x","action":{"type":"TAP"}}""", emptyMap()) }
++        assertTrue(agent(s, retries = 0).next(requestFrom("request_first.json")).isFailure)
++    }
++
++    @Test fun `요청 화면에 없는 targetId는 UNKNOWN으로 바꾼다`() = runBlocking {
++        val s = stub { _, _, _ -> Triple(200, """{"goal":"g","action":{"type":"TAP","targetId":"zzz","guideText":"없는 버튼"}}""", emptyMap()) }
++        val a = agent(s).next(requestFrom("request_first.json")).getOrThrow().action
++        assertTrue(a is GuideAction.Unknown)
++    }
++
++    @Test fun `모르는 필드는 무시한다`() {
++        val r = DtoMapper.parseResponse("""{"goal":"g","source":"llm","extra":{"a":1},"action":{"type":"DONE","guideText":"끝","x":1}}""")
++        assertEquals(GuideAction.Done("끝"), r.action)
++    }
++
++    // ---------- 보내기 전 정리 (길이 제한 3.6) ----------
++
++    @Test fun `길이 제한을 맞춰서 보낸다`() {
++        val base = requestFrom("request_first.json")
++        val many = (1..400).map { UiElement("e$it", "버튼$it".padEnd(120, '가'), NormRect(0.1f, 0.1f, 0.2f, 0.2f), 0.9f, ElementKind.BUTTON_LIKE) } +
++            UiElement("e1", "중복", NormRect(0.1f, 0.1f, 0.2f, 0.2f), 0.9f, ElementKind.TEXT) +
++            UiElement("bad", "깨진좌표", NormRect(0.5f, 0.5f, 0.2f, 0.2f), 0.9f, ElementKind.TEXT) +
++            UiElement("blank", "   ", NormRect(0.1f, 0.1f, 0.2f, 0.2f), 0.9f, ElementKind.TEXT)
++        val hist = (1..9).map { HistoryItem("s", ActionType.TAP, "t$it") }
++        val req = base.copy(utterance = "가".repeat(500), goal = "나".repeat(500), snapshot = base.snapshot.copy(elements = many), history = hist)
++        val out = Json.parse(DtoMapper.requestJson(req)) as Map<String, Any?>
++        assertEquals(200, (out["utterance"] as String).length)
++        assertEquals(200, (out["goal"] as String).length)
++        val els = (out["snapshot"] as Map<String, Any?>)["elements"] as List<Map<String, Any?>>
++        assertEquals(300, els.size)
++        assertTrue(els.all { (it["text"] as String).length <= 80 })
++        assertEquals(els.size, els.map { it["id"] }.toSet().size)
++        assertEquals(5, (out["history"] as List<*>).size)
++        assertEquals("t9", ((out["history"] as List<Map<String, Any?>>).last())["targetText"])
++    }
++
++    @Test fun `빈 말은 null로 보낸다`() {
++        val out = Json.parse(DtoMapper.requestJson(requestFrom("request_first.json").copy(utterance = "  ", goal = ""))) as Map<String, Any?>
++        assertNull(out["utterance"]); assertNull(out["goal"])
++    }
++
++    @Test fun `특수문자가 들어간 글자도 JSON으로 안전하다`() {
++        val base = requestFrom("request_first.json")
++        val el = UiElement("e1", "따옴표\"와 \\ 역슬래시\n줄바꿈", NormRect(0.1f, 0.1f, 0.3f, 0.2f), 0.9f, ElementKind.BUTTON_LIKE)
++        val out = Json.parse(DtoMapper.requestJson(base.copy(snapshot = base.snapshot.copy(elements = listOf(el))))) as Map<String, Any?>
++        val got = (((out["snapshot"] as Map<String, Any?>)["elements"] as List<Map<String, Any?>>)[0]["text"]) as String
++        assertEquals(el.text, got)
++    }
++
++    // ---------- Fake ----------
++
++    @Test fun `FakeGuideAgent 규칙`() = runBlocking {
++        val f = FakeGuideAgent()
++        val first = requestFrom("request_first.json")
++        val tap = f.next(first).getOrThrow().action as GuideAction.Tap
++        assertEquals("e4", tap.targetId)
++        assertTrue(f.next(first.copy(utterance = null, goal = null)).getOrThrow().action is GuideAction.AskUser)
++        val none = first.copy(snapshot = first.snapshot.copy(elements = emptyList()))
++        assertTrue(f.next(none).getOrThrow().action is GuideAction.Unknown)
++    }
++}
+diff --git a/app/README.md b/app/README.md
+index 6367a7c..da7ca4f 100644
+--- a/app/README.md
++++ b/app/README.md
+@@ -37,3 +37,21 @@
+ - [x] 1일차: 모듈 · 플레이버 뼈대
+ - [ ] 1일차: mock 플레이버 조립 (각 파트 Fake가 병합되면)
+ - [ ] 2일차: Compose 화면 · CameraX → FrameSink 연결 (P5 PoC 재사용) · DI
++
++## 구현 현황 (이 PR)
++
++- [x] `MainActivity`(큰 글씨 · 큰 버튼 · TalkBack 라이브 영역 · 화면 켜짐 유지 · 권한 거절 시 설정 열기) — **Compose 대신 일반 View**
++- [x] `camera/CameraController`(Preview + ImageAnalysis 4:3, 최신 한 장만 유지) · `ImageProxyFrame`
++- [x] `di/`: 플레이버별 `GraphFactory`(real: 실구현 / mock: 전부 Fake + 샘플 카페 화면 + "다음 화면" 버튼)
++- [x] 서버 주소 · 앱 키는 `local.properties`의 `kl.serverUrl` · `kl.appKey` → `BuildConfig` (저장소에 올라가지 않음)
++
++### 서버 연결
++
++```properties
++# local.properties (git에 안 올라감)
++sdk.dir=...
++kl.serverUrl=https://내-서버.example.com     # 개발 중에는 http://192.168.x.x:8000 도 가능(debug 빌드만)
++kl.appKey=서버의 APP_KEY 와 같은 값
++```
++
++서버를 무료로 돌리려면 `server/.env`에 `LLM_PROVIDER=gemini`, `GEMINI_API_KEY=...` (https://aistudio.google.com/apikey).
+diff --git a/app/build.gradle.kts b/app/build.gradle.kts
+index 8cbdcda..122b2e7 100644
+--- a/app/build.gradle.kts
++++ b/app/build.gradle.kts
+@@ -1,6 +1,18 @@
+ // 조립점 — 소유: P1. 로직 없이 어댑터를 골라 끼우기만 한다 (설계서 16.8).
++import java.util.Properties
++
+ plugins { alias(libs.plugins.android.application) }
+ 
++// 서버 주소 · 앱 키는 코드에 쓰지 않는다. 저장소 밖 파일(local.properties, git에 안 올라감)이나 ~/.gradle/gradle.properties 에 둔다:
++//   kl.serverUrl=https://내-서버.example.com
++//   kl.appKey=서버의 APP_KEY 와 같은 값
++// (LLM 키는 서버에만 있다. 앱에는 앱 키만 들어간다.)
++val localProps = Properties().apply {
++    val f = rootProject.file("local.properties")
++    if (f.exists()) f.inputStream().use { load(it) }
++}
++fun prop(name: String): String = (localProps.getProperty(name) ?: providers.gradleProperty(name).orNull ?: "").replace("\\", "\\\\").replace("\"", "\\\"")
++
+ android {
+     namespace = "kr.kiosklens.app"
+     compileSdk = 37
+@@ -11,16 +23,23 @@ android {
+         targetSdk = 37
+         versionCode = 1
+         versionName = "0.1"
++        buildConfigField("String", "SERVER_URL", "\"${prop("kl.serverUrl")}\"")
++        buildConfigField("String", "APP_KEY", "\"${prop("kl.appKey")}\"")
+     }
++    buildFeatures { buildConfig = true }
+ 
+     // real: 실구현 / mock: 모든 포트에 Fake 바인딩 (설계서 16.8)
+     flavorDimensions += "impl"
+     productFlavors {
+-        create("real") { dimension = "impl" }
++        create("real") {
++            dimension = "impl"
++            buildConfigField("boolean", "MOCK", "false")
++        }
+         create("mock") {
+             dimension = "impl"
+             applicationIdSuffix = ".mock"
+             versionNameSuffix = "-mock"
++            buildConfigField("boolean", "MOCK", "true")
+         }
+     }
+ 
+@@ -36,5 +55,11 @@ dependencies {
+     implementation(project(":voice"))
+     implementation(project(":agent"))
+     implementation(project(":overlay"))
++    implementation(libs.kotlinx.coroutines.android)
++    implementation(libs.androidx.appcompat)
++    implementation(libs.androidx.camera.core)
++    implementation(libs.androidx.camera.camera2)
++    implementation(libs.androidx.camera.lifecycle)
++    implementation(libs.androidx.camera.view)
+     testImplementation(libs.junit)
+ }
+diff --git a/app/src/debug/AndroidManifest.xml b/app/src/debug/AndroidManifest.xml
+new file mode 100644
+index 0000000..0c3054f
+--- /dev/null
++++ b/app/src/debug/AndroidManifest.xml
+@@ -0,0 +1,5 @@
++<?xml version="1.0" encoding="utf-8"?>
++<manifest xmlns:android="http://schemas.android.com/apk/res/android">
++    <!-- 개발 중 같은 와이파이의 노트북 서버(http://192.168.x.x:8000)에 붙을 수 있게. 릴리스 빌드는 https만. -->
++    <application android:usesCleartextTraffic="true" />
++</manifest>
+diff --git a/app/src/main/AndroidManifest.xml b/app/src/main/AndroidManifest.xml
+index 8be1f48..9c6cd65 100644
+--- a/app/src/main/AndroidManifest.xml
++++ b/app/src/main/AndroidManifest.xml
+@@ -1,11 +1,18 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <manifest xmlns:android="http://schemas.android.com/apk/res/android">
++
++    <uses-permission android:name="android.permission.CAMERA" />
++    <uses-feature android:name="android.hardware.camera" android:required="false" />
++
+     <application
++        android:allowBackup="false"
+         android:label="@string/app_name"
+-        android:supportsRtl="true">
++        android:supportsRtl="true"
++        android:theme="@style/Theme.KioskLens">
+         <activity
+             android:name=".MainActivity"
+-            android:exported="true">
++            android:exported="true"
++            android:screenOrientation="portrait">
+             <intent-filter>
+                 <action android:name="android.intent.action.MAIN" />
+                 <category android:name="android.intent.category.LAUNCHER" />
+diff --git a/app/src/main/kotlin/kr/kiosklens/app/MainActivity.kt b/app/src/main/kotlin/kr/kiosklens/app/MainActivity.kt
+index bcc1a41..cb76d27 100644
+--- a/app/src/main/kotlin/kr/kiosklens/app/MainActivity.kt
++++ b/app/src/main/kotlin/kr/kiosklens/app/MainActivity.kt
+@@ -1,13 +1,186 @@
+ package kr.kiosklens.app
+ 
+-import android.app.Activity
++import android.Manifest
++import android.content.Intent
++import android.content.pm.PackageManager
++import android.graphics.Color
++import android.graphics.Typeface
++import android.net.Uri
+ import android.os.Bundle
++import android.provider.Settings
++import android.util.TypedValue
++import android.view.Gravity
++import android.view.View
++import android.view.ViewGroup
++import android.view.WindowManager
++import android.widget.Button
++import android.widget.FrameLayout
++import android.widget.LinearLayout
+ import android.widget.TextView
++import androidx.appcompat.app.AppCompatActivity
++import androidx.camera.view.PreviewView
++import kotlinx.coroutines.CoroutineScope
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.SupervisorJob
++import kotlinx.coroutines.cancel
++import kotlinx.coroutines.launch
++import kr.kiosklens.app.camera.CameraController
++import kr.kiosklens.app.di.AndroidLogger
++import kr.kiosklens.app.di.Graph
++import kr.kiosklens.app.di.GraphFactory
++import kr.kiosklens.app.ui.MockScreenView
++import kr.kiosklens.app.ui.UiTexts
++import kr.kiosklens.domain.session.Phase
++import kr.kiosklens.overlay.ViewOverlay
++import kr.kiosklens.overlay.transform.StretchMapper
++
++/**
++ * 화면 하나짜리 앱: 카메라 미리보기 + 노란 테두리 + 큰 상태 문구 + "말하기" / "그만하기" 버튼.
++ * 로직은 없다. 조립은 [GraphFactory](플레이버별), 흐름은 :domain 의 SessionRunner.
++ * 본문 글자 20sp 이상, 핵심 버튼 72dp 이상 (설계서 10장).
++ */
++class MainActivity : AppCompatActivity() {
++    private val work = CoroutineScope(SupervisorJob() + Dispatchers.Default)
++    private val ui = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
++    private val logger = AndroidLogger()
++
++    private lateinit var overlay: ViewOverlay
++    private lateinit var status: TextView
++    private lateinit var note: TextView
++    private lateinit var startBtn: Button
++    private lateinit var stopBtn: Button
++    private lateinit var nextBtn: Button
++    private lateinit var settingsBtn: Button
++    private var preview: PreviewView? = null
++    private var mockView: MockScreenView? = null
++
++    private var graph: Graph? = null
++    private var camera: CameraController? = null
++    private var caption: String? = null
+ 
+-/** 1일차 자리 표시. 2일차에 Compose 화면(말하기 버튼 + 상태 문구 + 종료 버튼)으로 교체. */
+-class MainActivity : Activity() {
+     override fun onCreate(savedInstanceState: Bundle?) {
+         super.onCreate(savedInstanceState)
+-        setContentView(TextView(this).apply { text = getString(R.string.app_name) })
++        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)          // 안내 중 화면이 꺼지지 않게
++        setContentView(buildUi())
++        if (BuildConfig.MOCK) init() else ensurePermissions()
++    }
++
++    // ---------------- 권한 ----------------
++
++    private val needed = arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO)
++
++    private fun ensurePermissions() {
++        if (needed.all { checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED }) init()
++        else requestPermissions(needed, REQ)
++    }
++
++    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
++        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
++        if (requestCode != REQ) return
++        if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) init()
++        else {
++            status.text = getString(R.string.need_permission)
++            settingsBtn.visibility = View.VISIBLE
++            startBtn.isEnabled = false
++        }
++    }
++
++    // ---------------- 시작 ----------------
++
++    private fun init() {
++        if (graph != null) return
++        settingsBtn.visibility = View.GONE
++        val g = GraphFactory.create(this, work, overlay)
++        graph = g
++        g.setCaptionListener { text -> runOnUiThread { caption = text; render() } }
++
++        if (BuildConfig.MOCK) {
++            overlay.setMapper(StretchMapper())
++            nextBtn.visibility = View.VISIBLE
++        } else {
++            val p = preview!!
++            camera = CameraController(this, g.frameSink, logger) { w, h -> runOnUiThread { overlay.setAnalysisSize(w, h) } }.also { it.start(this, p) }
++            if (BuildConfig.SERVER_URL.isBlank()) { note.text = getString(R.string.need_server); note.visibility = View.VISIBLE }
++        }
++        g.runner.start()
++        ui.launch { g.runner.state.collect { s ->
++            if (s.phase == Phase.LISTENING) caption = null
++            mockView?.snapshot = s.snapshot; mockView?.postInvalidate()
++            render()
++        } }
++        render()
+     }
++
++    private fun render() {
++        val g = graph ?: return
++        val phase = g.runner.state.value.phase
++        status.text = UiTexts.status(phase, caption)
++        startBtn.isEnabled = UiTexts.canStart(phase)
++        stopBtn.visibility = if (UiTexts.canStop(phase)) View.VISIBLE else View.INVISIBLE
++    }
++
++    override fun onDestroy() {
++        camera?.stop(); graph?.close()
++        ui.cancel(); work.cancel()
++        super.onDestroy()
++    }
++
++    // ---------------- 화면 만들기 (XML 없이) ----------------
++
++    private fun dp(v: Int) = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v.toFloat(), resources.displayMetrics).toInt()
++
++    private fun buildUi(): View {
++        val root = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
++        val match = ViewGroup.LayoutParams.MATCH_PARENT
++
++        if (BuildConfig.MOCK) {
++            mockView = MockScreenView(this).also { root.addView(it, FrameLayout.LayoutParams(match, match)) }
++        } else {
++            preview = PreviewView(this).apply { scaleType = PreviewView.ScaleType.FILL_CENTER }.also { root.addView(it, FrameLayout.LayoutParams(match, match)) }
++        }
++        overlay = ViewOverlay(this).also { root.addView(it, FrameLayout.LayoutParams(match, match)) }
++
++        status = TextView(this).apply {
++            setTextSize(TypedValue.COMPLEX_UNIT_SP, 26f); setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD
++            gravity = Gravity.CENTER; setPadding(dp(16), dp(16), dp(16), dp(8))
++            accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE                  // TalkBack 이 상태 변화를 읽어 준다
++            text = ""
++        }
++        note = TextView(this).apply {
++            setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f); setTextColor(Color.rgb(255, 214, 0)); gravity = Gravity.CENTER
++            setPadding(dp(16), 0, dp(16), dp(8)); visibility = View.GONE
++        }
++        settingsBtn = bigButton(getString(R.string.open_settings), Color.WHITE, Color.BLACK, 72).apply {
++            visibility = View.GONE
++            setOnClickListener { startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))) }
++        }
++        nextBtn = bigButton(getString(R.string.next_screen), Color.DKGRAY, Color.WHITE, 72).apply {
++            visibility = View.GONE; setOnClickListener { graph?.debugNextScreen() }
++        }
++        startBtn = bigButton(getString(R.string.start), Color.rgb(255, 214, 0), Color.BLACK, 88).apply {
++            contentDescription = "말하기. 누르고 원하는 것을 말씀하세요"
++            setOnClickListener { graph?.runner?.pressStart() }
++        }
++        stopBtn = bigButton(getString(R.string.stop), Color.rgb(60, 60, 60), Color.WHITE, 88).apply {
++            visibility = View.INVISIBLE; setOnClickListener { graph?.runner?.pressStop() }
++        }
++        val row = LinearLayout(this).apply {
++            orientation = LinearLayout.HORIZONTAL; setPadding(dp(12), dp(4), dp(12), dp(16))
++            addView(stopBtn, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = dp(8) })
++            addView(startBtn, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 2f))
++        }
++        val panel = LinearLayout(this).apply {
++            orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.argb(230, 0, 0, 0))
++            addView(status); addView(note); addView(settingsBtn); addView(nextBtn); addView(row)
++        }
++        root.addView(panel, FrameLayout.LayoutParams(match, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM))
++        return root
++    }
++
++    private fun bigButton(label: String, bg: Int, fg: Int, heightDp: Int) = Button(this).apply {
++        text = label; setTextSize(TypedValue.COMPLEX_UNIT_SP, 28f); setTextColor(fg); typeface = Typeface.DEFAULT_BOLD
++        setBackgroundColor(bg); minHeight = dp(heightDp); minimumHeight = dp(heightDp); isAllCaps = false
++    }
++
++    private companion object { const val REQ = 100 }
+ }
+diff --git a/app/src/main/kotlin/kr/kiosklens/app/camera/CameraController.kt b/app/src/main/kotlin/kr/kiosklens/app/camera/CameraController.kt
+new file mode 100644
+index 0000000..344e800
+--- /dev/null
++++ b/app/src/main/kotlin/kr/kiosklens/app/camera/CameraController.kt
+@@ -0,0 +1,69 @@
++package kr.kiosklens.app.camera
++
++import android.content.Context
++import androidx.camera.core.AspectRatio
++import androidx.camera.core.CameraSelector
++import androidx.camera.core.ImageAnalysis
++import androidx.camera.core.Preview
++import androidx.camera.lifecycle.ProcessCameraProvider
++import androidx.camera.view.PreviewView
++import androidx.core.content.ContextCompat
++import androidx.lifecycle.LifecycleOwner
++import java.util.concurrent.Executors
++import java.util.concurrent.atomic.AtomicLong
++import kr.kiosklens.core.port.FrameSink
++import kr.kiosklens.core.port.Logger
++
++/**
++ * 후면 카메라 미리보기 + 분석 프레임을 [FrameSink]로 보낸다.
++ * - 미리보기와 분석은 같은 종횡비(4:3)를 써서 하이라이트 좌표가 어긋나지 않게 한다.
++ * - 분석은 "최신 한 장만 유지" 전략: 처리가 느리면 CameraX 가 알아서 건너뛴다.
++ * - 분석 프레임 크기(회전 보정 후)는 [onAnalysisSize] 로 알려 준다(오버레이 좌표 변환용).
++ */
++class CameraController(
++    private val context: Context,
++    private val sink: FrameSink,
++    private val logger: Logger,
++    private val onAnalysisSize: (width: Int, height: Int) -> Unit,
++) {
++    private val executor = Executors.newSingleThreadExecutor()
++    private val ids = AtomicLong()
++    private var provider: ProcessCameraProvider? = null
++    @Volatile private var reportedSize = ""
++
++    fun start(owner: LifecycleOwner, view: PreviewView) {
++        val future = ProcessCameraProvider.getInstance(context)
++        future.addListener({
++            try {
++                val p = future.get(); provider = p
++                val preview = Preview.Builder().setTargetAspectRatio(AspectRatio.RATIO_4_3).build().also { it.setSurfaceProvider(view.surfaceProvider) }
++                val analysis = ImageAnalysis.Builder()
++                    .setTargetAspectRatio(AspectRatio.RATIO_4_3)
++                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
++                    .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888)
++                    .build()
++                analysis.setAnalyzer(executor) { proxy ->
++                    try {
++                        val rot = proxy.imageInfo.rotationDegrees
++                        val w = if (rot == 90 || rot == 270) proxy.height else proxy.width
++                        val h = if (rot == 90 || rot == 270) proxy.width else proxy.height
++                        val key = "${w}x$h"
++                        if (key != reportedSize) { reportedSize = key; onAnalysisSize(w, h) }
++                        sink.submit(ImageProxyFrame(proxy, ids.incrementAndGet(), System.currentTimeMillis()))   // 닫는 책임은 sink
++                    } catch (t: Throwable) {
++                        proxy.close()
++                    }
++                }
++                p.unbindAll()
++                p.bindToLifecycle(owner, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
++            } catch (t: Throwable) {
++                logger.e("CameraController", "camera start failed", t)
++            }
++        }, ContextCompat.getMainExecutor(context))
++    }
++
++    fun stop() {
++        provider?.unbindAll()
++        executor.shutdown()
++    }
++}
+diff --git a/app/src/main/kotlin/kr/kiosklens/app/camera/ImageProxyFrame.kt b/app/src/main/kotlin/kr/kiosklens/app/camera/ImageProxyFrame.kt
+new file mode 100644
+index 0000000..880d1cf
+--- /dev/null
++++ b/app/src/main/kotlin/kr/kiosklens/app/camera/ImageProxyFrame.kt
+@@ -0,0 +1,19 @@
++package kr.kiosklens.app.camera
++
++import androidx.camera.core.ImageProxy
++import java.util.concurrent.atomic.AtomicBoolean
++import kr.kiosklens.core.model.CameraFrame
++
++/** CameraX 프레임을 계약의 [CameraFrame]으로 감싼다. close()는 여러 번 불러도 한 번만 반환한다. */
++class ImageProxyFrame(
++    private val proxy: ImageProxy,
++    override val frameId: Long,
++    override val timestampMs: Long,
++) : CameraFrame {
++    private val closed = AtomicBoolean(false)
++    override val rotationDegrees: Int = proxy.imageInfo.rotationDegrees
++    override val width: Int = proxy.width
++    override val height: Int = proxy.height
++    override val image: Any = proxy
++    override fun close() { if (closed.compareAndSet(false, true)) proxy.close() }
++}
+diff --git a/app/src/main/kotlin/kr/kiosklens/app/di/AndroidLogger.kt b/app/src/main/kotlin/kr/kiosklens/app/di/AndroidLogger.kt
+new file mode 100644
+index 0000000..4a6d880
+--- /dev/null
++++ b/app/src/main/kotlin/kr/kiosklens/app/di/AndroidLogger.kt
+@@ -0,0 +1,11 @@
++package kr.kiosklens.app.di
++
++import android.util.Log
++import kr.kiosklens.core.port.Logger
++
++/** 발화 · 화면 글자 원문은 호출하는 쪽에서 넘기지 않는다(계약). 성능 구간은 tag = "KL_PERF". */
++class AndroidLogger : Logger {
++    override fun d(tag: String, message: String) { Log.d(tag, message) }
++    override fun w(tag: String, message: String, error: Throwable?) { Log.w(tag, message, error) }
++    override fun e(tag: String, message: String, error: Throwable?) { Log.e(tag, message, error) }
++}
+diff --git a/app/src/main/kotlin/kr/kiosklens/app/di/CaptionSpeechOutput.kt b/app/src/main/kotlin/kr/kiosklens/app/di/CaptionSpeechOutput.kt
+new file mode 100644
+index 0000000..780c1c9
+--- /dev/null
++++ b/app/src/main/kotlin/kr/kiosklens/app/di/CaptionSpeechOutput.kt
+@@ -0,0 +1,9 @@
++package kr.kiosklens.app.di
++
++import kr.kiosklens.core.port.SpeechOutput
++
++/** 읽어 주는 문장을 화면에도 크게 보여 주기 위해 SpeechOutput 을 감싼다(소리가 안 들리는 곳에서도 읽을 수 있게). */
++class CaptionSpeechOutput(private val inner: SpeechOutput, private val onCaption: (String) -> Unit) : SpeechOutput {
++    override suspend fun speak(text: String, interrupt: Boolean) { onCaption(text); inner.speak(text, interrupt) }
++    override fun stop() = inner.stop()
++}
+diff --git a/app/src/main/kotlin/kr/kiosklens/app/di/Graph.kt b/app/src/main/kotlin/kr/kiosklens/app/di/Graph.kt
+new file mode 100644
+index 0000000..f2372d7
+--- /dev/null
++++ b/app/src/main/kotlin/kr/kiosklens/app/di/Graph.kt
+@@ -0,0 +1,16 @@
++package kr.kiosklens.app.di
++
++import kr.kiosklens.core.port.FrameSink
++import kr.kiosklens.domain.runner.SessionRunner
++
++/** 조립 결과. 플레이버(real / mock)마다 [GraphFactory]가 다르게 만든다. 여기에는 로직이 없다. */
++interface Graph {
++    val runner: SessionRunner
++    /** 카메라 프레임을 받는 쪽 */
++    val frameSink: FrameSink
++    /** 마지막으로 읽어 준 안내 문장을 화면에 보여 주기 위한 알림 */
++    fun setCaptionListener(listener: (String) -> Unit)
++    /** mock 에서만 의미 있음: 다음 샘플 화면으로 */
++    fun debugNextScreen() {}
++    fun close()
++}
+diff --git a/app/src/main/kotlin/kr/kiosklens/app/ui/MockScreenView.kt b/app/src/main/kotlin/kr/kiosklens/app/ui/MockScreenView.kt
+new file mode 100644
+index 0000000..2b0dc0e
+--- /dev/null
++++ b/app/src/main/kotlin/kr/kiosklens/app/ui/MockScreenView.kt
+@@ -0,0 +1,29 @@
++package kr.kiosklens.app.ui
++
++import android.content.Context
++import android.graphics.Canvas
++import android.graphics.Color
++import android.graphics.Paint
++import android.view.View
++import kr.kiosklens.core.model.ElementKind
++import kr.kiosklens.core.model.ScreenSnapshot
++
++/** mock 플레이버 전용: 카메라 대신 가짜 키오스크 화면(글자 상자들)을 그린다. 하이라이트가 어디에 뜨는지 볼 수 있다. */
++class MockScreenView(context: Context) : View(context) {
++    @Volatile var snapshot: ScreenSnapshot? = null
++    private val box = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; color = Color.GRAY; strokeWidth = 3f }
++    private val text = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; textSize = 44f }
++
++    init { setBackgroundColor(Color.rgb(30, 30, 40)) }
++
++    override fun onDraw(canvas: Canvas) {
++        val s = snapshot ?: return
++        for (e in s.elements) {
++            val r = e.rect
++            val l = r.left * width; val t = r.top * height
++            box.color = if (e.kind == ElementKind.BUTTON_LIKE) Color.rgb(120, 170, 255) else Color.GRAY
++            canvas.drawRect(l, t, r.right * width, r.bottom * height, box)
++            canvas.drawText(e.text, l + 12f, t + (r.bottom - r.top) * height / 2f + 14f, text)
++        }
++    }
++}
+diff --git a/app/src/main/kotlin/kr/kiosklens/app/ui/UiTexts.kt b/app/src/main/kotlin/kr/kiosklens/app/ui/UiTexts.kt
+new file mode 100644
+index 0000000..b496ca3
+--- /dev/null
++++ b/app/src/main/kotlin/kr/kiosklens/app/ui/UiTexts.kt
+@@ -0,0 +1,32 @@
++package kr.kiosklens.app.ui
++
++import kr.kiosklens.domain.session.Phase
++
++/**
++ * 화면에 크게 보여 주는 상태 문구 (쉬운 존댓말, 비난 · 전문용어 금지).
++ * 읽어 주는 안내 문장은 :domain 의 GuideTextComposer 가 만들고, 여기는 "지금 무슨 상태인지" 한 줄만 정한다.
++ */
++object UiTexts {
++    /** @param caption 방금 읽어 준(읽고 있는) 안내 문장. 있으면 그것을 그대로 보여 준다(소리가 안 들려도 읽을 수 있게). */
++    fun status(phase: Phase, caption: String?): String {
++        val base = when (phase) {
++            Phase.IDLE -> "아래 '말하기' 버튼을 누르고\n원하는 것을 말씀해 주세요"
++            Phase.LISTENING -> "듣고 있어요…\n천천히 말씀해 주세요"
++            Phase.PLANNING -> "찾고 있어요…"
++            Phase.SCANNING -> "키오스크 화면을 찾고 있어요…"
++            Phase.GUIDING, Phase.WAIT_CHANGE -> "노란 테두리를 눌러 주세요"
++            Phase.ASKING -> "질문에 답해 주세요"
++            Phase.DONE -> "다 됐어요. 잘 하셨어요!"
++            Phase.LOST -> "키오스크 화면이 잘 보이게\n비춰 주세요"
++            Phase.ERROR -> "잠시 문제가 생겼어요"
++        }
++        val c = caption?.trim().orEmpty()
++        return if (c.isNotEmpty() && phase != Phase.IDLE && phase != Phase.LISTENING && phase != Phase.PLANNING) c else base
++    }
++
++    /** "말하기" 버튼을 누를 수 있는 단계 (진행 중에는 무시된다) */
++    fun canStart(phase: Phase) = phase == Phase.IDLE
++
++    /** "그만하기" 버튼은 진행 중에만 보인다 */
++    fun canStop(phase: Phase) = phase != Phase.IDLE
++}
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index c890bfb..dd076a4 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -1,3 +1,10 @@
++<?xml version="1.0" encoding="utf-8"?>
+ <resources>
+     <string name="app_name">키오스크 렌즈</string>
++    <string name="start">말하기</string>
++    <string name="stop">그만하기</string>
++    <string name="next_screen">다음 화면 (모의)</string>
++    <string name="open_settings">설정 열기</string>
++    <string name="need_permission">카메라와 마이크를 쓸 수 있게 허용해 주세요.</string>
++    <string name="need_server">서버 주소가 설정되지 않았어요. README의 \'서버 연결\'을 따라 설정해 주세요.</string>
+ </resources>
+diff --git a/app/src/main/res/values/themes.xml b/app/src/main/res/values/themes.xml
+new file mode 100644
+index 0000000..2804791
+--- /dev/null
++++ b/app/src/main/res/values/themes.xml
+@@ -0,0 +1,8 @@
++<?xml version="1.0" encoding="utf-8"?>
++<resources>
++    <style name="Theme.KioskLens" parent="Theme.AppCompat.NoActionBar">
++        <item name="android:windowBackground">@android:color/black</item>
++        <item name="android:statusBarColor">@android:color/black</item>
++        <item name="android:navigationBarColor">@android:color/black</item>
++    </style>
++</resources>
+diff --git a/app/src/mock/kotlin/kr/kiosklens/app/di/GraphFactory.kt b/app/src/mock/kotlin/kr/kiosklens/app/di/GraphFactory.kt
+new file mode 100644
+index 0000000..6fdac79
+--- /dev/null
++++ b/app/src/mock/kotlin/kr/kiosklens/app/di/GraphFactory.kt
+@@ -0,0 +1,36 @@
++package kr.kiosklens.app.di
++
++import android.content.Context
++import kotlinx.coroutines.CoroutineScope
++import kr.kiosklens.agent.FakeGuideAgent
++import kr.kiosklens.core.port.Clock
++import kr.kiosklens.core.port.FrameSink
++import kr.kiosklens.domain.runner.SessionRunner
++import kr.kiosklens.domain.session.SessionStateMachine
++import kr.kiosklens.overlay.ViewOverlay
++import kr.kiosklens.vision.fake.FakeScreenAnalyzer
++import kr.kiosklens.vision.fake.SampleScreens
++import kr.kiosklens.voice.fake.FakeSpeechInput
++import kr.kiosklens.voice.fake.FakeSpeechOutput
++
++/** mock 플레이버: 모든 포트에 Fake. 카메라 · 마이크 · 서버 없이 전체 흐름(상태머신 → 안내 → 하이라이트)을 본다. */
++object GraphFactory {
++    fun create(context: Context, scope: CoroutineScope, overlay: ViewOverlay): Graph {
++        val logger = AndroidLogger()
++        val screens = FakeScreenAnalyzer(SampleScreens.cafe)
++        val said = listOf("아메리카노 주세요", "HOT", "결제할게요")
++        val speechIn = FakeSpeechInput(said + said + said, delayMs = 800)
++        var caption: (String) -> Unit = {}
++        val speechOut = CaptionSpeechOutput(FakeSpeechOutput(readMs = 1500)) { caption(it) }
++        val runner = SessionRunner(scope, SessionStateMachine(), screens, speechIn, speechOut, FakeGuideAgent(), overlay,
++            Clock { System.currentTimeMillis() }, logger)
++        screens.show(1)                                                 // 메뉴 화면에서 시작
++        return object : Graph {
++            override val runner = runner
++            override val frameSink: FrameSink = screens
++            override fun setCaptionListener(listener: (String) -> Unit) { caption = listener }
++            override fun debugNextScreen() = screens.next()
++            override fun close() = runner.close()
++        }
++    }
++}
+diff --git a/app/src/real/kotlin/kr/kiosklens/app/di/GraphFactory.kt b/app/src/real/kotlin/kr/kiosklens/app/di/GraphFactory.kt
+new file mode 100644
+index 0000000..3458ebc
+--- /dev/null
++++ b/app/src/real/kotlin/kr/kiosklens/app/di/GraphFactory.kt
+@@ -0,0 +1,44 @@
++package kr.kiosklens.app.di
++
++import android.content.Context
++import kotlinx.coroutines.CoroutineScope
++import kr.kiosklens.agent.AgentConfig
++import kr.kiosklens.agent.RemoteGuideAgent
++import kr.kiosklens.app.BuildConfig
++import kr.kiosklens.core.port.Clock
++import kr.kiosklens.core.port.FrameSink
++import kr.kiosklens.domain.runner.SessionRunner
++import kr.kiosklens.domain.session.SessionStateMachine
++import kr.kiosklens.overlay.ViewOverlay
++import kr.kiosklens.vision.VisionScreenAnalyzer
++import kr.kiosklens.vision.ocr.MlKitOcrEngine
++import kr.kiosklens.vision.pipeline.ImageProxyThumbnail
++import kr.kiosklens.voice.EchoGuard
++import kr.kiosklens.voice.stt.AndroidSpeechInput
++import kr.kiosklens.voice.tts.AndroidSpeechOutput
++
++/** real 플레이버: 포트마다 실구현을 끼운다. (로직 없음 — 끼우기만) */
++object GraphFactory {
++    fun create(context: Context, scope: CoroutineScope, overlay: ViewOverlay): Graph {
++        val app = context.applicationContext
++        val logger = AndroidLogger()
++        val clock = Clock { System.currentTimeMillis() }
++        val echo = EchoGuard()
++
++        val ocr = MlKitOcrEngine()
++        val vision = VisionScreenAnalyzer(scope, ocr, clock, logger, thumbnailer = ImageProxyThumbnail::of)
++        val tts = AndroidSpeechOutput(app, echo, logger)
++        var caption: (String) -> Unit = {}
++        val speechOut = CaptionSpeechOutput(tts) { caption(it) }
++        val speechIn = AndroidSpeechInput(app, echo, logger)
++        val agent = RemoteGuideAgent(AgentConfig(BuildConfig.SERVER_URL, BuildConfig.APP_KEY), logger)
++
++        val runner = SessionRunner(scope, SessionStateMachine(), vision, speechIn, speechOut, agent, overlay, clock, logger)
++        return object : Graph {
++            override val runner = runner
++            override val frameSink: FrameSink = vision
++            override fun setCaptionListener(listener: (String) -> Unit) { caption = listener }
++            override fun close() { runner.close(); tts.shutdown(); ocr.close() }
++        }
++    }
++}
+diff --git a/app/src/test/kotlin/kr/kiosklens/app/UiTextsTest.kt b/app/src/test/kotlin/kr/kiosklens/app/UiTextsTest.kt
+new file mode 100644
+index 0000000..bcee73c
+--- /dev/null
++++ b/app/src/test/kotlin/kr/kiosklens/app/UiTextsTest.kt
+@@ -0,0 +1,34 @@
++package kr.kiosklens.app
++
++import kr.kiosklens.app.ui.UiTexts
++import kr.kiosklens.domain.session.Phase
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++class UiTextsTest {
++    @Test fun `모든 단계에 문구가 있고 비어 있지 않다`() {
++        for (p in Phase.values()) assertTrue(p.name, UiTexts.status(p, null).isNotBlank())
++    }
++
++    @Test fun `안내 문장이 있으면 그대로 크게 보여 준다`() {
++        assertEquals("화면 왼쪽 위 깜빡이는 아메리카노 버튼을 누르세요", UiTexts.status(Phase.GUIDING, "화면 왼쪽 위 깜빡이는 아메리카노 버튼을 누르세요"))
++        assertEquals("질문입니다", UiTexts.status(Phase.ASKING, " 질문입니다 "))
++    }
++
++    @Test fun `듣는 중에는 이전 안내가 남아 있지 않다`() {
++        assertEquals(UiTexts.status(Phase.LISTENING, null), UiTexts.status(Phase.LISTENING, "지난 안내"))
++        assertEquals(UiTexts.status(Phase.IDLE, null), UiTexts.status(Phase.IDLE, "지난 안내"))
++    }
++
++    @Test fun `말하기는 대기 중에만 그만하기는 진행 중에만`() {
++        assertTrue(UiTexts.canStart(Phase.IDLE)); assertFalse(UiTexts.canStop(Phase.IDLE))
++        for (p in Phase.values().filter { it != Phase.IDLE }) { assertFalse(UiTexts.canStart(p)); assertTrue(UiTexts.canStop(p)) }
++    }
++
++    @Test fun `문구에 비난이나 전문용어가 없다`() {
++        val banned = listOf("실패", "오류", "에러", "잘못", "OCR", "서버", "STT", "TTS")
++        for (p in Phase.values()) { val t = UiTexts.status(p, null); assertTrue("$p: $t", banned.none { t.contains(it) }) }
++    }
++}
+diff --git a/docs/decisions.md b/docs/decisions.md
+index 804ce0c..fe508b7 100644
+--- a/docs/decisions.md
++++ b/docs/decisions.md
+@@ -87,6 +87,17 @@
+ 
+ ---
+ 
++## 5. 어댑터 구현 PR (1~2일차 분량을 한 번에)
++
++| # | 항목 | 결정 |
++|---|---|---|
++| T1 | UI · 오버레이 | **Compose 대신 일반 View**. 이유: Compose 컴파일러 플러그인을 버전 카탈로그에 더하지 않아도 되고, 화면이 하나뿐이라 효과가 작다. 포트 계약은 그대로. 나중에 Compose로 바꿔도 `:domain` · 포트는 안 바뀐다 |
++| T2 | `:agent` JSON | `kotlinx.serialization` 대신 **직접 만든 작은 JSON**(`remote/Json.kt`). 외부 의존 0, 계약 필드가 적음. `DtoMapper`만 바꾸면 교체 가능 |
++| T3 | HTTP | `HttpURLConnection`. 6초 · 1회 재시도 · 400/401은 재시도 안 함 · 429는 Retry-After. (스트리밍 모드는 쓰지 않음: 401 본문이 사라지는 문제를 테스트에서 확인) |
++| T4 | LLM | 서버에 **Gemini 제공자 추가**(무료 한도). 기본은 그대로 anthropic. 평가 스크립트로 두 모델의 정확도를 비교한 뒤 정할 것 |
++| T5 | 서버 주소 · 앱 키 | `local.properties` → `BuildConfig`. 저장소에 비밀 값 없음. LLM 키는 서버에만 |
++| T6 | 화면 전환 | `ScreenDiffer`: Jaccard 0.6 · 연속 2프레임 · 요소 3개 미만 제외. 처음 화면은 stableFrames 2부터 시작 |
++
+ ## 변경 이력
+ 
+ | 날짜 | 내용 |
+@@ -94,3 +105,4 @@
+ | 2026-11-09 | 멀티모듈 스켈레톤 · `:core-model` 초안 (PR #1, 병합) |
+ | 2026-11-09 | 계약 v1 확정안 · 서버 정렬 · 팀 README (PR #2, 병합) |
+ | 2026-11-09 | 상태머신 · 위치 문구 · 안내 문장 (`feat/p1-state-machine`) |
++| 2026-11-09 | 어댑터 구현: SessionRunner · :agent · :vision · :voice · :overlay · :app · 서버 Gemini (`feat/impl-adapters`) |
+diff --git a/domain/README.md b/domain/README.md
+index f714128..c645ee5 100644
+--- a/domain/README.md
++++ b/domain/README.md
+@@ -64,3 +64,7 @@
+ ```bash
+ ./gradlew :domain:test
+ ```
++
++## 구현 현황 (이 PR)
++
++- [x] `runner/SessionRunner`: 이벤트를 한 줄로 모아 한 번에 하나씩 `reduce` · 효과를 포트 호출로 실행 · 포트 예외는 이벤트로 변환 · 종료 시 정리. 테스트 9개(가짜 포트 + 실제 코루틴).
+diff --git a/domain/src/main/kotlin/kr/kiosklens/domain/runner/SessionRunner.kt b/domain/src/main/kotlin/kr/kiosklens/domain/runner/SessionRunner.kt
+new file mode 100644
+index 0000000..6d4cd2b
+--- /dev/null
++++ b/domain/src/main/kotlin/kr/kiosklens/domain/runner/SessionRunner.kt
+@@ -0,0 +1,193 @@
++package kr.kiosklens.domain.runner
++
++import java.util.UUID
++import kotlinx.coroutines.CancellationException
++import kotlinx.coroutines.CoroutineScope
++import kotlinx.coroutines.Job
++import kotlinx.coroutines.channels.Channel
++import kotlinx.coroutines.delay
++import kotlinx.coroutines.flow.MutableStateFlow
++import kotlinx.coroutines.flow.StateFlow
++import kotlinx.coroutines.flow.asStateFlow
++import kotlinx.coroutines.launch
++import kr.kiosklens.core.model.SttError
++import kr.kiosklens.core.model.SttEvent
++import kr.kiosklens.core.port.Clock
++import kr.kiosklens.core.port.GuideAgent
++import kr.kiosklens.core.port.HighlightSurface
++import kr.kiosklens.core.port.Logger
++import kr.kiosklens.core.port.SnapshotSource
++import kr.kiosklens.core.port.SpeechInput
++import kr.kiosklens.core.port.SpeechOutput
++import kr.kiosklens.domain.session.SessionEffect
++import kr.kiosklens.domain.session.SessionEvent
++import kr.kiosklens.domain.session.SessionState
++import kr.kiosklens.domain.session.SessionStateMachine
++
++/**
++ * 상태머신이 내린 할 일([SessionEffect])을 포트 호출로 실행하고, 결과를 이벤트로 돌려 넣는다.
++ * 서버 호출([GuideAgent.next])은 이 클래스에서만 한다.
++ *
++ * 규칙
++ * - 이벤트는 한 줄(Channel)로 모아서 **한 번에 하나씩, 들어온 순서대로** reduce 한다.
++ * - 포트가 던진 예외는 여기서 잡아 이벤트(실패)로 바꾼다. 앱이 죽지 않는다.
++ * - 로그에는 개수·시간·종류만 남긴다. 발화·화면 글자 원문은 남기지 않는다.
++ */
++class SessionRunner(
++    private val scope: CoroutineScope,
++    private val machine: SessionStateMachine,
++    private val snapshots: SnapshotSource,
++    private val speechIn: SpeechInput,
++    private val speechOut: SpeechOutput,
++    private val agent: GuideAgent,
++    private val highlight: HighlightSurface,
++    private val clock: Clock,
++    private val logger: Logger,
++    private val newSessionId: () -> String = { UUID.randomUUID().toString() },
++) {
++    private val events = Channel<SessionEvent>(Channel.UNLIMITED)
++    private val _state = MutableStateFlow(SessionState())
++    val state: StateFlow<SessionState> = _state.asStateFlow()
++
++    private var listenJob: Job? = null
++    private var speakJob: Job? = null
++    private var planJob: Job? = null
++    private var timerJob: Job? = null
++    private var loopJob: Job? = null
++    private val sources = mutableListOf<Job>()
++
++    /** 이벤트 처리와 화면 수신을 시작한다. 한 번만 부른다. */
++    fun start() {
++        if (loopJob != null) return
++        loopJob = scope.launch { for (e in events) handle(e) }
++        sources += scope.launch { guarded("snapshots") { snapshots.snapshots.collect { send(SessionEvent.SnapshotReceived(it)) } } }
++        sources += scope.launch { guarded("screenChanges") { snapshots.screenChanges.collect { send(SessionEvent.ScreenChanged(it)) } } }
++    }
++
++    fun pressStart() = send(SessionEvent.StartPressed(newSessionId()))
++    fun pressStop() = send(SessionEvent.StopPressed)
++
++    fun send(event: SessionEvent) {
++        events.trySend(event)
++    }
++
++    /** 앱 종료 시. 진행 중인 일을 모두 멈춘다. */
++    fun close() {
++        listOf(listenJob, speakJob, planJob, timerJob, loopJob).forEach { it?.cancel() }
++        sources.forEach { it.cancel() }
++        events.close()
++        runCatching { speechIn.stop() }
++        runCatching { speechOut.stop() }
++        runCatching { highlight.setTarget(null) }
++    }
++
++    private fun handle(event: SessionEvent) {
++        val before = _state.value
++        val t = machine.reduce(before, event)
++        _state.value = t.next
++        if (before.phase != t.next.phase) logger.d(TAG, "phase ${before.phase} -> ${t.next.phase} (${event::class.simpleName})")
++        for (effect in t.effects) {
++            try {
++                execute(effect)
++            } catch (e: CancellationException) {
++                throw e
++            } catch (e: Exception) {
++                logger.e(TAG, "effect failed: ${effect::class.simpleName}", e)
++            }
++        }
++    }
++
++    private fun execute(effect: SessionEffect) {
++        when (effect) {
++            is SessionEffect.StartListening -> {
++                listenJob?.cancel()
++                listenJob = scope.launch { listen(effect.ticket) }
++            }
++            SessionEffect.StopListening -> {
++                listenJob?.cancel(); listenJob = null
++                runCatching { speechIn.stop() }
++            }
++            is SessionEffect.Speak -> {
++                speakJob?.cancel()
++                speakJob = scope.launch { speak(effect.text, effect.ticket) }
++            }
++            SessionEffect.StopSpeaking -> {
++                speakJob?.cancel(); speakJob = null
++                runCatching { speechOut.stop() }
++            }
++            is SessionEffect.RequestGuide -> {
++                planJob?.cancel()
++                planJob = scope.launch { plan(effect) }
++            }
++            is SessionEffect.Highlight -> highlight.setTarget(effect.target)
++            SessionEffect.ClearHighlight -> highlight.setTarget(null)
++            is SessionEffect.StartTimer -> {
++                timerJob?.cancel()
++                timerJob = scope.launch { delay(effect.delayMs); send(SessionEvent.TimedOut(effect.ticket)) }
++            }
++            SessionEffect.CancelPending -> {
++                timerJob?.cancel(); timerJob = null
++                planJob?.cancel(); planJob = null
++            }
++        }
++    }
++
++    private suspend fun listen(ticket: Int) {
++        var done = false
++        try {
++            speechIn.start().collect { ev ->
++                if (done) return@collect
++                when (ev) {
++                    is SttEvent.Partial -> Unit
++                    is SttEvent.Final -> { done = true; send(SessionEvent.SpeechRecognized(ticket, ev.text)) }
++                    is SttEvent.Error -> { done = true; send(SessionEvent.SpeechFailed(ticket, ev.code)) }
++                }
++            }
++            if (!done) send(SessionEvent.SpeechFailed(ticket, SttError.NO_SPEECH))     // 계약 위반 방어: 결과 없이 끝남
++        } catch (e: CancellationException) {
++            throw e
++        } catch (e: Exception) {
++            logger.e(TAG, "listen failed", e)
++            if (!done) send(SessionEvent.SpeechFailed(ticket, SttError.BUSY))
++        }
++    }
++
++    private suspend fun speak(text: String, ticket: Int) {
++        try {
++            speechOut.speak(text, interrupt = true)
++        } catch (e: CancellationException) {
++            throw e                                                            // 취소되면 SpeechFinished를 보내지 않는다
++        } catch (e: Exception) {
++            logger.e(TAG, "speak failed", e)                                   // 소리가 안 나도 흐름은 이어 간다
++        }
++        send(SessionEvent.SpeechFinished(ticket))
++    }
++
++    private suspend fun plan(effect: SessionEffect.RequestGuide) {
++        val t0 = clock.nowMs()
++        val result = try {
++            agent.next(effect.request)
++        } catch (e: CancellationException) {
++            throw e
++        } catch (e: Exception) {
++            Result.failure(e)                                                  // 계약 위반 방어: 예외 대신 failure여야 함
++        }
++        logger.d("KL_PERF", "guide_request ms=${clock.nowMs() - t0} ok=${result.isSuccess}")
++        result.fold(
++            onSuccess = { send(SessionEvent.GuideReceived(effect.ticket, it)) },
++            onFailure = { send(SessionEvent.GuideFailed(effect.ticket)) },
++        )
++    }
++
++    private suspend fun guarded(name: String, block: suspend () -> Unit) {
++        try {
++            block()
++        } catch (e: CancellationException) {
++            throw e
++        } catch (e: Exception) {
++            logger.e(TAG, "$name collect failed", e)
++        }
++    }
++
++    private companion object { const val TAG = "SessionRunner" }
++}
+diff --git a/domain/src/test/kotlin/kr/kiosklens/domain/runner/SessionRunnerTest.kt b/domain/src/test/kotlin/kr/kiosklens/domain/runner/SessionRunnerTest.kt
+new file mode 100644
+index 0000000..b0de28f
+--- /dev/null
++++ b/domain/src/test/kotlin/kr/kiosklens/domain/runner/SessionRunnerTest.kt
+@@ -0,0 +1,190 @@
++package kr.kiosklens.domain.runner
++
++import java.util.concurrent.CopyOnWriteArrayList
++import kotlinx.coroutines.CompletableDeferred
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.SupervisorJob
++import kotlinx.coroutines.CoroutineScope
++import kotlinx.coroutines.cancel
++import kotlinx.coroutines.delay
++import kotlinx.coroutines.flow.Flow
++import kotlinx.coroutines.flow.MutableSharedFlow
++import kotlinx.coroutines.flow.flow
++import kotlinx.coroutines.runBlocking
++import kotlinx.coroutines.withTimeout
++import kr.kiosklens.core.model.GuideAction
++import kr.kiosklens.core.model.GuideRequest
++import kr.kiosklens.core.model.GuideResponse
++import kr.kiosklens.core.model.HighlightTarget
++import kr.kiosklens.core.model.ScreenSnapshot
++import kr.kiosklens.core.model.SttEvent
++import kr.kiosklens.core.port.Clock
++import kr.kiosklens.core.port.GuideAgent
++import kr.kiosklens.core.port.HighlightSurface
++import kr.kiosklens.core.port.Logger
++import kr.kiosklens.core.port.SnapshotSource
++import kr.kiosklens.core.port.SpeechInput
++import kr.kiosklens.core.port.SpeechOutput
++import kr.kiosklens.domain.policy.TimeoutPolicy
++import kr.kiosklens.domain.session.Phase
++import kr.kiosklens.domain.session.Screens
++import kr.kiosklens.domain.session.SessionStateMachine
++import org.junit.After
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Before
++import org.junit.Test
++
++class SessionRunnerTest {
++    private class Src : SnapshotSource {
++        val snaps = MutableSharedFlow<ScreenSnapshot>(replay = 1)
++        val changes = MutableSharedFlow<String>(extraBufferCapacity = 8)
++        override val snapshots: Flow<ScreenSnapshot> = snaps
++        override val screenChanges: Flow<String> = changes
++    }
++
++    private class Ear(var script: () -> Flow<SttEvent>) : SpeechInput {
++        var stops = 0
++        override fun start(): Flow<SttEvent> = script()
++        override fun stop() { stops++ }
++    }
++
++    private class Mouth(val readMs: Long = 5) : SpeechOutput {
++        val said = CopyOnWriteArrayList<String>()
++        var stops = 0
++        override suspend fun speak(text: String, interrupt: Boolean) { said += text; delay(readMs) }
++        override fun stop() { stops++ }
++    }
++
++    private class Brain(var answer: (GuideRequest) -> Result<GuideResponse>) : GuideAgent {
++        val requests = CopyOnWriteArrayList<GuideRequest>()
++        override suspend fun next(request: GuideRequest): Result<GuideResponse> { requests += request; return answer(request) }
++    }
++
++    private class Hand : HighlightSurface {
++        val targets = CopyOnWriteArrayList<HighlightTarget?>()
++        override fun setTarget(target: HighlightTarget?) { targets += target }
++    }
++
++    private val quiet = object : Logger {
++        override fun d(tag: String, message: String) {}
++        override fun w(tag: String, message: String, error: Throwable?) {}
++        override fun e(tag: String, message: String, error: Throwable?) {}
++    }
++
++    private lateinit var scope: CoroutineScope
++    private val src = Src()
++    private val ear = Ear { flow { emit(SttEvent.Partial("따뜻")); emit(SttEvent.Final("아메리카노 주세요")) } }
++    private val mouth = Mouth()
++    private val hand = Hand()
++    private val brain = Brain { r ->
++        val e = r.snapshot.elements.first { it.text == "아메리카노" }
++        Result.success(GuideResponse("아메리카노 주세요", GuideAction.Tap(e.id, e.text)))
++    }
++
++    @Before fun setUp() { scope = CoroutineScope(SupervisorJob() + Dispatchers.Default) }
++    @After fun tearDown() { scope.cancel() }
++
++    private fun runner(t: TimeoutPolicy = TimeoutPolicy()) =
++        SessionRunner(scope, SessionStateMachine(t), src, ear, mouth, brain, hand, Clock { System.currentTimeMillis() }, quiet, newSessionId = { "sid-1" })
++
++    private fun waitUntil(ms: Long = 3000, cond: () -> Boolean) = runBlocking {
++        withTimeout(ms) { while (!cond()) delay(5) }
++    }
++
++    @Test fun `말하면 서버에 묻고 하이라이트와 안내를 실행한다`() {
++        val r = runner(); r.start()
++        src.snaps.tryEmit(Screens.menu)
++        waitUntil { r.state.value.snapshot != null }
++        r.pressStart()
++        waitUntil { r.state.value.phase == Phase.WAIT_CHANGE }
++        assertEquals("아메리카노 주세요", brain.requests.single().utterance)
++        assertEquals("sid-1", brain.requests.single().sessionId)
++        assertEquals("e4", hand.targets.filterNotNull().first().elementId)
++        assertTrue(mouth.said.single().contains("아메리카노 버튼을 누르세요"))
++    }
++
++    @Test fun `화면이 바뀌면 같은 목표로 다시 묻는다`() {
++        val r = runner(); r.start()
++        src.snaps.tryEmit(Screens.menu)
++        waitUntil { r.state.value.snapshot != null }
++        r.pressStart()
++        waitUntil { r.state.value.phase == Phase.WAIT_CHANGE }
++        brain.answer = { Result.success(GuideResponse(it.goal ?: "", GuideAction.Tap("e2", "HOT"))) }
++        src.snaps.tryEmit(Screens.options)
++        waitUntil { brain.requests.size == 2 && r.state.value.phase == Phase.WAIT_CHANGE }
++        val second = brain.requests[1]
++        assertNull(second.utterance)
++        assertEquals("아메리카노 주세요", second.goal)
++        assertEquals(1, second.history.size)
++    }
++
++    @Test fun `서버 실패는 오류 안내로 끝난다`() {
++        brain.answer = { Result.failure(RuntimeException("x")) }
++        val r = runner(); r.start()
++        src.snaps.tryEmit(Screens.menu)
++        waitUntil { r.state.value.snapshot != null }
++        r.pressStart()
++        waitUntil { r.state.value.phase == Phase.IDLE && mouth.said.isNotEmpty() }
++        assertTrue(mouth.said.first().contains("연결"))
++    }
++
++    @Test fun `에이전트가 예외를 던져도 앱이 죽지 않는다`() {
++        brain.answer = { throw IllegalStateException("계약 위반") }
++        val r = runner(); r.start()
++        src.snaps.tryEmit(Screens.menu)
++        waitUntil { r.state.value.snapshot != null }
++        r.pressStart()
++        waitUntil { mouth.said.isNotEmpty() }
++        waitUntil { r.state.value.phase == Phase.IDLE }
++    }
++
++    @Test fun `종료 버튼은 듣기 말하기 하이라이트를 모두 멈춘다`() {
++        val r = runner(); r.start()
++        src.snaps.tryEmit(Screens.menu)
++        waitUntil { r.state.value.snapshot != null }
++        r.pressStart()
++        waitUntil { r.state.value.phase == Phase.WAIT_CHANGE }
++        r.pressStop()
++        waitUntil { r.state.value.phase == Phase.IDLE }
++        waitUntil { hand.targets.last() == null }
++        assertTrue(ear.stops > 0 && mouth.stops > 0)
++    }
++
++    @Test fun `무음이면 시간 초과로 끝난다`() {
++        ear.script = { flow { delay(60_000) } }                       // 아무것도 안 내고 계속 듣기
++        val r = runner(TimeoutPolicy(listenSilenceMs = 60)); r.start()
++        r.pressStart()
++        waitUntil { r.state.value.phase == Phase.IDLE && mouth.said.isNotEmpty() }
++        assertTrue(mouth.said.first().contains("듣지 못했"))
++    }
++
++    @Test fun `화면이 없으면 찾다가 안내하고 화면이 보이면 바로 묻는다`() {
++        val r = runner(TimeoutPolicy(scanningMs = 60)); r.start()
++        r.pressStart()
++        waitUntil { r.state.value.phase == Phase.LOST }
++        src.snaps.tryEmit(Screens.menu)
++        waitUntil { r.state.value.phase == Phase.WAIT_CHANGE }
++    }
++
++    @Test fun `인식 결과 없이 끝난 플로우도 말없음으로 처리한다`() {
++        ear.script = { flow { } }
++        val r = runner(); r.start()
++        r.pressStart()
++        waitUntil { r.state.value.phase == Phase.IDLE && mouth.said.isNotEmpty() }
++    }
++
++    @Test fun `소리 출력이 예외를 던져도 흐름은 이어진다`() {
++        val bad = object : SpeechOutput {
++            override suspend fun speak(text: String, interrupt: Boolean) { throw IllegalStateException("tts") }
++            override fun stop() {}
++        }
++        val r = SessionRunner(scope, SessionStateMachine(), src, ear, bad, brain, hand, Clock { 0 }, quiet, newSessionId = { "s" })
++        r.start(); src.snaps.tryEmit(Screens.menu)
++        waitUntil { r.state.value.snapshot != null }
++        r.pressStart()
++        waitUntil { r.state.value.phase == Phase.WAIT_CHANGE }
++    }
++}
+diff --git a/gradle/libs.versions.toml b/gradle/libs.versions.toml
+index 6a37813..1d82ef7 100644
+--- a/gradle/libs.versions.toml
++++ b/gradle/libs.versions.toml
+@@ -3,11 +3,21 @@ agp = "9.5.1"
+ kotlin = "2.2.10"
+ coroutines = "1.10.2"
+ junit = "4.13.2"
++camerax = "1.4.2"
++mlkit-korean = "16.0.1"
++appcompat = "1.7.0"
+ 
+ [libraries]
+ kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
++kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
+ kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
+ junit = { module = "junit:junit", version.ref = "junit" }
++androidx-camera-core = { module = "androidx.camera:camera-core", version.ref = "camerax" }
++androidx-camera-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "camerax" }
++androidx-camera-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "camerax" }
++androidx-camera-view = { module = "androidx.camera:camera-view", version.ref = "camerax" }
++mlkit-text-korean = { module = "com.google.mlkit:text-recognition-korean", version.ref = "mlkit-korean" }
++androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
+ 
+ [plugins]
+ android-application = { id = "com.android.application", version.ref = "agp" }
+diff --git a/overlay/README.md b/overlay/README.md
+index 10d5e7c..110efff 100644
+--- a/overlay/README.md
++++ b/overlay/README.md
+@@ -54,3 +54,10 @@ kr.kiosklens.overlay
+ ## 참고
+ 
+ 설계서 4.1 (좌표계) · 7.5 (좌표 변환 · 트래킹) · 10장 (하이라이트 스타일)
++
++## 구현 현황 (이 PR)
++
++- [x] `ViewOverlay`(**Compose 대신 일반 View** — 컴파일러 플러그인 없이 쓰려고. 포트 계약은 같다) · `HighlightHolder`(스레드 안전 · 멱등) · `FakeOverlay`
++- [x] `FillCenterMapper` · `FitCenterMapper` · `StretchMapper`(좌표 변환) · `BoxSmoother`(EMA α=0.3, 시간 보정) · `PulseCurve`(1.5Hz, 최소 밝기 유지) · `PulseBorderPainter`(6dp 이상 노랑 + 검정 외곽)
++- [x] 테스트 17개(JVM)
++- **기기에서 확인 필요:** 실제 프리뷰 위 위치 오차(목표: 버튼 크기의 20% 이내), 기기 회전 시 박스, 30fps 렌더
+diff --git a/overlay/src/main/AndroidManifest.xml b/overlay/src/main/AndroidManifest.xml
+new file mode 100644
+index 0000000..b2d3ea1
+--- /dev/null
++++ b/overlay/src/main/AndroidManifest.xml
+@@ -0,0 +1,2 @@
++<?xml version="1.0" encoding="utf-8"?>
++<manifest xmlns:android="http://schemas.android.com/apk/res/android" />
+diff --git a/overlay/src/main/kotlin/kr/kiosklens/overlay/FakeOverlay.kt b/overlay/src/main/kotlin/kr/kiosklens/overlay/FakeOverlay.kt
+new file mode 100644
+index 0000000..c5fe927
+--- /dev/null
++++ b/overlay/src/main/kotlin/kr/kiosklens/overlay/FakeOverlay.kt
+@@ -0,0 +1,17 @@
++package kr.kiosklens.overlay
++
++import java.util.concurrent.CopyOnWriteArrayList
++import kr.kiosklens.core.model.HighlightTarget
++import kr.kiosklens.core.port.HighlightSurface
++import kr.kiosklens.core.port.Logger
++
++/** 받은 대상을 기록(+로그)하는 가짜 (mock 플레이버 · 테스트용). */
++class FakeOverlay(private val logger: Logger? = null) : HighlightSurface {
++    private val holder = HighlightHolder { t ->
++        history += t
++        logger?.d("FakeOverlay", if (t == null) "hide" else "show ${t.elementId}")
++    }
++    val history = CopyOnWriteArrayList<HighlightTarget?>()
++    val current: HighlightTarget? get() = holder.target
++    override fun setTarget(target: HighlightTarget?) = holder.setTarget(target)
++}
+diff --git a/overlay/src/main/kotlin/kr/kiosklens/overlay/HighlightHolder.kt b/overlay/src/main/kotlin/kr/kiosklens/overlay/HighlightHolder.kt
+new file mode 100644
+index 0000000..6774079
+--- /dev/null
++++ b/overlay/src/main/kotlin/kr/kiosklens/overlay/HighlightHolder.kt
+@@ -0,0 +1,20 @@
++package kr.kiosklens.overlay
++
++import java.util.concurrent.atomic.AtomicReference
++import kr.kiosklens.core.model.HighlightTarget
++import kr.kiosklens.core.port.HighlightSurface
++
++/**
++ * HighlightSurface 계약의 핵심(스레드 안전 · null=숨김 · 같은 값 재호출은 무해)을 한 곳에 둔 상태 보관소.
++ * [ViewOverlay]가 이것을 쓰고, 값이 바뀔 때만 [onChanged]로 다시 그리게 한다.
++ * 같은 값이 또 오면 아무 일도 하지 않으므로 깜빡임이 처음부터 다시 시작되지 않는다.
++ */
++class HighlightHolder(private val onChanged: (HighlightTarget?) -> Unit = {}) : HighlightSurface {
++    private val ref = AtomicReference<HighlightTarget?>(null)
++    val target: HighlightTarget? get() = ref.get()
++
++    override fun setTarget(target: HighlightTarget?) {
++        val old = ref.getAndSet(target)
++        if (old != target) onChanged(target)
++    }
++}
+diff --git a/overlay/src/main/kotlin/kr/kiosklens/overlay/ViewOverlay.kt b/overlay/src/main/kotlin/kr/kiosklens/overlay/ViewOverlay.kt
+new file mode 100644
+index 0000000..610f192
+--- /dev/null
++++ b/overlay/src/main/kotlin/kr/kiosklens/overlay/ViewOverlay.kt
+@@ -0,0 +1,69 @@
++package kr.kiosklens.overlay
++
++import android.content.Context
++import android.graphics.Canvas
++import android.os.SystemClock
++import android.view.View
++import kr.kiosklens.core.model.FrameMotion
++import kr.kiosklens.core.model.HighlightTarget
++import kr.kiosklens.core.port.HighlightSurface
++import kr.kiosklens.core.port.MotionSink
++import kr.kiosklens.overlay.style.PulseBorderPainter
++import kr.kiosklens.overlay.style.PulseCurve
++import kr.kiosklens.overlay.tracking.BoxSmoother
++import kr.kiosklens.overlay.transform.CoordinateMapper
++import kr.kiosklens.overlay.transform.FillCenterMapper
++
++/**
++ * 카메라 화면 위에 겹쳐 놓는 투명 View. 눌러야 할 버튼에 노란 테두리를 깜빡이게 그린다.
++ * (README 의 이름은 ComposeOverlay 였지만 Compose 플러그인 없이 쓰려고 일반 View 로 만들었다. 포트 계약은 같다.)
++ *
++ * - [setTarget]은 어느 스레드에서 불러도 안전. null 이면 숨김. 같은 값을 또 줘도 깜빡임이 리셋되지 않는다([HighlightHolder]).
++ * - [setAnalysisSize]로 분석 프레임 크기(회전 보정 후)를 알려 주면 프리뷰 크롭까지 보정해 정확한 위치에 그린다.
++ * - 새 위치가 오면 EMA 로 부드럽게 옮긴다([BoxSmoother]).
++ */
++class ViewOverlay(context: Context) : View(context), HighlightSurface, MotionSink {
++    private val painter = PulseBorderPainter(context.resources.displayMetrics.density)
++    private val smoother = BoxSmoother()
++    private val lock = Any()
++    private val holder = HighlightHolder { t -> onTargetChanged(t) }
++
++    @Volatile private var mapper: CoordinateMapper? = null
++    private var shownSince = 0L
++    private var lastDraw = 0L
++
++    init { setWillNotDraw(false); isClickable = false; isFocusable = false; importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO }
++
++    /** 분석 프레임의 (회전 보정된) 가로 · 세로 픽셀 수. 프리뷰와 같은 방향이어야 한다. */
++    fun setAnalysisSize(width: Int, height: Int, mirrorX: Boolean = false) { mapper = FillCenterMapper(width, height, mirrorX); postInvalidateOnAnimation() }
++    fun setMapper(m: CoordinateMapper) { mapper = m; postInvalidateOnAnimation() }
++
++    override fun setTarget(target: HighlightTarget?) = holder.setTarget(target)
++
++    override fun onFrameMotion(motion: FrameMotion) {
++        if (motion.confidence < 0.5f) return
++        synchronized(lock) { smoother.nudge(motion.dx, motion.dy) }
++        postInvalidateOnAnimation()
++    }
++
++    private fun onTargetChanged(t: HighlightTarget?) {
++        synchronized(lock) {
++            val firstShow = smoother.current == null
++            smoother.setTarget(t?.rect)
++            if (t != null && firstShow) shownSince = SystemClock.uptimeMillis()
++        }
++        postInvalidateOnAnimation()                                  // 어느 스레드든 안전
++    }
++
++    override fun onDraw(canvas: Canvas) {
++        val m = mapper
++        val now = SystemClock.uptimeMillis()
++        val dt = if (lastDraw == 0L) 16L else now - lastDraw
++        lastDraw = now
++        val rect = synchronized(lock) { smoother.step(dt); smoother.current } ?: run { lastDraw = 0L; return }
++        if (m != null) {
++            painter.draw(canvas, m.map(rect, width.toFloat(), height.toFloat()), PulseCurve.level(now - shownSince))
++        }
++        postInvalidateOnAnimation()                                  // 보이는 동안 계속 깜빡임
++    }
++}
+diff --git a/overlay/src/main/kotlin/kr/kiosklens/overlay/package-info.kt b/overlay/src/main/kotlin/kr/kiosklens/overlay/package-info.kt
+deleted file mode 100644
+index 0ace206..0000000
+--- a/overlay/src/main/kotlin/kr/kiosklens/overlay/package-info.kt
++++ /dev/null
+@@ -1,2 +0,0 @@
+-// :overlay 모듈 자리. 담당 파트가 포트 구현과 Fake를 여기에 추가합니다.
+-package kr.kiosklens.overlay
+diff --git a/overlay/src/main/kotlin/kr/kiosklens/overlay/style/PulseBorderPainter.kt b/overlay/src/main/kotlin/kr/kiosklens/overlay/style/PulseBorderPainter.kt
+new file mode 100644
+index 0000000..fac3a76
+--- /dev/null
++++ b/overlay/src/main/kotlin/kr/kiosklens/overlay/style/PulseBorderPainter.kt
+@@ -0,0 +1,34 @@
++package kr.kiosklens.overlay.style
++
++import android.graphics.Canvas
++import android.graphics.Color
++import android.graphics.Paint
++import android.graphics.RectF
++import kr.kiosklens.overlay.transform.PxRect
++
++/**
++ * 노란 테두리 + 검은 바깥선 (설계서 10장): 두께 6dp 이상, 어떤 배경 위에서도 보이게.
++ * [level] 0.55..1.0 은 깜빡임 정도(굵기와 투명도가 함께 변한다).
++ */
++class PulseBorderPainter(density: Float) {
++    private val minStroke = 6f * density
++    private val outline = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; color = Color.BLACK }
++    private val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; color = Color.rgb(255, 214, 0) }
++    private val glow = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL; color = Color.argb(40, 255, 214, 0) }
++    private val box = RectF()
++    private val pad = 6f * density
++
++    fun draw(canvas: Canvas, r: PxRect, level: Float, alpha: Float = 1f) {
++        box.set(r.left - pad, r.top - pad, r.right + pad, r.bottom + pad)
++        val w = minStroke * (0.9f + 0.3f * level)                    // 6dp 아래로 내려가지 않는다
++        val a = (255 * alpha).toInt().coerceIn(0, 255)
++        glow.alpha = (40 * level * alpha).toInt()
++        canvas.drawRoundRect(box, w * 1.5f, w * 1.5f, glow)
++        outline.strokeWidth = w + 2f * minStroke * 0.35f
++        outline.alpha = a
++        canvas.drawRoundRect(box, w * 1.5f, w * 1.5f, outline)
++        ring.strokeWidth = maxOf(w, minStroke)
++        ring.alpha = (a * (0.7f + 0.3f * level)).toInt()
++        canvas.drawRoundRect(box, w * 1.5f, w * 1.5f, ring)
++    }
++}
+diff --git a/overlay/src/main/kotlin/kr/kiosklens/overlay/style/PulseCurve.kt b/overlay/src/main/kotlin/kr/kiosklens/overlay/style/PulseCurve.kt
+new file mode 100644
+index 0000000..99664f1
+--- /dev/null
++++ b/overlay/src/main/kotlin/kr/kiosklens/overlay/style/PulseCurve.kt
+@@ -0,0 +1,20 @@
++package kr.kiosklens.overlay.style
++
++import kotlin.math.PI
++import kotlin.math.sin
++
++/**
++ * 깜빡임 곡선. 1.5Hz(1초에 1.5번)로 부드럽게 커졌다 작아졌다 한다.
++ * 광과민 안전 (설계서 10장): 3Hz 초과 금지, 완전히 꺼지지 않고(최소 밝기 유지) 급격한 점멸 없음.
++ */
++object PulseCurve {
++    const val HZ = 1.5
++    const val MAX_SAFE_HZ = 3.0
++    private const val MIN = 0.55f
++
++    /** 0.55..1.0 */
++    fun level(elapsedMs: Long): Float {
++        val phase = (elapsedMs / 1000.0) * HZ * 2.0 * PI
++        return (MIN + (1f - MIN) * (0.5f + 0.5f * sin(phase).toFloat()))
++    }
++}
+diff --git a/overlay/src/main/kotlin/kr/kiosklens/overlay/tracking/BoxSmoother.kt b/overlay/src/main/kotlin/kr/kiosklens/overlay/tracking/BoxSmoother.kt
+new file mode 100644
+index 0000000..baf9e77
+--- /dev/null
++++ b/overlay/src/main/kotlin/kr/kiosklens/overlay/tracking/BoxSmoother.kt
+@@ -0,0 +1,49 @@
++package kr.kiosklens.overlay.tracking
++
++import kr.kiosklens.core.model.NormRect
++import kotlin.math.abs
++import kotlin.math.pow
++
++/**
++ * 새 OCR 결과가 와서 목표 위치가 바뀔 때 박스가 튀지 않고 부드럽게 따라가게 한다 (설계서 7.5).
++ * 지수 이동 평균(EMA): 한 걸음마다 목표와의 거리의 일부만 이동. 기준 α=0.3 @ 30fps(33ms).
++ * 프레임 간격이 달라도 같은 속도로 움직이도록 시간으로 보정한다.
++ * 목표가 크게 달라지면(다른 버튼) 따라가지 않고 바로 옮긴다.
++ */
++class BoxSmoother(private val alpha: Float = 0.3f, private val snapDistance: Float = 0.25f, private val refMs: Float = 33f) {
++    private var cur: FloatArray? = null
++    private var tgt: FloatArray? = null
++
++    val current: NormRect? get() = cur?.let { NormRect(it[0], it[1], it[2], it[3]) }
++
++    fun setTarget(r: NormRect?) {
++        if (r == null) { cur = null; tgt = null; return }
++        val t = floatArrayOf(r.left, r.top, r.right, r.bottom)
++        val c = cur
++        if (c == null || distance(c, t) > snapDistance) cur = t.copyOf()      // 처음이거나 다른 버튼: 바로 옮김
++        tgt = t
++    }
++
++    /** dtMs 만큼 시간이 흘렀을 때의 위치. 움직임이 남아 있으면 true. */
++    fun step(dtMs: Long): Boolean {
++        val c = cur ?: return false; val t = tgt ?: return false
++        val a = 1f - (1f - alpha).pow(dtMs.coerceIn(1, 200) / refMs)
++        var moving = false
++        for (i in 0..3) {
++            val d = t[i] - c[i]
++            if (abs(d) < 0.0005f) c[i] = t[i] else { c[i] += d * a; moving = true }
++        }
++        return moving
++    }
++
++    /** 카메라가 흔들린 만큼 박스를 바로 옮긴다 (MotionSink). */
++    fun nudge(dx: Float, dy: Float) {
++        cur?.let { it[0] += dx; it[2] += dx; it[1] += dy; it[3] += dy }
++        tgt?.let { it[0] += dx; it[2] += dx; it[1] += dy; it[3] += dy }
++    }
++
++    private fun distance(a: FloatArray, b: FloatArray): Float =
++        max4(abs(a[0] - b[0]), abs(a[1] - b[1]), abs(a[2] - b[2]), abs(a[3] - b[3]))
++
++    private fun max4(a: Float, b: Float, c: Float, d: Float) = maxOf(maxOf(a, b), maxOf(c, d))
++}
+diff --git a/overlay/src/main/kotlin/kr/kiosklens/overlay/transform/CoordinateMapper.kt b/overlay/src/main/kotlin/kr/kiosklens/overlay/transform/CoordinateMapper.kt
+new file mode 100644
+index 0000000..e755b0d
+--- /dev/null
++++ b/overlay/src/main/kotlin/kr/kiosklens/overlay/transform/CoordinateMapper.kt
+@@ -0,0 +1,63 @@
++package kr.kiosklens.overlay.transform
++
++import kr.kiosklens.core.model.NormRect
++import kotlin.math.max
++import kotlin.math.min
++
++/** 화면(픽셀) 사각형. android.graphics.RectF 를 쓰지 않아 JVM 에서 테스트할 수 있다. */
++data class PxRect(val left: Float, val top: Float, val right: Float, val bottom: Float) {
++    val width get() = right - left
++    val height get() = bottom - top
++}
++
++/**
++ * 정규화 좌표(분석 프레임 기준) → 화면 픽셀. 이 변환은 :overlay 만 한다.
++ * 분석 프레임 좌표는 이미 회전이 보정되어 있다(contract 1장). 여기서는 프리뷰의 크기 맞춤(크롭)만 보정한다.
++ */
++interface CoordinateMapper {
++    fun map(rect: NormRect, viewW: Float, viewH: Float): PxRect
++}
++
++/**
++ * CameraX PreviewView 의 FILL_CENTER(기본): 프리뷰를 화면 가득 채우도록 키우고 넘치는 가장자리를 자른다.
++ * 분석 프레임이 프리뷰와 같은 시야(같은 종횡비)이면 [cropRatio] 는 1.
++ * 비율이 다르면 분석 프레임이 프리뷰의 일부만 보는 것이 아니라 같은 센서 영역이라고 가정하고 종횡비만 같게 맞춘다.
++ */
++class FillCenterMapper(private val frameW: Int, private val frameH: Int, private val mirrorX: Boolean = false) : CoordinateMapper {
++    override fun map(rect: NormRect, viewW: Float, viewH: Float): PxRect {
++        if (frameW <= 0 || frameH <= 0 || viewW <= 0f || viewH <= 0f) return PxRect(0f, 0f, 0f, 0f)
++        val scale = max(viewW / frameW, viewH / frameH)
++        val dx = (viewW - frameW * scale) / 2f
++        val dy = (viewH - frameH * scale) / 2f
++        var l = rect.left * frameW * scale + dx
++        var r = rect.right * frameW * scale + dx
++        val t = rect.top * frameH * scale + dy
++        val b = rect.bottom * frameH * scale + dy
++        if (mirrorX) { val nl = viewW - r; r = viewW - l; l = nl }
++        return PxRect(l, t, r, b)
++    }
++
++    /** 프리뷰가 잘려서 화면 밖으로 나간 부분이 있는가 (디버그/경고용): 박스 중심이 보이는 영역 안인지 */
++    fun isCentreVisible(rect: NormRect, viewW: Float, viewH: Float): Boolean {
++        val p = map(rect, viewW, viewH)
++        val cx = (p.left + p.right) / 2f; val cy = (p.top + p.bottom) / 2f
++        return cx in 0f..viewW && cy in 0f..viewH
++    }
++}
++
++/** FIT_CENTER: 프리뷰 전체가 보이고 남는 곳은 검은 띠. */
++class FitCenterMapper(private val frameW: Int, private val frameH: Int) : CoordinateMapper {
++    override fun map(rect: NormRect, viewW: Float, viewH: Float): PxRect {
++        if (frameW <= 0 || frameH <= 0 || viewW <= 0f || viewH <= 0f) return PxRect(0f, 0f, 0f, 0f)
++        val scale = min(viewW / frameW, viewH / frameH)
++        val dx = (viewW - frameW * scale) / 2f
++        val dy = (viewH - frameH * scale) / 2f
++        return PxRect(rect.left * frameW * scale + dx, rect.top * frameH * scale + dy, rect.right * frameW * scale + dx, rect.bottom * frameH * scale + dy)
++    }
++}
++
++/** 화면 전체에 늘려서 그린다(크롭 없음). 카메라가 없는 mock 화면이나 디버그용. */
++class StretchMapper : CoordinateMapper {
++    override fun map(rect: NormRect, viewW: Float, viewH: Float) =
++        PxRect(rect.left * viewW, rect.top * viewH, rect.right * viewW, rect.bottom * viewH)
++}
+diff --git a/overlay/src/test/kotlin/kr/kiosklens/overlay/OverlayTest.kt b/overlay/src/test/kotlin/kr/kiosklens/overlay/OverlayTest.kt
+new file mode 100644
+index 0000000..02c5f7c
+--- /dev/null
++++ b/overlay/src/test/kotlin/kr/kiosklens/overlay/OverlayTest.kt
+@@ -0,0 +1,125 @@
++package kr.kiosklens.overlay
++
++import java.util.concurrent.CountDownLatch
++import java.util.concurrent.Executors
++import kr.kiosklens.core.model.HighlightTarget
++import kr.kiosklens.core.model.NormRect
++import kr.kiosklens.core.port.HighlightSurface
++import kr.kiosklens.overlay.style.PulseCurve
++import kr.kiosklens.overlay.tracking.BoxSmoother
++import kr.kiosklens.overlay.transform.FillCenterMapper
++import kr.kiosklens.overlay.transform.FitCenterMapper
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNotNull
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++abstract class HighlightSurfaceContractSpec {
++    protected abstract fun create(): Pair<HighlightSurface, () -> HighlightTarget?>
++    private fun t(id: String, l: Float = 0.1f) = HighlightTarget(id, NormRect(l, 0.2f, l + 0.2f, 0.3f))
++
++    @Test fun `여러 스레드에서 동시에 불러도 예외 없이 마지막 값이 남는다`() {
++        val (s, cur) = create()
++        val pool = Executors.newFixedThreadPool(8); val go = CountDownLatch(1); val done = CountDownLatch(8)
++        repeat(8) { i -> pool.execute { go.await(); repeat(500) { s.setTarget(t("e$i", 0.1f + (it % 5) * 0.01f)) }; done.countDown() } }
++        go.countDown(); done.await(); pool.shutdown()
++        s.setTarget(t("last"))
++        assertEquals("last", cur()?.elementId)
++    }
++
++    @Test fun `null이면 숨긴다`() { val (s, cur) = create(); s.setTarget(t("a")); s.setTarget(null); assertNull(cur()) }
++
++    @Test fun `같은 값을 연속으로 넣어도 상태가 같다`() {
++        val (s, cur) = create(); val a = t("a")
++        s.setTarget(a); val first = cur(); s.setTarget(a.copy()); s.setTarget(a)
++        assertEquals(first, cur())
++    }
++}
++
++class FakeOverlayContractTest : HighlightSurfaceContractSpec() {
++    override fun create(): Pair<HighlightSurface, () -> HighlightTarget?> = FakeOverlay().let { it to { it.current } }
++}
++class HighlightHolderContractTest : HighlightSurfaceContractSpec() {
++    override fun create(): Pair<HighlightSurface, () -> HighlightTarget?> = HighlightHolder().let { it to { it.target } }
++}
++
++class OverlayMathTest {
++    private val eps = 0.01f
++    private fun near(a: Float, b: Float) = assertTrue("$a vs $b", kotlin.math.abs(a - b) < eps)
++
++    @Test fun `프리뷰와 비율이 같으면 그대로 비례한다`() {
++        val m = FillCenterMapper(1080, 1920)
++        val p = m.map(NormRect(0.1f, 0.2f, 0.5f, 0.3f), 540f, 960f)
++        near(p.left, 54f); near(p.top, 192f); near(p.right, 270f); near(p.bottom, 288f)
++    }
++
++    @Test fun `프리뷰가 더 길쭉하면 좌우가 잘리고 중앙이 맞는다`() {
++        val m = FillCenterMapper(1000, 1000)                 // 정사각 분석 프레임
++        val p = m.map(NormRect(0.4f, 0.4f, 0.6f, 0.6f), 500f, 1000f)   // 세로로 긴 화면 → scale=1, 좌우 250씩 잘림
++        near(p.left, 150f); near(p.width, 200f)
++        near((p.left + p.right) / 2f, 250f); near((p.top + p.bottom) / 2f, 500f)
++    }
++
++    @Test fun `좌우 반전`() {
++        val a = FillCenterMapper(100, 100, mirrorX = false).map(NormRect(0f, 0f, 0.2f, 0.2f), 100f, 100f)
++        val b = FillCenterMapper(100, 100, mirrorX = true).map(NormRect(0f, 0f, 0.2f, 0.2f), 100f, 100f)
++        near(b.left, 100f - a.right); near(b.right, 100f - a.left)
++    }
++
++    @Test fun `FIT은 검은 띠를 둔다`() {
++        val p = FitCenterMapper(1000, 500).map(NormRect(0f, 0f, 1f, 1f), 1000f, 1000f)
++        near(p.top, 250f); near(p.bottom, 750f); near(p.left, 0f); near(p.right, 1000f)
++    }
++
++    @Test fun `늘려 그리기`() {
++        val p = kr.kiosklens.overlay.transform.StretchMapper().map(NormRect(0.1f, 0.2f, 0.5f, 0.4f), 1000f, 500f)
++        near(p.left, 100f); near(p.top, 100f); near(p.right, 500f); near(p.bottom, 200f)
++    }
++
++    @Test fun `크기가 0이어도 죽지 않는다`() {
++        val p = FillCenterMapper(0, 0).map(NormRect(0f, 0f, 1f, 1f), 0f, 0f)
++        assertEquals(0f, p.width)
++    }
++
++    @Test fun `부드럽게 따라가고 결국 목표에 닿는다`() {
++        val s = BoxSmoother()
++        s.setTarget(NormRect(0.1f, 0.1f, 0.3f, 0.2f))
++        s.setTarget(NormRect(0.15f, 0.12f, 0.35f, 0.22f))              // 작은 이동 → 따라감
++        val first = s.current!!.left
++        assertTrue(first < 0.15f)
++        s.step(33); val second = s.current!!.left
++        assertTrue(second > first && second < 0.15f)
++        repeat(60) { s.step(33) }
++        near(s.current!!.left, 0.15f)
++    }
++
++    @Test fun `다른 버튼이면 바로 옮긴다`() {
++        val s = BoxSmoother(); s.setTarget(NormRect(0.1f, 0.1f, 0.3f, 0.2f)); s.setTarget(NormRect(0.6f, 0.7f, 0.9f, 0.8f))
++        near(s.current!!.left, 0.6f)
++    }
++
++    @Test fun `프레임 간격이 달라도 속도가 비슷하다`() {
++        val a = BoxSmoother(); val b = BoxSmoother()
++        for (s in listOf(a, b)) { s.setTarget(NormRect(0.1f, 0.1f, 0.3f, 0.2f)); s.setTarget(NormRect(0.2f, 0.1f, 0.4f, 0.2f)) }
++        repeat(10) { a.step(33) }; repeat(5) { b.step(66) }
++        near(a.current!!.left, b.current!!.left)
++    }
++
++    @Test fun `카메라 흔들림만큼 박스를 옮긴다`() {
++        val s = BoxSmoother(); s.setTarget(NormRect(0.1f, 0.1f, 0.3f, 0.2f)); s.nudge(0.05f, -0.02f)
++        near(s.current!!.left, 0.15f); near(s.current!!.top, 0.08f)
++    }
++
++    @Test fun `깜빡임은 3Hz를 넘지 않고 완전히 꺼지지 않는다`() {
++        assertTrue(PulseCurve.HZ <= PulseCurve.MAX_SAFE_HZ)
++        var min = 9f; var max = 0f; var flips = 0; var prevUp = true; var prev = PulseCurve.level(0)
++        for (ms in 0..3000 step 5) {
++            val v = PulseCurve.level(ms.toLong()); min = minOf(min, v); max = maxOf(max, v)
++            val up = v >= prev; if (up != prevUp) flips++; prevUp = up; prev = v
++        }
++        assertTrue(min >= 0.5f && max <= 1.0f)
++        assertTrue("3초에 방향 전환 ${flips}번", flips <= 10)       // 1.5Hz × 3초 × 2 = 9
++    }
++}
+diff --git a/server/.env.example b/server/.env.example
+index 8e3b43a..56a8cc0 100644
+--- a/server/.env.example
++++ b/server/.env.example
+@@ -1,8 +1,9 @@
+ # 서버 비밀 값은 여기가 아니라 배포 환경의 환경변수에 넣으세요. 이 파일은 이름 목록입니다.
+ APP_KEY=앱과_서버가_공유하는_긴_무작위_문자열
+ ANTHROPIC_API_KEY=sk-ant-...
+-LLM_PROVIDER=anthropic      # anthropic | fake(키 없이 연동 연습)
+-LLM_MODEL=claude-haiku-5-5
++GEMINI_API_KEY=            # 무료 키: https://aistudio.google.com/apikey (LLM_PROVIDER=gemini 일 때만)
++LLM_PROVIDER=anthropic      # anthropic | gemini(무료 한도) | fake(키 없이 연동 연습)
++LLM_MODEL=claude-haiku-5-5  # gemini 이면 기본 gemini-2.5-flash-lite
+ LLM_TIMEOUT_S=4.0
+ CANDIDATE_K=8
+ FASTPATH=true
+diff --git a/server/README.md b/server/README.md
+index 8f58ead..8e86884 100644
+--- a/server/README.md
++++ b/server/README.md
+@@ -59,3 +59,14 @@ v0.1의 "가정" 표를 설계서 · `:core-model`에 맞춰 확정했습니다.
+ 
+ ## 미검증
+ 실제 Anthropic 호출, Docker 이미지 빌드(이 환경에 데몬 없음), 실제 OCR 입력, 실제 p95는 **아직 해보지 않았습니다**. Anthropic 호출부는 모의 HTTP(MockTransport)로 상태코드·타임아웃 매핑만 확인했습니다.
++
++## 무료로 쓰기: Gemini
++
++```bash
++export LLM_PROVIDER=gemini
++export GEMINI_API_KEY=...      # https://aistudio.google.com/apikey 에서 무료 키
++export APP_KEY=긴_무작위_문자열
++uvicorn app.main:app --port 8000
++```
++
++기본 모델은 `gemini-2.5-flash-lite` (`LLM_MODEL`로 변경). 무료 한도를 넘으면 429 → 앱은 잠시 뒤 다시 시도하고, 계속되면 오류 안내를 읽는다. 정확도는 `python scripts/evaluate.py --llm gemini`로 anthropic과 비교해서 정할 것 *(이 PR에서는 키가 없어 실제 호출은 확인하지 못함, MockTransport 테스트만 통과)*.
+diff --git a/server/app/llm.py b/server/app/llm.py
+index bd0e5ea..d1b8ff3 100644
+--- a/server/app/llm.py
++++ b/server/app/llm.py
+@@ -94,6 +94,60 @@ class AnthropicLlmClient:
+         await self._http.aclose()
+ 
+ 
++class GeminiLlmClient:
++    """Google Gemini (무료 한도가 있는 API 키로 쓸 수 있음). 키는 서버 환경변수 GEMINI_API_KEY 에만 둔다.
++    JSON 응답을 강제(responseMimeType)하고, 오류는 AnthropicLlmClient 와 같은 예외로 바꾼다."""
++
++    URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
++
++    def __init__(self, api_key: str, model: str, http: Optional[httpx.AsyncClient] = None, max_tokens: int = 256):
++        if not api_key:
++            raise ValueError("GEMINI_API_KEY is required for the gemini provider")
++        self.api_key = api_key
++        self.model = model
++        self.max_tokens = max_tokens
++        self._http = http or httpx.AsyncClient()
++
++    async def _post(self, system: str, user: str, timeout_s: float) -> httpx.Response:
++        return await self._http.post(
++            self.URL.format(model=self.model),
++            headers={"x-goog-api-key": self.api_key, "content-type": "application/json"},
++            json={
++                "systemInstruction": {"parts": [{"text": system}]},
++                "contents": [{"role": "user", "parts": [{"text": user}]}],
++                "generationConfig": {"temperature": 0, "maxOutputTokens": self.max_tokens, "responseMimeType": "application/json"},
++            },
++            timeout=timeout_s,
++        )
++
++    async def complete(self, system: str, user: str, timeout_s: float) -> str:
++        try:
++            r = await asyncio.wait_for(self._post(system, user, timeout_s), timeout=timeout_s)
++        except (asyncio.TimeoutError, httpx.TimeoutException) as e:
++            raise LlmTimeout("llm timeout") from e
++        except httpx.HTTPError as e:
++            raise LlmUpstream("network") from e
++        if r.status_code == 429:
++            try:
++                ra = int(float(r.headers.get("retry-after", "5")))
++            except ValueError:
++                ra = 5
++            raise LlmRateLimited(max(1, min(ra, 60)))
++        if r.status_code in (401, 403):
++            raise LlmUpstream("auth")
++        if r.status_code >= 400:
++            raise LlmUpstream(f"http_{r.status_code}")          # 본문은 남기지 않음
++        try:
++            cands = r.json().get("candidates") or []
++            parts = (cands[0].get("content") or {}).get("parts") or [] if cands else []
++            return "".join(p.get("text", "") for p in parts if isinstance(p, dict))
++        except (ValueError, AttributeError, IndexError) as e:
++            raise LlmUpstream("bad_body") from e
++
++    async def aclose(self) -> None:
++        await self._http.aclose()
++
++
+ # ---------------- Fake들 ----------------
+ Step = Union[str, Exception, Callable[[str, str], str]]
+ 
+diff --git a/server/app/main.py b/server/app/main.py
+index d92bcd2..1a64389 100644
+--- a/server/app/main.py
++++ b/server/app/main.py
+@@ -17,7 +17,7 @@ from fastapi.responses import JSONResponse
+ 
+ from .agent import FakeGuideAgent, GuideAgent, LlmGuideAgent
+ from .errors import ApiError, body
+-from .llm import (AnthropicLlmClient, HeuristicFakeLlmClient, LlmRateLimited, LlmTimeout, LlmUpstream)
++from .llm import (AnthropicLlmClient, GeminiLlmClient, HeuristicFakeLlmClient, LlmRateLimited, LlmTimeout, LlmUpstream)
+ from .models import GuideRequest
+ from .ratelimit import RateLimiter
+ from .settings import VERSION, Settings
+@@ -34,6 +34,8 @@ if not log.handlers and not logging.getLogger().handlers:      # uvicorn은 앱
+ def build_agent(s: Settings) -> GuideAgent:
+     if s.llm_provider == "fake":
+         return LlmGuideAgent(HeuristicFakeLlmClient(), s)
++    if s.llm_provider == "gemini":
++        return LlmGuideAgent(GeminiLlmClient(s.gemini_api_key, s.llm_model), s)
+     return LlmGuideAgent(AnthropicLlmClient(s.anthropic_api_key, s.llm_model), s)
+ 
+ 
+diff --git a/server/app/settings.py b/server/app/settings.py
+index 8016756..190aa04 100644
+--- a/server/app/settings.py
++++ b/server/app/settings.py
+@@ -17,8 +17,9 @@ def _env_bool(name: str, default: bool) -> bool:
+ @dataclass(frozen=True)
+ class Settings:
+     app_key: str = ""                         # X-App-Key. 비어 있으면 모든 요청을 401로 거절 (안전 기본값)
+-    llm_provider: str = "anthropic"           # anthropic | fake
++    llm_provider: str = "anthropic"           # anthropic | gemini | fake
+     anthropic_api_key: str = field(default="", repr=False)
++    gemini_api_key: str = field(default="", repr=False)
+     llm_model: str = "claude-haiku-5-5"       # p95 2초 예산에 맞춘 빠른 모델 (바꿀 때는 평가 스크립트로 비교)
+     llm_timeout_s: float = 4.0                # 설계: LlmClient 타임아웃 4초
+     candidate_k: int = 8                      # 설계: 후보 K=8
+@@ -35,7 +36,8 @@ class Settings:
+             app_key=e("APP_KEY", ""),
+             llm_provider=e("LLM_PROVIDER", "anthropic").strip().lower(),
+             anthropic_api_key=e("ANTHROPIC_API_KEY", ""),
+-            llm_model=e("LLM_MODEL", "claude-haiku-5-5"),
++            gemini_api_key=e("GEMINI_API_KEY", ""),
++            llm_model=e("LLM_MODEL", "gemini-2.5-flash-lite" if e("LLM_PROVIDER", "anthropic").strip().lower() == "gemini" else "claude-haiku-5-5"),
+             llm_timeout_s=float(e("LLM_TIMEOUT_S", "4.0")),
+             candidate_k=int(e("CANDIDATE_K", "8")),
+             fastpath=_env_bool("FASTPATH", True),
+diff --git a/server/scripts/evaluate.py b/server/scripts/evaluate.py
+index ad3b8ad..43b83db 100644
+--- a/server/scripts/evaluate.py
++++ b/server/scripts/evaluate.py
+@@ -49,11 +49,15 @@ def judge(case, snap, resp):
+ async def run(args):
+     s = Settings(app_key="x", llm_provider=args.llm, fastpath=not args.no_fastpath,
+                  anthropic_api_key=__import__("os").environ.get("ANTHROPIC_API_KEY", ""),
+-                 llm_model=__import__("os").environ.get("LLM_MODEL", "claude-haiku-5-5"))
++                 gemini_api_key=__import__("os").environ.get("GEMINI_API_KEY", ""),
++                 llm_model=__import__("os").environ.get("LLM_MODEL", "gemini-2.5-flash-lite" if args.llm == "gemini" else "claude-haiku-5-5"))
+     if args.llm == "fake":
+         agent = FakeGuideAgent()
+     elif args.llm == "heuristic":
+         agent = LlmGuideAgent(HeuristicFakeLlmClient(), s)
++    elif args.llm == "gemini":
++        from app.llm import GeminiLlmClient
++        agent = LlmGuideAgent(GeminiLlmClient(s.gemini_api_key, s.llm_model), s)
+     else:
+         agent = LlmGuideAgent(AnthropicLlmClient(s.anthropic_api_key, s.llm_model), s)
+     cases, snaps = load_cases()
+@@ -99,7 +103,7 @@ async def run(args):
+ 
+ if __name__ == "__main__":
+     ap = argparse.ArgumentParser()
+-    ap.add_argument("--llm", choices=["fake", "heuristic", "anthropic"], default="fake")
++    ap.add_argument("--llm", choices=["fake", "heuristic", "anthropic", "gemini"], default="fake")
+     ap.add_argument("--repeat", type=int, default=1)
+     ap.add_argument("--no-fastpath", action="store_true")
+     ap.add_argument("--fail-under", type=float, default=0.0)
+diff --git a/server/tests/test_api.py b/server/tests/test_api.py
+index 9a1b87d..711464f 100644
+--- a/server/tests/test_api.py
++++ b/server/tests/test_api.py
+@@ -148,3 +148,42 @@ async def test_anthropic_slow_response_times_out():
+         return httpx.Response(200, json={"content": []})
+     with pytest.raises(LlmTimeout):
+         await anth(slow).complete("s", "u", 0.1)
++
++
++# ---- GeminiLlmClient: 네트워크 없이 MockTransport로 ----
++def gem(handler):
++    from app.llm import GeminiLlmClient
++    return GeminiLlmClient("g-test", "gemini-x", http=httpx.AsyncClient(transport=httpx.MockTransport(handler)))
++
++
++async def test_gemini_ok_and_request_shape():
++    seen = {}
++    def h(req):
++        seen["h"] = req.headers; seen["b"] = req.content; seen["u"] = str(req.url)
++        return httpx.Response(200, json={"candidates": [{"content": {"parts": [{"text": '{"action":'}, {"text": '"DONE"}'}]}}]})
++    assert await gem(h).complete("s", "u", 4) == '{"action":"DONE"}'
++    assert seen["h"]["x-goog-api-key"] == "g-test" and "key=" not in seen["u"] and b"image" not in seen["b"]
++    assert b"application/json" in seen["b"] and b"gemini-x" in seen["u"].encode()
++
++
++@pytest.mark.parametrize("status,exc", [(401, LlmUpstream), (403, LlmUpstream), (400, LlmUpstream), (404, LlmUpstream),
++                                        (500, LlmUpstream), (429, LlmRateLimited)])
++async def test_gemini_status_mapping(status, exc):
++    with pytest.raises(exc):
++        await gem(lambda r: httpx.Response(status, json={"error": "x"}, headers={"retry-after": "3"})).complete("s", "u", 4)
++
++
++async def test_gemini_empty_candidates_returns_empty_text():
++    assert await gem(lambda r: httpx.Response(200, json={"candidates": []})).complete("s", "u", 4) == ""
++
++
++async def test_gemini_timeout_mapped():
++    def h(req): raise httpx.ReadTimeout("t")
++    with pytest.raises(LlmTimeout):
++        await gem(h).complete("s", "u", 4)
++
++
++def test_gemini_requires_key():
++    from app.llm import GeminiLlmClient
++    with pytest.raises(ValueError):
++        GeminiLlmClient("", "m")
+diff --git a/vision/README.md b/vision/README.md
+index 0b6a0e3..cc52fd8 100644
+--- a/vision/README.md
++++ b/vision/README.md
+@@ -74,3 +74,11 @@ override fun submit(frame: CameraFrame) {
+ ## 참고
+ 
+ 설계서 4.3 (요소 ID) · 7.1 (샘플링 · 필터 · 분류) · 7.2 (전환 감지) · 11.1 (테스트 데이터)
++
++## 구현 현황 (이 PR)
++
++- [x] `OcrEngine` · `MlKitOcrEngine`(ImageProxy / Bitmap) · 필터 4종(`CardNumberFilter` · `LowConfidenceFilter` · `TinyAreaFilter` · `BlankFilter`) · 분류기(`PriceClassifier` · `ButtonLikeClassifier`)
++- [x] `ElementBuilder`(요소 ID = FNV-1a 해시 + 20×20 셀, 충돌 `_2`) · `ScreenDiffer`(Jaccard 0.6, 연속 2프레임, 요소 3개 미만 제외) · `FrameSampler`(3fps + 똑같은 프레임 건너뛰기) · `ImageProxyThumbnail`(64×36)
++- [x] `VisionScreenAnalyzer : FrameSink, SnapshotSource` — 밀린 프레임은 `close()`, 모든 프레임은 정확히 한 번 닫힘
++- [x] `FakeScreenAnalyzer` + `SampleScreens`(카페 5화면) + 계약 테스트(Fake · 실구현 공통)
++- 테스트 22개(JVM). **기기에서 확인 필요:** ML Kit 실제 인식률(버튼 누락), 3fps에서의 지연, 요소 ID가 실제 카메라 프레임에서 안정적인지
+diff --git a/vision/build.gradle.kts b/vision/build.gradle.kts
+index f3bf30f..98b8afc 100644
+--- a/vision/build.gradle.kts
++++ b/vision/build.gradle.kts
+@@ -14,5 +14,7 @@ android {
+ 
+ dependencies {
+     implementation(project(":domain"))
++    implementation(libs.androidx.camera.core)          // ImageProxy
++    implementation(libs.mlkit.text.korean)             // 기기 안 한국어 글자 인식
+     testImplementation(libs.junit)
+ }
+diff --git a/vision/src/main/AndroidManifest.xml b/vision/src/main/AndroidManifest.xml
+new file mode 100644
+index 0000000..b2d3ea1
+--- /dev/null
++++ b/vision/src/main/AndroidManifest.xml
+@@ -0,0 +1,2 @@
++<?xml version="1.0" encoding="utf-8"?>
++<manifest xmlns:android="http://schemas.android.com/apk/res/android" />
+diff --git a/vision/src/main/kotlin/kr/kiosklens/vision/VisionScreenAnalyzer.kt b/vision/src/main/kotlin/kr/kiosklens/vision/VisionScreenAnalyzer.kt
+new file mode 100644
+index 0000000..86faeb2
+--- /dev/null
++++ b/vision/src/main/kotlin/kr/kiosklens/vision/VisionScreenAnalyzer.kt
+@@ -0,0 +1,128 @@
++package kr.kiosklens.vision
++
++import java.util.concurrent.atomic.AtomicReference
++import kotlinx.coroutines.CancellationException
++import kotlinx.coroutines.CoroutineScope
++import kotlinx.coroutines.channels.BufferOverflow
++import kotlinx.coroutines.channels.Channel
++import kotlinx.coroutines.flow.Flow
++import kotlinx.coroutines.flow.MutableSharedFlow
++import kotlinx.coroutines.launch
++import kr.kiosklens.core.model.CameraFrame
++import kr.kiosklens.core.model.ScreenSnapshot
++import kr.kiosklens.core.model.UiElement
++import kr.kiosklens.core.port.Clock
++import kr.kiosklens.core.port.FrameSink
++import kr.kiosklens.core.port.Logger
++import kr.kiosklens.core.port.SnapshotSource
++import kr.kiosklens.vision.classify.ClassifierChain
++import kr.kiosklens.vision.classify.ElementClassifier
++import kr.kiosklens.vision.filter.BlankFilter
++import kr.kiosklens.vision.filter.CardNumberFilter
++import kr.kiosklens.vision.filter.LowConfidenceFilter
++import kr.kiosklens.vision.filter.TextFilter
++import kr.kiosklens.vision.filter.TinyAreaFilter
++import kr.kiosklens.vision.ocr.OcrEngine
++import kr.kiosklens.vision.pipeline.ElementBuilder
++import kr.kiosklens.vision.pipeline.FrameSampler
++import kr.kiosklens.vision.pipeline.ScreenDiffer
++
++/**
++ * 카메라 프레임 → 글자 읽기 → [ScreenSnapshot]. (:vision 의 두 포트를 한 클래스가 구현)
++ *
++ * 계약
++ * - [submit]은 즉시 돌아오고 예외를 던지지 않는다. 처리가 밀리면 **오래된 프레임을 버리고 close()** 한다.
++ * - 모든 프레임은 정확히 한 번 close() 된다 (안 닫으면 카메라가 멈춘다).
++ * - [snapshots]는 `stableFrames >= 2` 만 발행하고, 받는 쪽이 느려도 막히지 않는다(최신만 남김).
++ * - 원본 글자는 로그에 남기지 않는다.
++ */
++class VisionScreenAnalyzer(
++    private val scope: CoroutineScope,
++    private val ocr: OcrEngine,
++    private val clock: Clock,
++    private val logger: Logger,
++    filters: List<TextFilter> = defaultFilters(),
++    classifier: ElementClassifier = ClassifierChain.default(),
++    private val sampler: FrameSampler = FrameSampler(),
++    private val differ: ScreenDiffer = ScreenDiffer(),
++    /** 64×36 흑백 축소본. 없으면 시간 간격만으로 샘플링한다. :app 이 ImageProxy 의 Y 평면에서 만들어 넣는다. */
++    private val thumbnailer: (CameraFrame) -> ByteArray? = { null },
++) : FrameSink, SnapshotSource {
++
++    private val builder = ElementBuilder(filters, classifier)
++    private val latest = AtomicReference<CameraFrame?>(null)
++    private val wake = Channel<Unit>(Channel.CONFLATED)
++    private val snapFlow = MutableSharedFlow<ScreenSnapshot>(replay = 1, extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
++    private val changeFlow = MutableSharedFlow<String>(extraBufferCapacity = 8, onBufferOverflow = BufferOverflow.DROP_OLDEST)
++
++    override val snapshots: Flow<ScreenSnapshot> = snapFlow
++    override val screenChanges: Flow<String> = changeFlow
++
++    private var lastElements: List<UiElement> = emptyList()
++    private var lastFrame: CameraFrame? = null
++
++    init {
++        scope.launch {
++            try {
++                for (u in wake) {
++                    val f = latest.getAndSet(null) ?: continue
++                    process(f)
++                }
++            } finally {
++                latest.getAndSet(null)?.safeClose()
++            }
++        }
++    }
++
++    override fun submit(frame: CameraFrame) {
++        try {
++            val old = latest.getAndSet(frame)
++            old?.safeClose()                                    // 밀린 프레임은 버린다
++            wake.trySend(Unit)
++        } catch (e: Throwable) {
++            frame.safeClose()
++        }
++    }
++
++    private suspend fun process(frame: CameraFrame) {
++        val t0 = clock.nowMs()
++        try {
++            val thumb = runCatching { thumbnailer(frame) }.getOrNull()
++            when (sampler.decide(t0, thumb)) {
++                FrameSampler.Decision.DROP -> return
++                FrameSampler.Decision.SAME_AS_LAST -> {
++                    val r = differ.repeat()
++                    val id = r.screenId
++                    if (id != null && r.stableFrames == MIN_STABLE && lastElements.isNotEmpty()) publish(frame, id, r.stableFrames, lastElements)
++                    return
++                }
++                FrameSampler.Decision.RUN_OCR -> Unit
++            }
++            val blocks = ocr.recognize(frame)
++            val elements = builder.build(blocks)
++            val r = differ.update(elements)
++            val id = r.screenId ?: return                       // 요소가 너무 적음: 화면이 아니거나 가려짐
++            if (r.isNewScreen) changeFlow.tryEmit(id)
++            lastElements = elements
++            if (r.stableFrames >= MIN_STABLE) publish(frame, id, r.stableFrames, elements)
++            logger.d("KL_PERF", "vision ocr_ms=${clock.nowMs() - t0} elements=${elements.size} stable=${r.stableFrames}")
++        } catch (e: CancellationException) {
++            throw e
++        } catch (e: Throwable) {
++            logger.e("KL_PERF", "vision failed", e)             // 한 프레임 실패는 건너뛴다
++        } finally {
++            frame.safeClose()
++        }
++    }
++
++    private fun publish(frame: CameraFrame, id: String, stable: Int, elements: List<UiElement>) {
++        snapFlow.tryEmit(ScreenSnapshot(id, frame.frameId, frame.timestampMs, elements, stable))
++    }
++
++    private fun CameraFrame.safeClose() { try { close() } catch (_: Throwable) {} }
++
++    companion object {
++        const val MIN_STABLE = 2
++        fun defaultFilters(): List<TextFilter> = listOf(BlankFilter(), CardNumberFilter(), LowConfidenceFilter(), TinyAreaFilter())
++    }
++}
+diff --git a/vision/src/main/kotlin/kr/kiosklens/vision/classify/ElementClassifier.kt b/vision/src/main/kotlin/kr/kiosklens/vision/classify/ElementClassifier.kt
+new file mode 100644
+index 0000000..2b38db7
+--- /dev/null
++++ b/vision/src/main/kotlin/kr/kiosklens/vision/classify/ElementClassifier.kt
+@@ -0,0 +1,42 @@
++package kr.kiosklens.vision.classify
++
++import kr.kiosklens.core.model.ElementKind
++import kr.kiosklens.vision.ocr.OcrBlock
++
++/** 글자 하나가 어떤 종류인지 판단. 모르면 null (다음 분류기에게 넘김). */
++fun interface ElementClassifier {
++    fun classify(block: OcrBlock): ElementKind?
++}
++
++/** 4,500원 · ₩4500 · 4.5천원 같은 가격 */
++class PriceClassifier : ElementClassifier {
++    private val price = Regex("""^\s*(₩\s*)?\d{1,3}([,.]\d{3})*\s*(원|₩|won)?\s*$|^\s*\d+(\.\d+)?\s*(천|만)\s*원\s*$""", RegexOption.IGNORE_CASE)
++    override fun classify(block: OcrBlock): ElementKind? {
++        val t = block.text.trim()
++        if (t.endsWith("원") && t.dropLast(1).trim().let { it.isNotEmpty() && it.all { c -> c.isDigit() || c == ',' || c == '.' || c == ' ' } }) return ElementKind.PRICE
++        if (t.startsWith("₩") || (t.contains(',') && price.matches(t) && t.any { it.isDigit() } && t.length >= 5)) return ElementKind.PRICE
++        return null
++    }
++}
++
++/**
++ * 누를 수 있어 보이는 글자: 짧고, 문장이 아니다.
++ * 키오스크 버튼은 "아메리카노", "HOT", "담기", "장바구니 보기"처럼 짧다. 안내 문장("원하시는 메뉴를 선택하세요")은 버튼이 아니다.
++ */
++class ButtonLikeClassifier(private val maxChars: Int = 16, private val maxWords: Int = 4) : ElementClassifier {
++    private val sentenceEnd = Regex("""(세요|하세요|주세요|입니다|합니다|됩니다|십시오|니다|해요|에요|예요|[.!?。])\s*$""")
++    override fun classify(block: OcrBlock): ElementKind? {
++        val t = block.text.trim()
++        val compact = t.filter { !it.isWhitespace() }
++        if (compact.isEmpty()) return null
++        if (compact.length > maxChars || t.split(Regex("\\s+")).size > maxWords) return ElementKind.TEXT
++        if (sentenceEnd.containsMatchIn(t)) return ElementKind.TEXT
++        return ElementKind.BUTTON_LIKE
++    }
++}
++
++/** 분류기를 차례로 물어 처음 답한 것을 쓴다. 아무도 모르면 TEXT. */
++class ClassifierChain(private val chain: List<ElementClassifier>) : ElementClassifier {
++    override fun classify(block: OcrBlock): ElementKind? = chain.firstNotNullOfOrNull { it.classify(block) } ?: ElementKind.TEXT
++    companion object { fun default() = ClassifierChain(listOf(PriceClassifier(), ButtonLikeClassifier())) }
++}
+diff --git a/vision/src/main/kotlin/kr/kiosklens/vision/fake/FakeScreenAnalyzer.kt b/vision/src/main/kotlin/kr/kiosklens/vision/fake/FakeScreenAnalyzer.kt
+new file mode 100644
+index 0000000..fdd7921
+--- /dev/null
++++ b/vision/src/main/kotlin/kr/kiosklens/vision/fake/FakeScreenAnalyzer.kt
+@@ -0,0 +1,38 @@
++package kr.kiosklens.vision.fake
++
++import kotlinx.coroutines.channels.BufferOverflow
++import kotlinx.coroutines.flow.Flow
++import kotlinx.coroutines.flow.MutableSharedFlow
++import kr.kiosklens.core.model.CameraFrame
++import kr.kiosklens.core.model.ScreenSnapshot
++import kr.kiosklens.core.port.FrameSink
++import kr.kiosklens.core.port.SnapshotSource
++
++/**
++ * 카메라 없이 미리 만든 화면을 차례로 재생하는 가짜 (mock 플레이버 · 테스트용).
++ * [show]로 화면을 하나 보여 주면 새 화면일 때 screenChanges 와 snapshots 를 낸다.
++ * 프레임은 받는 즉시 close() 한다.
++ */
++class FakeScreenAnalyzer(private val screens: List<ScreenSnapshot> = emptyList()) : FrameSink, SnapshotSource {
++    private val snapFlow = MutableSharedFlow<ScreenSnapshot>(replay = 1, extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
++    private val changeFlow = MutableSharedFlow<String>(extraBufferCapacity = 8, onBufferOverflow = BufferOverflow.DROP_OLDEST)
++    override val snapshots: Flow<ScreenSnapshot> = snapFlow
++    override val screenChanges: Flow<String> = changeFlow
++
++    private var current: String? = null
++    var index = -1
++        private set
++
++    override fun submit(frame: CameraFrame) { runCatching { frame.close() } }
++
++    fun show(snapshot: ScreenSnapshot) {
++        if (snapshot.screenId != current) { current = snapshot.screenId; changeFlow.tryEmit(snapshot.screenId) }
++        snapFlow.tryEmit(snapshot.copy(stableFrames = maxOf(2, snapshot.stableFrames)))
++    }
++
++    fun show(i: Int) { index = i.coerceIn(0, screens.lastIndex); show(screens[index]) }
++
++    /** 다음 화면으로 (끝이면 마지막 화면 유지) */
++    fun next() = show(index + 1)
++    fun hasScreens() = screens.isNotEmpty()
++}
+diff --git a/vision/src/main/kotlin/kr/kiosklens/vision/fake/SampleScreens.kt b/vision/src/main/kotlin/kr/kiosklens/vision/fake/SampleScreens.kt
+new file mode 100644
+index 0000000..165414b
+--- /dev/null
++++ b/vision/src/main/kotlin/kr/kiosklens/vision/fake/SampleScreens.kt
+@@ -0,0 +1,32 @@
++package kr.kiosklens.vision.fake
++
++import kr.kiosklens.core.model.ElementKind
++import kr.kiosklens.core.model.NormRect
++import kr.kiosklens.core.model.ScreenSnapshot
++import kr.kiosklens.core.model.UiElement
++
++/** 카페 키오스크 손 픽스처 (server/testdata/snapshots 와 같은 배치). 대상 키오스크 사진이 나오기 전까지 mock 플레이버가 쓴다. */
++object SampleScreens {
++    private fun el(id: String, text: String, l: Float, t: Float, r: Float, b: Float, kind: ElementKind = ElementKind.BUTTON_LIKE) =
++        UiElement(id, text, NormRect(l, t, r, b), 0.95f, kind)
++
++    val cafe: List<ScreenSnapshot> = listOf(
++        ScreenSnapshot("s01_dine", 1, 0, listOf(
++            el("e1", "매장에서 드시겠어요?", 0.2f, 0.1f, 0.8f, 0.18f, ElementKind.TEXT),
++            el("e2", "매장", 0.1f, 0.35f, 0.45f, 0.6f), el("e3", "포장", 0.55f, 0.35f, 0.9f, 0.6f)), 2),
++        ScreenSnapshot("s02_menu", 2, 0, listOf(
++            el("e1", "커피", 0.02f, 0.12f, 0.2f, 0.18f), el("e2", "음료", 0.22f, 0.12f, 0.4f, 0.18f), el("e3", "디저트", 0.42f, 0.12f, 0.6f, 0.18f),
++            el("e4", "아메리카노", 0.05f, 0.25f, 0.3f, 0.4f), el("e5", "카페라떼", 0.35f, 0.25f, 0.6f, 0.4f),
++            el("e9", "4,500원", 0.05f, 0.41f, 0.3f, 0.45f, ElementKind.PRICE), el("e10", "5,000원", 0.35f, 0.41f, 0.6f, 0.45f, ElementKind.PRICE),
++            el("e11", "장바구니 보기", 0.6f, 0.9f, 0.95f, 0.97f)), 2),
++        ScreenSnapshot("s03_options", 3, 0, listOf(
++            el("e1", "아메리카노 옵션 선택", 0.2f, 0.08f, 0.8f, 0.15f, ElementKind.TEXT),
++            el("e2", "HOT", 0.1f, 0.25f, 0.4f, 0.38f), el("e3", "ICE", 0.55f, 0.25f, 0.85f, 0.38f), el("e6", "담기", 0.55f, 0.88f, 0.95f, 0.96f)), 2),
++        ScreenSnapshot("s04_cart", 4, 0, listOf(
++            el("e1", "주문 내역", 0.3f, 0.06f, 0.7f, 0.12f, ElementKind.TEXT), el("e2", "아메리카노 1잔", 0.05f, 0.2f, 0.6f, 0.28f, ElementKind.TEXT),
++            el("e3", "결제하기", 0.55f, 0.9f, 0.95f, 0.97f), el("e4", "더 담기", 0.05f, 0.9f, 0.45f, 0.97f)), 2),
++        ScreenSnapshot("s05_payment", 5, 0, listOf(
++            el("e1", "결제 수단을 선택하세요", 0.2f, 0.08f, 0.8f, 0.15f, ElementKind.TEXT),
++            el("e2", "신용카드", 0.1f, 0.3f, 0.45f, 0.5f), el("e3", "카카오페이", 0.55f, 0.3f, 0.9f, 0.5f), el("e4", "삼성페이", 0.1f, 0.55f, 0.45f, 0.75f)), 2),
++    )
++}
+diff --git a/vision/src/main/kotlin/kr/kiosklens/vision/filter/TextFilter.kt b/vision/src/main/kotlin/kr/kiosklens/vision/filter/TextFilter.kt
+new file mode 100644
+index 0000000..b5a7928
+--- /dev/null
++++ b/vision/src/main/kotlin/kr/kiosklens/vision/filter/TextFilter.kt
+@@ -0,0 +1,39 @@
++package kr.kiosklens.vision.filter
++
++import kr.kiosklens.vision.ocr.OcrBlock
++
++/** 요소로 만들기 전에 걸러 내는 규칙 하나. 새 규칙은 이 인터페이스를 구현한 새 클래스로 추가한다. */
++fun interface TextFilter {
++    /** true면 남긴다. */
++    fun keep(block: OcrBlock): Boolean
++}
++
++/** 카드 번호(숫자 13~19자리)와 유효기간(MM/YY)은 절대 앱 안에서도 요소로 만들지 않는다 (개인정보). */
++class CardNumberFilter : TextFilter {
++    private val expiry = Regex("""(?<!\d)(0[1-9]|1[0-2])\s*[/\-.]\s*(\d{2}|\d{4})(?!\d)""")
++    override fun keep(block: OcrBlock): Boolean {
++        val t = block.text
++        val digits = t.filter { it.isDigit() }
++        val onlyDigitsAndSeparators = t.all { it.isDigit() || it in " -·.*xX•" }
++        if (onlyDigitsAndSeparators && digits.length in 13..19) return false
++        if (digits.length in 13..19 && digits.length >= t.count { !it.isWhitespace() } - 4) return false   // 숫자가 거의 전부
++        if (expiry.containsMatchIn(t) && digits.length <= 8 && t.none { it in '가'..'힣' }) return false
++        return true
++    }
++}
++
++class LowConfidenceFilter(private val min: Float = 0.5f) : TextFilter {
++    override fun keep(block: OcrBlock) = block.confidence >= min
++}
++
++/** 너무 작은 글자(먼지 · 노이즈)와 화면 대부분을 덮는 상자를 거른다. */
++class TinyAreaFilter(private val minHeight: Float = 0.008f, private val minWidth: Float = 0.01f, private val maxArea: Float = 0.6f) : TextFilter {
++    override fun keep(block: OcrBlock): Boolean {
++        val r = block.rect
++        return r.height >= minHeight && r.width >= minWidth && r.width * r.height <= maxArea
++    }
++}
++
++class BlankFilter : TextFilter {
++    override fun keep(block: OcrBlock) = block.text.isNotBlank() && block.text.any { it.isLetterOrDigit() || it in '가'..'힣' }
++}
+diff --git a/vision/src/main/kotlin/kr/kiosklens/vision/ocr/MlKitOcrEngine.kt b/vision/src/main/kotlin/kr/kiosklens/vision/ocr/MlKitOcrEngine.kt
+new file mode 100644
+index 0000000..192a93c
+--- /dev/null
++++ b/vision/src/main/kotlin/kr/kiosklens/vision/ocr/MlKitOcrEngine.kt
+@@ -0,0 +1,60 @@
++package kr.kiosklens.vision.ocr
++
++import android.graphics.Bitmap
++import androidx.camera.core.ExperimentalGetImage
++import androidx.camera.core.ImageProxy
++import com.google.mlkit.vision.common.InputImage
++import com.google.mlkit.vision.text.Text
++import com.google.mlkit.vision.text.TextRecognition
++import com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions
++import kotlin.coroutines.resume
++import kotlin.coroutines.resumeWithException
++import kotlinx.coroutines.suspendCancellableCoroutine
++import kr.kiosklens.core.model.CameraFrame
++import kr.kiosklens.core.model.NormRect
++
++/**
++ * ML Kit 한국어 글자 인식 (기기 안에서 동작, 이미지는 밖으로 나가지 않는다).
++ * 이미지는 [ImageProxy](실제 카메라) 또는 [Bitmap](사진 입력 디버그 모드).
++ *
++ * ML Kit은 회전 각도를 넘기면 "돌려서 세운" 이미지 기준 좌표를 돌려준다. 그 크기로 나누어 0~1로 만든다.
++ */
++class MlKitOcrEngine : OcrEngine {
++    private val recognizer = TextRecognition.getClient(KoreanTextRecognizerOptions.Builder().build())
++
++    @OptIn(ExperimentalGetImage::class)
++    override suspend fun recognize(frame: CameraFrame): List<OcrBlock> {
++        val (input, w, h) = when (val img = frame.image) {
++            is ImageProxy -> {
++                val media = img.image ?: return emptyList()
++                val rot = frame.rotationDegrees
++                val upright = if (rot == 90 || rot == 270) Pair(img.height, img.width) else Pair(img.width, img.height)
++                Triple(InputImage.fromMediaImage(media, rot), upright.first, upright.second)
++            }
++            is Bitmap -> {
++                val rot = frame.rotationDegrees
++                val upright = if (rot == 90 || rot == 270) Pair(img.height, img.width) else Pair(img.width, img.height)
++                Triple(InputImage.fromBitmap(img, rot), upright.first, upright.second)
++            }
++            else -> return emptyList()
++        }
++        if (w <= 0 || h <= 0) return emptyList()
++        val text = suspendCancellableCoroutine<Text> { cont ->
++            recognizer.process(input)
++                .addOnSuccessListener { cont.resume(it) }
++                .addOnFailureListener { cont.resumeWithException(it) }
++        }
++        val out = ArrayList<OcrBlock>()
++        for (block in text.textBlocks) for (line in block.lines) {
++            val box = line.boundingBox ?: continue
++            val rect = NormRect(
++                (box.left.toFloat() / w).coerceIn(0f, 1f), (box.top.toFloat() / h).coerceIn(0f, 1f),
++                (box.right.toFloat() / w).coerceIn(0f, 1f), (box.bottom.toFloat() / h).coerceIn(0f, 1f),
++            )
++            out += OcrBlock(line.text, rect, line.confidence)
++        }
++        return out
++    }
++
++    fun close() = recognizer.close()
++}
+diff --git a/vision/src/main/kotlin/kr/kiosklens/vision/ocr/OcrEngine.kt b/vision/src/main/kotlin/kr/kiosklens/vision/ocr/OcrEngine.kt
+new file mode 100644
+index 0000000..33534b2
+--- /dev/null
++++ b/vision/src/main/kotlin/kr/kiosklens/vision/ocr/OcrEngine.kt
+@@ -0,0 +1,16 @@
++package kr.kiosklens.vision.ocr
++
++import kr.kiosklens.core.model.CameraFrame
++import kr.kiosklens.core.model.NormRect
++
++/** OCR이 읽은 글자 한 덩어리 (줄 단위). 좌표는 회전 보정된 분석 프레임 기준 정규화. */
++data class OcrBlock(val text: String, val rect: NormRect, val confidence: Float)
++
++/**
++ * 글자 읽기 엔진. 구현을 바꿔 끼울 수 있게 인터페이스로 둔다 (설계서 16.3).
++ * 프레임을 닫는 것은 호출한 쪽([kr.kiosklens.vision.VisionScreenAnalyzer])의 일이다.
++ */
++interface OcrEngine {
++    /** 실패하면 예외를 던져도 된다 (호출한 쪽이 잡는다). */
++    suspend fun recognize(frame: CameraFrame): List<OcrBlock>
++}
+diff --git a/vision/src/main/kotlin/kr/kiosklens/vision/package-info.kt b/vision/src/main/kotlin/kr/kiosklens/vision/package-info.kt
+deleted file mode 100644
+index cbfb5ae..0000000
+--- a/vision/src/main/kotlin/kr/kiosklens/vision/package-info.kt
++++ /dev/null
+@@ -1,2 +0,0 @@
+-// :vision 모듈 자리. 담당 파트가 포트 구현과 Fake를 여기에 추가합니다.
+-package kr.kiosklens.vision
+diff --git a/vision/src/main/kotlin/kr/kiosklens/vision/pipeline/ElementBuilder.kt b/vision/src/main/kotlin/kr/kiosklens/vision/pipeline/ElementBuilder.kt
+new file mode 100644
+index 0000000..21c14f4
+--- /dev/null
++++ b/vision/src/main/kotlin/kr/kiosklens/vision/pipeline/ElementBuilder.kt
+@@ -0,0 +1,54 @@
++package kr.kiosklens.vision.pipeline
++
++import kr.kiosklens.core.model.NormRect
++import kr.kiosklens.core.model.ScreenSnapshot
++import kr.kiosklens.core.model.UiElement
++import kr.kiosklens.vision.classify.ElementClassifier
++import kr.kiosklens.vision.filter.TextFilter
++import kr.kiosklens.vision.ocr.OcrBlock
++
++/**
++ * OCR 결과 → 필터 → 분류 → [UiElement] (id 부여).
++ *
++ * 요소 ID 규칙 (설계서 4.3): "e" + hash(정규화 텍스트 + 중심점을 20×20 격자로 양자화한 셀).
++ * 프레임이 바뀌어도 같은 버튼이면 같은 id. 충돌하면 `_2`, `_3`…
++ */
++class ElementBuilder(private val filters: List<TextFilter>, private val classifier: ElementClassifier) {
++
++    fun build(blocks: List<OcrBlock>): List<UiElement> {
++        val used = HashSet<String>()
++        val out = ArrayList<UiElement>()
++        val sorted = blocks.sortedWith(compareBy({ it.rect.top }, { it.rect.left }))            // 같은 입력이면 같은 id가 나오게
++        for (b in sorted) {
++            if (out.size >= ScreenSnapshot.MAX_ELEMENTS) break
++            val text = b.text.replace(Regex("\\s+"), " ").trim().take(UiElement.MAX_TEXT_LENGTH)
++            if (text.isEmpty()) continue
++            val block = b.copy(text = text, rect = clamp(b.rect), confidence = b.confidence.coerceIn(0f, 1f))
++            if (!block.rect.isValid) continue
++            if (!filters.all { it.keep(block) }) continue
++            val kind = classifier.classify(block) ?: continue
++            out += UiElement(unique(idOf(text, block.rect), used), text, block.rect, block.confidence, kind)
++        }
++        return out
++    }
++
++    private fun clamp(r: NormRect) = NormRect(r.left.coerceIn(0f, 1f), r.top.coerceIn(0f, 1f), r.right.coerceIn(0f, 1f), r.bottom.coerceIn(0f, 1f))
++
++    private fun unique(base: String, used: MutableSet<String>): String {
++        var id = base; var n = 2
++        while (!used.add(id)) id = base + "_" + n++
++        return id
++    }
++
++    companion object {
++        const val GRID = 20
++
++        fun idOf(text: String, rect: NormRect): String {
++            val cx = (rect.centerX * GRID).toInt().coerceIn(0, GRID - 1)
++            val cy = (rect.centerY * GRID).toInt().coerceIn(0, GRID - 1)
++            var h = 0x811C9DC5.toInt()                                                         // FNV-1a 32비트: 기기·실행마다 같은 값
++            for (c in TextNorm.norm(text) + "@" + cx + "," + cy) { h = h xor c.code; h *= 0x01000193 }
++            return "e" + Integer.toHexString(h)
++        }
++    }
++}
+diff --git a/vision/src/main/kotlin/kr/kiosklens/vision/pipeline/FrameSampler.kt b/vision/src/main/kotlin/kr/kiosklens/vision/pipeline/FrameSampler.kt
+new file mode 100644
+index 0000000..6d9c838
+--- /dev/null
++++ b/vision/src/main/kotlin/kr/kiosklens/vision/pipeline/FrameSampler.kt
+@@ -0,0 +1,37 @@
++package kr.kiosklens.vision.pipeline
++
++import kotlin.math.abs
++
++/**
++ * 어떤 프레임에 OCR을 돌릴지 정한다 (설계서 7.1): 초당 [fps]장 이하로, 앞 프레임과 거의 같으면 건너뛴다.
++ * 건너뛴 프레임도 "같은 화면이 한 번 더 보였다"는 뜻이라 ScreenDiffer.repeat()로 센다.
++ */
++class FrameSampler(fps: Int = 3, private val diffThreshold: Float = 2.0f) {
++    enum class Decision { RUN_OCR, SAME_AS_LAST, DROP }
++
++    private val minIntervalMs = 1000L / fps.coerceAtLeast(1)
++    private var lastRunMs = Long.MIN_VALUE / 2
++    private var lastThumb: ByteArray? = null
++    private var sinceOcr = 0
++
++    /** thumb: 64×36 흑백 축소 이미지 (없으면 시간만 본다) */
++    fun decide(nowMs: Long, thumb: ByteArray?): Decision {
++        if (nowMs - lastRunMs < minIntervalMs) return Decision.DROP
++        lastRunMs = nowMs
++        val prev = lastThumb
++        if (thumb != null && prev != null && prev.size == thumb.size && meanAbsDiff(prev, thumb) < diffThreshold && sinceOcr < MAX_SKIPS) {
++            sinceOcr++
++            return Decision.SAME_AS_LAST
++        }
++        lastThumb = thumb; sinceOcr = 0
++        return Decision.RUN_OCR
++    }
++
++    private fun meanAbsDiff(a: ByteArray, b: ByteArray): Float {
++        var s = 0L
++        for (i in a.indices) s += abs((a[i].toInt() and 0xFF) - (b[i].toInt() and 0xFF))
++        return s.toFloat() / a.size
++    }
++
++    private companion object { const val MAX_SKIPS = 6 }          // 화면이 정지해 있어도 가끔은 다시 읽는다
++}
+diff --git a/vision/src/main/kotlin/kr/kiosklens/vision/pipeline/ImageProxyThumbnail.kt b/vision/src/main/kotlin/kr/kiosklens/vision/pipeline/ImageProxyThumbnail.kt
+new file mode 100644
+index 0000000..cf0da38
+--- /dev/null
++++ b/vision/src/main/kotlin/kr/kiosklens/vision/pipeline/ImageProxyThumbnail.kt
+@@ -0,0 +1,34 @@
++package kr.kiosklens.vision.pipeline
++
++import androidx.camera.core.ImageProxy
++import kr.kiosklens.core.model.CameraFrame
++
++/**
++ * 카메라 프레임의 밝기(Y) 평면을 64×36 흑백으로 줄인다. [FrameSampler]가 "앞 프레임과 거의 같은가"를 볼 때 쓴다.
++ * 줄이기만 하므로 매우 가볍다(한 프레임에 수백 번 읽기). 이미지는 어디에도 저장하거나 보내지 않는다.
++ *
++ * 사용: `VisionScreenAnalyzer(..., thumbnailer = ImageProxyThumbnail::of)`
++ */
++object ImageProxyThumbnail {
++    const val W = 64
++    const val H = 36
++
++    fun of(frame: CameraFrame): ByteArray? {
++        val img = frame.image as? ImageProxy ?: return null
++        val plane = img.planes.firstOrNull() ?: return null
++        val w = img.width; val h = img.height
++        if (w <= 0 || h <= 0) return null
++        val buf = plane.buffer
++        val stride = plane.rowStride
++        val out = ByteArray(W * H)
++        for (y in 0 until H) {
++            val sy = (y * h / H).coerceAtMost(h - 1)
++            for (x in 0 until W) {
++                val sx = (x * w / W).coerceAtMost(w - 1)
++                val pos = sy * stride + sx
++                out[y * W + x] = if (pos < buf.limit()) buf.get(pos) else 0
++            }
++        }
++        return out
++    }
++}
+diff --git a/vision/src/main/kotlin/kr/kiosklens/vision/pipeline/ScreenDiffer.kt b/vision/src/main/kotlin/kr/kiosklens/vision/pipeline/ScreenDiffer.kt
+new file mode 100644
+index 0000000..bb53e69
+--- /dev/null
++++ b/vision/src/main/kotlin/kr/kiosklens/vision/pipeline/ScreenDiffer.kt
+@@ -0,0 +1,75 @@
++package kr.kiosklens.vision.pipeline
++
++import kr.kiosklens.core.model.UiElement
++
++/**
++ * 화면이 바뀌었는지 판단하고 `stableFrames` 를 센다 (설계서 7.2).
++ * - 글자 집합의 Jaccard 유사도가 [threshold] 미만인 프레임이 **연속 [confirmFrames]** 이어야 새 화면.
++ *   (카메라가 잠깐 흔들려 한 프레임만 다르게 읽혀도 새 화면으로 보지 않는다)
++ * - 요소가 [minElements]개 미만인 프레임은 판단에서 제외 (손가락이 가리거나 화면이 아닐 때).
++ */
++class ScreenDiffer(
++    private val threshold: Float = 0.6f,
++    private val confirmFrames: Int = 2,
++    private val minElements: Int = 3,
++) {
++    data class Result(
++        /** 판단에서 제외된 프레임이면 null */
++        val screenId: String?,
++        val stableFrames: Int,
++        /** 이번 프레임에서 새 화면으로 확정됐는가 (맨 처음 화면 포함) */
++        val isNewScreen: Boolean,
++    )
++
++    private var seq = 0
++    private var currentId: String? = null
++    private var reference: Set<String> = emptySet()
++    private var stable = 0
++    private var candidate: Set<String>? = null
++    private var candidateCount = 0
++
++    fun signature(elements: List<UiElement>): Set<String> = elements.map { TextNorm.norm(it.text) }.filter { it.isNotEmpty() }.toSet()
++
++    fun update(elements: List<UiElement>): Result {
++        val sig = signature(elements)
++        if (sig.size < minElements) return Result(null, stable, false)
++        if (currentId == null) return startScreen(sig)
++
++        if (jaccard(reference, sig) >= threshold) {                    // 같은 화면
++            candidate = null; candidateCount = 0
++            reference = sig                                            // 천천히 바뀌는 내용(합계 등)을 따라간다
++            stable++
++            return Result(currentId, stable, false)
++        }
++        // 다른 화면 후보. 후보끼리도 서로 비슷해야 같은 새 화면의 연속 프레임으로 센다.
++        val c = candidate
++        if (c != null && jaccard(c, sig) >= threshold) candidateCount++ else { candidateCount = 1 }
++        candidate = sig
++        if (candidateCount >= confirmFrames) return startScreen(sig)
++        return Result(currentId, 0, false)                              // 확정 전: 안정 아님
++    }
++
++    /** OCR을 건너뛴(앞 프레임과 똑같은) 프레임. 같은 화면으로 계속 센다. */
++    fun repeat(): Result {
++        val id = currentId ?: return Result(null, 0, false)
++        stable++
++        candidate = null; candidateCount = 0
++        return Result(id, stable, false)
++    }
++
++    private fun startScreen(sig: Set<String>): Result {
++        seq++
++        currentId = "s%03d".format(seq)
++        reference = sig; stable = confirmFrames.coerceAtLeast(1)
++        candidate = null; candidateCount = 0
++        return Result(currentId, stable, true)
++    }
++
++    fun reset() { currentId = null; reference = emptySet(); stable = 0; candidate = null; candidateCount = 0 }
++
++    private fun jaccard(a: Set<String>, b: Set<String>): Float {
++        if (a.isEmpty() && b.isEmpty()) return 1f
++        val inter = a.count { it in b }
++        return inter.toFloat() / (a.size + b.size - inter)
++    }
++}
+diff --git a/vision/src/main/kotlin/kr/kiosklens/vision/pipeline/TextNorm.kt b/vision/src/main/kotlin/kr/kiosklens/vision/pipeline/TextNorm.kt
+new file mode 100644
+index 0000000..57265de
+--- /dev/null
++++ b/vision/src/main/kotlin/kr/kiosklens/vision/pipeline/TextNorm.kt
+@@ -0,0 +1,8 @@
++package kr.kiosklens.vision.pipeline
++
++/** 비교용 글자 정리: 글자·숫자만 남기고 소문자로. */
++object TextNorm {
++    fun norm(t: String): String = buildString(t.length) {
++        for (c in t) if (c.isLetterOrDigit() || c in '가'..'힣' || c in 'ㄱ'..'ㅣ') append(c.lowercaseChar())
++    }
++}
+diff --git a/vision/src/test/kotlin/kr/kiosklens/vision/VisionTest.kt b/vision/src/test/kotlin/kr/kiosklens/vision/VisionTest.kt
+new file mode 100644
+index 0000000..63605f0
+--- /dev/null
++++ b/vision/src/test/kotlin/kr/kiosklens/vision/VisionTest.kt
+@@ -0,0 +1,304 @@
++package kr.kiosklens.vision
++
++import java.util.concurrent.atomic.AtomicInteger
++import kotlinx.coroutines.CoroutineScope
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.SupervisorJob
++import kotlinx.coroutines.cancel
++import kotlinx.coroutines.delay
++import kotlinx.coroutines.flow.toList
++import kotlinx.coroutines.launch
++import kotlinx.coroutines.runBlocking
++import kotlinx.coroutines.withTimeout
++import kr.kiosklens.core.model.CameraFrame
++import kr.kiosklens.core.model.ElementKind
++import kr.kiosklens.core.model.NormRect
++import kr.kiosklens.core.model.ScreenSnapshot
++import kr.kiosklens.core.port.Clock
++import kr.kiosklens.core.port.FrameSink
++import kr.kiosklens.core.port.Logger
++import kr.kiosklens.core.port.SnapshotSource
++import kr.kiosklens.vision.classify.ButtonLikeClassifier
++import kr.kiosklens.vision.classify.ClassifierChain
++import kr.kiosklens.vision.classify.PriceClassifier
++import kr.kiosklens.vision.fake.FakeScreenAnalyzer
++import kr.kiosklens.vision.fake.SampleScreens
++import kr.kiosklens.vision.filter.CardNumberFilter
++import kr.kiosklens.vision.filter.LowConfidenceFilter
++import kr.kiosklens.vision.filter.TinyAreaFilter
++import kr.kiosklens.vision.ocr.OcrBlock
++import kr.kiosklens.vision.ocr.OcrEngine
++import kr.kiosklens.vision.pipeline.ElementBuilder
++import kr.kiosklens.vision.pipeline.FrameSampler
++import kr.kiosklens.vision.pipeline.ScreenDiffer
++import org.junit.After
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNotEquals
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++internal class TestFrame(override val frameId: Long, var closed: AtomicInteger = AtomicInteger()) : CameraFrame {
++    override val timestampMs = frameId * 100
++    override val rotationDegrees = 0
++    override val width = 1080
++    override val height = 1920
++    override val image: Any = Any()
++    override fun close() { closed.incrementAndGet() }
++}
++
++internal fun blk(text: String, l: Float, t: Float, r: Float, b: Float, c: Float = 0.9f) = OcrBlock(text, NormRect(l, t, r, b), c)
++
++internal val quiet = object : Logger {
++    override fun d(tag: String, message: String) {}
++    override fun w(tag: String, message: String, error: Throwable?) {}
++    override fun e(tag: String, message: String, error: Throwable?) {}
++}
++
++/** 메뉴 화면을 OCR이 읽은 모양 */
++internal fun menuBlocks(extra: List<OcrBlock> = emptyList()) = listOf(
++    blk("커피", 0.02f, 0.12f, 0.2f, 0.18f), blk("음료", 0.22f, 0.12f, 0.4f, 0.18f),
++    blk("아메리카노", 0.05f, 0.25f, 0.3f, 0.4f), blk("4,500원", 0.05f, 0.41f, 0.3f, 0.45f),
++    blk("장바구니 보기", 0.6f, 0.9f, 0.95f, 0.97f), blk("원하시는 메뉴를 선택해 주세요", 0.1f, 0.05f, 0.9f, 0.1f),
++) + extra
++
++internal fun optionBlocks() = listOf(
++    blk("HOT", 0.1f, 0.25f, 0.4f, 0.38f), blk("ICE", 0.55f, 0.25f, 0.85f, 0.38f),
++    blk("담기", 0.55f, 0.88f, 0.95f, 0.96f), blk("아메리카노 옵션", 0.2f, 0.08f, 0.8f, 0.15f),
++)
++
++/** 계약 테스트 (README): Fake 와 실구현이 둘 다 이 클래스를 상속해서 통과해야 한다. */
++abstract class VisionContractSpec {
++    protected abstract fun create(): Pair<FrameSink, SnapshotSource>
++    /** 화면 하나가 충분히 안정되어 스냅샷이 나오게 만든다 */
++    protected abstract fun feedStableScreen(sink: FrameSink, source: SnapshotSource)
++    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
++    @After fun cancel() { scope.cancel() }
++
++    @Test fun `submit은 막히지 않고 이상한 프레임도 예외가 없다`() {
++        val (sink, _) = create()
++        val bad = object : CameraFrame {
++            override val frameId = -1L; override val timestampMs = -5L; override val rotationDegrees = 777
++            override val width = 0; override val height = 0; override val image: Any = "not an image"
++            override fun close() { throw IllegalStateException("close도 실패") }
++        }
++        val t0 = System.nanoTime()
++        sink.submit(bad); sink.submit(TestFrame(1))
++        assertTrue("즉시 복귀", (System.nanoTime() - t0) / 1_000_000 < 200)
++    }
++
++    @Test fun `스냅샷은 stableFrames 2 이상만 나온다`() = runBlocking {
++        val (sink, src) = create()
++        val got = java.util.concurrent.CopyOnWriteArrayList<ScreenSnapshot>()
++        val job = scope.launch { src.snapshots.collect { got += it } }
++        feedStableScreen(sink, src)
++        withTimeout(3000) { while (got.isEmpty()) delay(10) }
++        assertTrue(got.all { it.stableFrames >= 2 })
++        job.cancel()
++    }
++
++    @Test fun `받는 쪽이 느려도 막히지 않는다`() = runBlocking {
++        val (sink, src) = create()
++        val job = scope.launch { src.snapshots.collect { delay(10_000) } }              // 아주 느린 수집
++        val t0 = System.currentTimeMillis()
++        repeat(5) { feedStableScreen(sink, src) }
++        assertTrue(System.currentTimeMillis() - t0 < 3000)
++        job.cancel()
++    }
++}
++
++class FakeScreenAnalyzerContractTest : VisionContractSpec() {
++    override fun create(): Pair<FrameSink, SnapshotSource> = FakeScreenAnalyzer(SampleScreens.cafe).let { it to it }
++    override fun feedStableScreen(sink: FrameSink, source: SnapshotSource) { (source as FakeScreenAnalyzer).show(1) }
++}
++
++class VisionScreenAnalyzerContractTest : VisionContractSpec() {
++    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
++    private var n = 0L
++    override fun create(): Pair<FrameSink, SnapshotSource> {
++        val ocr = object : OcrEngine { override suspend fun recognize(frame: CameraFrame) = menuBlocks() }
++        val a = VisionScreenAnalyzer(scope, ocr, Clock { System.currentTimeMillis() }, quiet, sampler = FrameSampler(fps = 1000))
++        return a to a
++    }
++    override fun feedStableScreen(sink: FrameSink, source: SnapshotSource) {
++        repeat(4) { sink.submit(TestFrame(++n)); Thread.sleep(15) }
++    }
++}
++
++class VisionPartsTest {
++    // ---- 보안 필터 ----
++    @Test fun `카드 번호와 유효기간은 요소가 되지 않는다`() {
++        val f = CardNumberFilter()
++        assertFalse(f.keep(blk("1234 5678 9012 3456", 0.1f, 0.1f, 0.5f, 0.15f)))
++        assertFalse(f.keep(blk("1234567890123456", 0.1f, 0.1f, 0.5f, 0.15f)))
++        assertFalse(f.keep(blk("1234-5678-9012-3456", 0.1f, 0.1f, 0.5f, 0.15f)))
++        assertFalse(f.keep(blk("12/27", 0.1f, 0.1f, 0.5f, 0.15f)))
++        assertTrue(f.keep(blk("4,500원", 0.1f, 0.1f, 0.5f, 0.15f)))
++        assertTrue(f.keep(blk("아메리카노", 0.1f, 0.1f, 0.5f, 0.15f)))
++        assertTrue(f.keep(blk("주문번호 105", 0.1f, 0.1f, 0.5f, 0.15f)))
++        assertTrue(f.keep(blk("10:30", 0.1f, 0.1f, 0.5f, 0.15f)))
++    }
++
++    @Test fun `낮은 신뢰도와 아주 작은 글자는 거른다`() {
++        assertFalse(LowConfidenceFilter(0.5f).keep(blk("흐림", 0.1f, 0.1f, 0.3f, 0.15f, c = 0.2f)))
++        assertFalse(TinyAreaFilter().keep(blk("점", 0.1f, 0.1f, 0.101f, 0.102f)))
++        assertFalse(TinyAreaFilter().keep(blk("전체", 0f, 0f, 1f, 1f)))
++        assertTrue(TinyAreaFilter().keep(blk("버튼", 0.1f, 0.1f, 0.3f, 0.15f)))
++    }
++
++    // ---- 분류 ----
++    @Test fun `가격과 버튼과 안내문을 구분한다`() {
++        val c = ClassifierChain.default()
++        fun k(t: String) = c.classify(blk(t, 0.1f, 0.1f, 0.4f, 0.15f))
++        assertEquals(ElementKind.PRICE, k("4,500원")); assertEquals(ElementKind.PRICE, k("12,000원")); assertEquals(ElementKind.PRICE, k("₩4500"))
++        assertEquals(ElementKind.BUTTON_LIKE, k("아메리카노")); assertEquals(ElementKind.BUTTON_LIKE, k("HOT")); assertEquals(ElementKind.BUTTON_LIKE, k("장바구니 보기"))
++        assertEquals(ElementKind.BUTTON_LIKE, k("담기")); assertEquals(ElementKind.BUTTON_LIKE, k("불고기버거 세트"))
++        assertEquals(ElementKind.TEXT, k("원하시는 메뉴를 선택해 주세요")); assertEquals(ElementKind.TEXT, k("결제 수단을 선택하세요"))
++        assertEquals(ElementKind.TEXT, k("국내산 한우 패티를 사용하여 만든 프리미엄 버거"))
++    }
++
++    // ---- 요소 ID ----
++    @Test fun `같은 버튼은 프레임이 바뀌어도 같은 id`() {
++        val b = ElementBuilder(listOf(), ClassifierChain.default())
++        val a = b.build(menuBlocks()).associate { it.text to it.id }
++        val shaken = menuBlocks().map { it.copy(rect = NormRect(it.rect.left + 0.003f, it.rect.top + 0.002f, it.rect.right + 0.003f, it.rect.bottom + 0.002f)) }
++        val c = b.build(shaken).associate { it.text to it.id }
++        assertEquals(a, c)
++    }
++
++    @Test fun `다른 자리의 같은 글자는 다른 id이고 충돌은 번호가 붙는다`() {
++        val b = ElementBuilder(listOf(), ClassifierChain.default())
++        val two = b.build(listOf(blk("추가", 0.1f, 0.2f, 0.3f, 0.25f), blk("추가", 0.6f, 0.7f, 0.8f, 0.75f)))
++        assertEquals(2, two.map { it.id }.toSet().size)
++        val same = b.build(listOf(blk("추가", 0.1f, 0.2f, 0.3f, 0.25f), blk("추가", 0.11f, 0.2f, 0.3f, 0.25f)))
++        assertTrue(same.any { it.id.endsWith("_2") })
++    }
++
++    @Test fun `길이와 개수 제한을 지킨다`() {
++        val b = ElementBuilder(listOf(), ClassifierChain.default())
++        val many = (0 until 400).map { blk("항목$it", (it % 20) / 20f, (it / 20) / 25f, (it % 20) / 20f + 0.04f, (it / 20) / 25f + 0.03f) }
++        assertEquals(300, b.build(many).size)
++        assertTrue(b.build(listOf(blk("가".repeat(200), 0.1f, 0.1f, 0.5f, 0.2f))).single().text.length <= 80)
++        assertTrue(b.build(listOf(blk("나쁨", 0.5f, 0.5f, 0.2f, 0.2f))).isEmpty())
++    }
++
++    // ---- 화면 전환 ----
++    private fun els(blocks: List<OcrBlock>) = ElementBuilder(listOf(), ClassifierChain.default()).build(blocks)
++
++    @Test fun `처음 화면은 바로 안정 2`() {
++        val d = ScreenDiffer()
++        val r = d.update(els(menuBlocks()))
++        assertTrue(r.isNewScreen); assertEquals(2, r.stableFrames)
++        assertEquals(3, d.update(els(menuBlocks())).stableFrames)
++    }
++
++    @Test fun `한 프레임만 다르게 읽혀도 새 화면이 아니다`() {
++        val d = ScreenDiffer(); val m = els(menuBlocks())
++        val id = d.update(m).screenId
++        d.update(m)
++        val glitch = d.update(els(optionBlocks()))
++        assertFalse(glitch.isNewScreen); assertEquals(id, glitch.screenId)
++        val back = d.update(m)
++        assertEquals(id, back.screenId); assertFalse(back.isNewScreen)
++    }
++
++    @Test fun `두 프레임 연속 다르면 새 화면`() {
++        val d = ScreenDiffer(); val m = els(menuBlocks())
++        val id = d.update(m).screenId
++        d.update(m)
++        d.update(els(optionBlocks()))
++        val r = d.update(els(optionBlocks()))
++        assertTrue(r.isNewScreen); assertNotEquals(id, r.screenId)
++    }
++
++    @Test fun `요소가 3개 미만이면 판단에서 제외`() {
++        val d = ScreenDiffer(); d.update(els(menuBlocks()))
++        val r = d.update(els(listOf(blk("손", 0.1f, 0.1f, 0.2f, 0.2f))))
++        assertNull(r.screenId)
++        assertFalse(d.update(els(menuBlocks())).isNewScreen)
++    }
++
++    @Test fun `OCR 노이즈가 조금 있어도 같은 화면`() {
++        val d = ScreenDiffer(); d.update(els(menuBlocks()))
++        val noisy = els(menuBlocks().filterNot { it.text == "음료" } + blk("잡음", 0.8f, 0.5f, 0.9f, 0.55f))
++        assertFalse(d.update(noisy).isNewScreen)
++    }
++
++    // ---- 샘플링 ----
++    @Test fun `초당 3장 이하로 줄이고 똑같은 프레임은 건너뛴다`() {
++        val s = FrameSampler(fps = 3)
++        val img = ByteArray(64 * 36) { 100 }
++        assertEquals(FrameSampler.Decision.RUN_OCR, s.decide(0, img))
++        assertEquals(FrameSampler.Decision.DROP, s.decide(100, img))
++        assertEquals(FrameSampler.Decision.SAME_AS_LAST, s.decide(400, img.copyOf()))
++        val changed = ByteArray(64 * 36) { 200.toByte() }
++        assertEquals(FrameSampler.Decision.RUN_OCR, s.decide(800, changed))
++        assertEquals(FrameSampler.Decision.RUN_OCR, FrameSampler().decide(0, null))
++    }
++}
++
++class VisionAnalyzerFlowTest {
++    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
++    @After fun end() { scope.cancel() }
++
++    @Test fun `화면을 읽어 스냅샷과 화면 전환을 내보내고 프레임을 모두 닫는다`() = runBlocking {
++        var current = menuBlocks()
++        val ocr = object : OcrEngine { override suspend fun recognize(frame: CameraFrame) = current }
++        val a = VisionScreenAnalyzer(scope, ocr, Clock { System.currentTimeMillis() }, quiet, sampler = FrameSampler(fps = 1000))
++        val snaps = java.util.concurrent.CopyOnWriteArrayList<ScreenSnapshot>()
++        val changes = java.util.concurrent.CopyOnWriteArrayList<String>()
++        scope.launch { a.snapshots.collect { snaps += it } }
++        scope.launch { a.screenChanges.collect { changes += it } }
++        delay(50)
++        val frames = ArrayList<TestFrame>()
++        fun feed(n: Int) = repeat(n) { val f = TestFrame(frames.size + 1L); frames += f; a.submit(f); Thread.sleep(25) }
++        feed(3); withTimeout(3000) { while (snaps.isEmpty()) delay(10) }
++        val first = snaps.last()
++        assertTrue(first.elements.any { it.text == "아메리카노" && it.kind == ElementKind.BUTTON_LIKE })
++        assertTrue(first.elements.any { it.kind == ElementKind.PRICE })
++        current = optionBlocks(); feed(4)
++        withTimeout(3000) { while (changes.size < 2) delay(10) }
++        withTimeout(3000) { while (snaps.last().screenId == first.screenId) delay(10) }
++        delay(200)
++        assertTrue("모든 프레임은 정확히 한 번 닫힌다: " + frames.map { it.closed.get() }, frames.all { it.closed.get() == 1 })
++    }
++
++    @Test fun `OCR이 예외를 던져도 계속 동작하고 프레임을 닫는다`() = runBlocking {
++        var fail = true
++        val ocr = object : OcrEngine { override suspend fun recognize(frame: CameraFrame): List<OcrBlock> { if (fail) throw RuntimeException("mlkit"); return menuBlocks() } }
++        val a = VisionScreenAnalyzer(scope, ocr, Clock { System.currentTimeMillis() }, quiet, sampler = FrameSampler(fps = 1000))
++        val f1 = TestFrame(1); a.submit(f1); delay(100)
++        assertEquals(1, f1.closed.get())
++        fail = false
++        val got = java.util.concurrent.CopyOnWriteArrayList<ScreenSnapshot>()
++        scope.launch { a.snapshots.collect { got += it } }
++        repeat(3) { a.submit(TestFrame(10L + it)); Thread.sleep(25) }
++        withTimeout(3000) { while (got.isEmpty()) delay(10) }
++    }
++
++    @Test fun `처리가 밀리면 오래된 프레임을 버리고 닫는다`() = runBlocking {
++        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
++        val ocr = object : OcrEngine { override suspend fun recognize(frame: CameraFrame): List<OcrBlock> { gate.await(); return menuBlocks() } }
++        val a = VisionScreenAnalyzer(scope, ocr, Clock { System.currentTimeMillis() }, quiet, sampler = FrameSampler(fps = 1000))
++        val fs = (1..6).map { TestFrame(it.toLong()) }
++        fs.forEach { a.submit(it); Thread.sleep(5) }
++        delay(100)
++        val closedWhileBlocked = fs.count { it.closed.get() == 1 }
++        assertTrue("밀린 프레임이 닫혀야 함: $closedWhileBlocked", closedWhileBlocked >= 4)
++        gate.complete(Unit); delay(200)
++        assertTrue(fs.all { it.closed.get() == 1 })
++    }
++
++    @Test fun `카드 번호는 스냅샷 어디에도 없다`() = runBlocking {
++        val ocr = object : OcrEngine { override suspend fun recognize(frame: CameraFrame) = menuBlocks(listOf(blk("1234 5678 9012 3456", 0.1f, 0.6f, 0.6f, 0.65f), blk("12/27", 0.7f, 0.6f, 0.8f, 0.65f))) }
++        val a = VisionScreenAnalyzer(scope, ocr, Clock { System.currentTimeMillis() }, quiet, sampler = FrameSampler(fps = 1000))
++        val got = java.util.concurrent.CopyOnWriteArrayList<ScreenSnapshot>()
++        scope.launch { a.snapshots.collect { got += it } }
++        repeat(3) { a.submit(TestFrame(it + 1L)); Thread.sleep(25) }
++        withTimeout(3000) { while (got.isEmpty()) delay(10) }
++        assertTrue(got.flatMap { it.elements }.none { it.text.contains("1234") || it.text == "12/27" })
++    }
++}
++
++private fun assertTrue(msg: String, c: Boolean) = org.junit.Assert.assertTrue(msg, c)
+diff --git a/voice/README.md b/voice/README.md
+index 6ed6fdd..24c8d04 100644
+--- a/voice/README.md
++++ b/voice/README.md
+@@ -69,3 +69,9 @@ cd server && pip install -r requirements-dev.txt && KL_SKIP_APP_INIT=1 pytest -q
+ ## 참고
+ 
+ 설계서 7.6 (STT/TTS 규칙) · 10장 (UX · 접근성)
++
++## 구현 현황 (이 PR)
++
++- [x] `AndroidSpeechInput`(ko-KR · 부분 결과 · 1.2초 무음 종료 · 1회 자동 재시도 · 온디바이스 우선) · `AndroidSpeechOutput`(속도 0.85 · 문장 단위 · 취소 즉시 중단) · `EchoGuard`(종료 후 300ms)
++- [x] `FakeSpeechInput` · `FakeSpeechOutput` + 계약 테스트, 오류 매핑 · 후보 선택 · 문장 나누기 테스트 (10개, JVM)
++- **기기에서 확인 필요:** 실제 STT/TTS 동작 전부 (`SpeechRecognizer` · `TextToSpeech`는 JVM에서 돌릴 수 없음), 기기별 한국어 음성 데이터 설치 여부
+diff --git a/voice/src/main/AndroidManifest.xml b/voice/src/main/AndroidManifest.xml
+new file mode 100644
+index 0000000..352fcb5
+--- /dev/null
++++ b/voice/src/main/AndroidManifest.xml
+@@ -0,0 +1,9 @@
++<?xml version="1.0" encoding="utf-8"?>
++<manifest xmlns:android="http://schemas.android.com/apk/res/android">
++    <uses-permission android:name="android.permission.RECORD_AUDIO" />
++    <!-- Android 11+ 패키지 가시성: 음성 인식 · 음성 합성 서비스를 찾으려면 필요 -->
++    <queries>
++        <intent><action android:name="android.speech.RecognitionService" /></intent>
++        <intent><action android:name="android.intent.action.TTS_SERVICE" /></intent>
++    </queries>
++</manifest>
+diff --git a/voice/src/main/kotlin/kr/kiosklens/voice/EchoGuard.kt b/voice/src/main/kotlin/kr/kiosklens/voice/EchoGuard.kt
+new file mode 100644
+index 0000000..d20426c
+--- /dev/null
++++ b/voice/src/main/kotlin/kr/kiosklens/voice/EchoGuard.kt
+@@ -0,0 +1,24 @@
++package kr.kiosklens.voice
++
++import java.util.concurrent.atomic.AtomicLong
++
++/**
++ * 에코 방지: 안내 소리가 끝난 뒤 [quietMs](300ms) 동안은 마이크를 켜지 않는다 (설계서 7.6).
++ * 스피커 소리가 마이크로 다시 들어가 "내가 한 말"로 오인되는 것을 막는다.
++ * 같은 인스턴스를 [kr.kiosklens.voice.tts.AndroidSpeechOutput]과 [kr.kiosklens.voice.stt.AndroidSpeechInput]에 함께 넘긴다.
++ */
++class EchoGuard(private val nowMs: () -> Long = System::currentTimeMillis, val quietMs: Long = 300) {
++    private val lastEnd = AtomicLong(Long.MIN_VALUE / 2)
++    @Volatile private var speaking = false
++
++    fun speakingStarted() { speaking = true }
++    fun speakingEnded() { lastEnd.set(nowMs()); speaking = false }
++
++    /** 지금부터 마이크를 켜도 되기까지 더 기다려야 하는 시간(ms). 0이면 바로 켜도 됨. */
++    fun waitMs(): Long {
++        if (speaking) return quietMs                                    // 아직 읽는 중이면 짧게 다시 확인하게 한다
++        return (lastEnd.get() + quietMs - nowMs()).coerceIn(0, quietMs)
++    }
++
++    fun isSpeaking() = speaking
++}
+diff --git a/voice/src/main/kotlin/kr/kiosklens/voice/fake/FakeSpeech.kt b/voice/src/main/kotlin/kr/kiosklens/voice/fake/FakeSpeech.kt
+new file mode 100644
+index 0000000..4386467
+--- /dev/null
++++ b/voice/src/main/kotlin/kr/kiosklens/voice/fake/FakeSpeech.kt
+@@ -0,0 +1,51 @@
++package kr.kiosklens.voice.fake
++
++import java.util.concurrent.CopyOnWriteArrayList
++import kotlinx.coroutines.delay
++import kotlinx.coroutines.flow.Flow
++import kotlinx.coroutines.flow.flow
++import kr.kiosklens.core.model.SttEvent
++import kr.kiosklens.core.port.SpeechInput
++import kr.kiosklens.core.port.SpeechOutput
++
++/**
++ * 미리 정한 문장을 Partial → Final 로 내보내는 가짜 (mock 플레이버 · 테스트용).
++ * [utterances]를 start() 할 때마다 하나씩 쓴다. 다 쓰면 Error(NO_SPEECH).
++ */
++class FakeSpeechInput(
++    utterances: List<String> = emptyList(),
++    private val delayMs: Long = 0,
++    private val errorOnEmpty: kr.kiosklens.core.model.SttError = kr.kiosklens.core.model.SttError.NO_SPEECH,
++) : SpeechInput {
++    private val queue = ArrayDeque(utterances)
++    var starts = 0; private set
++    var stops = 0; private set
++
++    fun enqueue(text: String) { queue.addLast(text) }
++
++    override fun start(): Flow<SttEvent> = flow {
++        starts++
++        if (delayMs > 0) delay(delayMs)
++        val next = queue.removeFirstOrNull()
++        if (next == null) { emit(SttEvent.Error(errorOnEmpty)); return@flow }
++        if (next.length > 2) emit(SttEvent.Partial(next.take(next.length / 2)))
++        emit(SttEvent.Final(next))
++    }
++
++    override fun stop() { stops++ }
++}
++
++/** 말한 문장을 기록하는 가짜. [readMs] 동안 읽는 척한다(취소하면 즉시 멈춤). */
++class FakeSpeechOutput(private val readMs: Long = 0) : SpeechOutput {
++    val said = CopyOnWriteArrayList<String>()
++    @Volatile var speaking = false; private set
++    @Volatile var stops = 0; private set
++
++    override suspend fun speak(text: String, interrupt: Boolean) {
++        said += text
++        speaking = true
++        try { if (readMs > 0) delay(readMs) } finally { speaking = false }
++    }
++
++    override fun stop() { stops++ }
++}
+diff --git a/voice/src/main/kotlin/kr/kiosklens/voice/package-info.kt b/voice/src/main/kotlin/kr/kiosklens/voice/package-info.kt
+deleted file mode 100644
+index 0de93f8..0000000
+--- a/voice/src/main/kotlin/kr/kiosklens/voice/package-info.kt
++++ /dev/null
+@@ -1,2 +0,0 @@
+-// :voice 모듈 자리. 담당 파트가 포트 구현과 Fake를 여기에 추가합니다.
+-package kr.kiosklens.voice
+diff --git a/voice/src/main/kotlin/kr/kiosklens/voice/stt/AndroidSpeechInput.kt b/voice/src/main/kotlin/kr/kiosklens/voice/stt/AndroidSpeechInput.kt
+new file mode 100644
+index 0000000..0cf1c28
+--- /dev/null
++++ b/voice/src/main/kotlin/kr/kiosklens/voice/stt/AndroidSpeechInput.kt
+@@ -0,0 +1,124 @@
++package kr.kiosklens.voice.stt
++
++import android.content.Context
++import android.content.Intent
++import android.os.Build
++import android.os.Bundle
++import android.os.Handler
++import android.os.Looper
++import android.speech.RecognitionListener
++import android.speech.RecognizerIntent
++import android.speech.SpeechRecognizer
++import kotlinx.coroutines.channels.awaitClose
++import kotlinx.coroutines.delay
++import kotlinx.coroutines.flow.Flow
++import kotlinx.coroutines.flow.callbackFlow
++import kr.kiosklens.core.model.SttError
++import kr.kiosklens.core.model.SttEvent
++import kr.kiosklens.core.port.Logger
++import kr.kiosklens.core.port.SpeechInput
++import kr.kiosklens.voice.EchoGuard
++
++/**
++ * 한국어(ko-KR) 음성 인식 (설계서 7.6).
++ * - 부분 결과를 내보내고, 발화 뒤 1.2초 조용하면 끝낸다.
++ * - 계약: `Final` 또는 `Error` **하나**를 내고 플로우 종료 / 수집을 취소하면 마이크 해제 / 실패는 예외가 아니라 `Error`.
++ * - 실패(권한 제외)하면 1회 자동으로 다시 듣는다.
++ * - [EchoGuard]가 안내 소리 직후 300ms는 기다리게 한다.
++ * - 기기 안(온디바이스) 인식이 되면 그것을 쓴다(Android 12+). 안 되면 일반 인식 + 오프라인 선호.
++ * - SpeechRecognizer는 **메인 스레드**에서만 만들고 쓴다.
++ * - 로그에는 인식된 글자를 남기지 않는다.
++ */
++class AndroidSpeechInput(
++    private val context: Context,
++    private val echo: EchoGuard,
++    private val logger: Logger,
++    private val silenceMs: Long = 1200,
++) : SpeechInput {
++    private val main = Handler(Looper.getMainLooper())
++    @Volatile private var current: SpeechRecognizer? = null
++
++    override fun start(): Flow<SttEvent> = callbackFlow {
++        if (!SpeechRecognizer.isRecognitionAvailable(context)) {
++            trySend(SttEvent.Error(SttError.NETWORK)); close(); return@callbackFlow
++        }
++        // 안내 소리의 끝울림이 사라질 때까지 (최대 300ms 씩 몇 번만) 기다린다
++        var guardTries = 0
++        while (echo.waitMs() > 0 && guardTries++ < 20) delay(echo.waitMs().coerceAtLeast(20))
++
++        var finished = false
++        var retried = false
++        var recognizer: SpeechRecognizer? = null
++
++        fun finish(event: SttEvent) {
++            if (finished) return
++            finished = true
++            trySend(event)
++            close()
++        }
++
++        fun begin() {                                                        // 항상 메인 스레드에서 호출
++            recognizer?.let { runCatching { it.cancel(); it.destroy() } }
++            val r = createRecognizer()
++            recognizer = r; current = r
++            r.setRecognitionListener(object : RecognitionListener {
++                override fun onReadyForSpeech(params: Bundle?) {}
++                override fun onBeginningOfSpeech() {}
++                override fun onRmsChanged(rmsdB: Float) {}
++                override fun onBufferReceived(buffer: ByteArray?) {}
++                override fun onEndOfSpeech() {}
++                override fun onEvent(eventType: Int, params: Bundle?) {}
++                override fun onPartialResults(partialResults: Bundle?) {
++                    val t = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
++                    if (!finished && !t.isNullOrBlank()) trySend(SttEvent.Partial(t))
++                }
++                override fun onResults(results: Bundle?) {
++                    val texts = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION).orEmpty()
++                    val best = SttMapping.best(texts, results?.getFloatArray(SpeechRecognizer.CONFIDENCE_SCORES))
++                    if (best == null) onError(SpeechRecognizer.ERROR_NO_MATCH) else finish(SttEvent.Final(best))
++                }
++                override fun onError(error: Int) {
++                    val e = SttMapping.toSttError(error)
++                    logger.w(TAG, "stt error=$error mapped=$e retried=$retried")
++                    if (!finished && SttMapping.shouldRetry(e, retried)) {
++                        retried = true
++                        main.postDelayed({ if (!finished) begin() }, 250)
++                    } else finish(SttEvent.Error(e))
++                }
++            })
++            r.startListening(intent())
++        }
++
++        main.post { if (!finished) runCatching { begin() }.onFailure { logger.e(TAG, "stt start failed", it); finish(SttEvent.Error(SttError.BUSY)) } }
++
++        awaitClose {
++            main.post {                                                      // 수집이 취소되면 마이크를 놓는다
++                recognizer?.let { runCatching { it.cancel(); it.destroy() } }
++                if (current === recognizer) current = null
++            }
++        }
++    }
++
++    override fun stop() {
++        main.post { current?.let { runCatching { it.cancel(); it.destroy() } }; current = null }
++    }
++
++    private fun createRecognizer(): SpeechRecognizer =
++        if (Build.VERSION.SDK_INT >= 31 && SpeechRecognizer.isOnDeviceRecognitionAvailable(context))
++            SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
++        else SpeechRecognizer.createSpeechRecognizer(context)
++
++    private fun intent() = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
++        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
++        putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ko-KR")
++        putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "ko-KR")
++        putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
++        putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
++        putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
++        putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, context.packageName)
++        putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, silenceMs)
++        putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, silenceMs)
++    }
++
++    private companion object { const val TAG = "AndroidSpeechInput" }
++}
+diff --git a/voice/src/main/kotlin/kr/kiosklens/voice/stt/SttMapping.kt b/voice/src/main/kotlin/kr/kiosklens/voice/stt/SttMapping.kt
+new file mode 100644
+index 0000000..a90394f
+--- /dev/null
++++ b/voice/src/main/kotlin/kr/kiosklens/voice/stt/SttMapping.kt
+@@ -0,0 +1,44 @@
++package kr.kiosklens.voice.stt
++
++import kr.kiosklens.core.model.SttError
++
++/** android.speech.SpeechRecognizer 의 오류 번호를 [SttError]로. (번호는 Android 문서의 ERROR_* 값) */
++object SttMapping {
++    const val ERROR_NETWORK_TIMEOUT = 1
++    const val ERROR_NETWORK = 2
++    const val ERROR_AUDIO = 3
++    const val ERROR_SERVER = 4
++    const val ERROR_CLIENT = 5
++    const val ERROR_SPEECH_TIMEOUT = 6
++    const val ERROR_NO_MATCH = 7
++    const val ERROR_RECOGNIZER_BUSY = 8
++    const val ERROR_INSUFFICIENT_PERMISSIONS = 9
++    const val ERROR_TOO_MANY_REQUESTS = 10
++    const val ERROR_SERVER_DISCONNECTED = 11
++    const val ERROR_LANGUAGE_NOT_SUPPORTED = 12
++    const val ERROR_LANGUAGE_UNAVAILABLE = 13
++
++    fun toSttError(code: Int): SttError = when (code) {
++        ERROR_SPEECH_TIMEOUT, ERROR_NO_MATCH -> SttError.NO_SPEECH
++        ERROR_NETWORK_TIMEOUT, ERROR_NETWORK, ERROR_SERVER, ERROR_SERVER_DISCONNECTED,
++        ERROR_LANGUAGE_NOT_SUPPORTED, ERROR_LANGUAGE_UNAVAILABLE -> SttError.NETWORK
++        ERROR_RECOGNIZER_BUSY, ERROR_TOO_MANY_REQUESTS, ERROR_CLIENT -> SttError.BUSY
++        ERROR_INSUFFICIENT_PERMISSIONS -> SttError.PERMISSION
++        else -> SttError.NO_SPEECH                                            // 마이크 오류 등: 다시 말하게 한다
++    }
++
++    /** 실패했을 때 한 번 자동으로 다시 듣는가 (설계: 실패 시 1회 자동 재시도). 권한 문제는 다시 해도 같다. */
++    fun shouldRetry(error: SttError, alreadyRetried: Boolean): Boolean =
++        !alreadyRetried && error != SttError.PERMISSION
++
++    /** 인식 후보 중 가장 믿을 만한 것 (신뢰도가 있으면 그것으로, 없으면 첫 번째). 빈 문장은 제외. */
++    fun best(texts: List<String>, confidences: FloatArray?): String? {
++        var bestI = -1; var bestC = -1f
++        texts.forEachIndexed { i, t ->
++            if (t.isBlank()) return@forEachIndexed
++            val c = confidences?.getOrNull(i)?.takeIf { it >= 0f } ?: (1f - i * 0.01f)
++            if (c > bestC) { bestC = c; bestI = i }
++        }
++        return texts.getOrNull(bestI)?.trim()
++    }
++}
+diff --git a/voice/src/main/kotlin/kr/kiosklens/voice/tts/AndroidSpeechOutput.kt b/voice/src/main/kotlin/kr/kiosklens/voice/tts/AndroidSpeechOutput.kt
+new file mode 100644
+index 0000000..fb6e184
+--- /dev/null
++++ b/voice/src/main/kotlin/kr/kiosklens/voice/tts/AndroidSpeechOutput.kt
+@@ -0,0 +1,86 @@
++package kr.kiosklens.voice.tts
++
++import android.content.Context
++import android.os.Bundle
++import android.speech.tts.TextToSpeech
++import android.speech.tts.UtteranceProgressListener
++import java.util.Locale
++import java.util.concurrent.ConcurrentHashMap
++import java.util.concurrent.atomic.AtomicInteger
++import kotlin.coroutines.resume
++import kotlinx.coroutines.CompletableDeferred
++import kotlinx.coroutines.suspendCancellableCoroutine
++import kotlinx.coroutines.withTimeoutOrNull
++import kr.kiosklens.core.port.Logger
++import kr.kiosklens.core.port.SpeechOutput
++import kr.kiosklens.voice.EchoGuard
++
++/**
++ * 한국어 음성 안내 (설계서 7.6): 속도 0.85, 새 안내가 오면 이전 안내를 끊는다.
++ * 계약: `speak()`는 재생이 **끝날 때** 돌아온다 / 코루틴이 취소되면 즉시 멈춘다 / `interrupt=true`면 직전 안내를 끊는다.
++ * TextToSpeech 준비는 비동기라서 처음 `speak()`는 준비될 때까지(최대 5초) 기다린다.
++ * 긴 문장은 문장 단위로 나눠 읽는다(엔진 길이 제한 · 중간 멈춤 대비).
++ */
++class AndroidSpeechOutput(
++    context: Context,
++    private val echo: EchoGuard,
++    private val logger: Logger,
++    private val rate: Float = 0.85f,
++) : SpeechOutput {
++    private val ready = CompletableDeferred<Boolean>()
++    private val waiting = ConcurrentHashMap<String, () -> Unit>()
++    private val ids = AtomicInteger()
++    private val tts: TextToSpeech = TextToSpeech(context.applicationContext) { status ->
++        ready.complete(status == TextToSpeech.SUCCESS)
++    }
++
++    init {
++        tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
++            override fun onStart(utteranceId: String?) {}
++            override fun onDone(utteranceId: String?) { utteranceId?.let { waiting.remove(it)?.invoke() } }
++            @Deprecated("Deprecated in Java") override fun onError(utteranceId: String?) { utteranceId?.let { waiting.remove(it)?.invoke() } }
++            override fun onError(utteranceId: String?, errorCode: Int) { utteranceId?.let { waiting.remove(it)?.invoke() } }
++            override fun onStop(utteranceId: String?, interrupted: Boolean) { utteranceId?.let { waiting.remove(it)?.invoke() } }
++        })
++    }
++
++    override suspend fun speak(text: String, interrupt: Boolean) {
++        val clean = text.trim()
++        if (clean.isEmpty()) return
++        val ok = withTimeoutOrNull(5_000) { ready.await() } ?: false
++        if (!ok) { logger.w(TAG, "tts not ready"); return }                      // 소리를 못 내도 흐름은 이어 간다
++        tts.language = Locale.KOREA
++        tts.setSpeechRate(rate)
++        echo.speakingStarted()
++        try {
++            val parts = SpeechSplit.split(clean)
++            parts.forEachIndexed { i, part ->
++                val mode = if (i == 0 && interrupt) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD
++                playOne(part, mode)
++            }
++        } finally {
++            echo.speakingEnded()
++        }
++    }
++
++    private suspend fun playOne(part: String, mode: Int) = suspendCancellableCoroutine<Unit> { cont ->
++        val id = "kl-" + ids.incrementAndGet()
++        waiting[id] = { if (cont.isActive) cont.resume(Unit) }
++        cont.invokeOnCancellation { waiting.remove(id); tts.stop() }            // 취소 → 즉시 멈춤
++        val r = tts.speak(part, mode, Bundle(), id)
++        if (r != TextToSpeech.SUCCESS) { waiting.remove(id); if (cont.isActive) cont.resume(Unit) }
++    }
++
++    override fun stop() {
++        tts.stop()
++        waiting.values.toList().forEach { it() }
++        waiting.clear()
++        echo.speakingEnded()
++    }
++
++    fun shutdown() { tts.stop(); tts.shutdown() }
++
++    companion object {
++        private const val TAG = "AndroidSpeechOutput"
++    }
++}
+diff --git a/voice/src/main/kotlin/kr/kiosklens/voice/tts/SpeechSplit.kt b/voice/src/main/kotlin/kr/kiosklens/voice/tts/SpeechSplit.kt
+new file mode 100644
+index 0000000..ea5afde
+--- /dev/null
++++ b/voice/src/main/kotlin/kr/kiosklens/voice/tts/SpeechSplit.kt
+@@ -0,0 +1,11 @@
++package kr.kiosklens.voice.tts
++
++/** 긴 안내를 문장 단위로 나눈다. 문장 끝(. ! ? 줄바꿈)에서 자르되 너무 짧은 조각은 앞과 합친다. */
++object SpeechSplit {
++    fun split(text: String, min: Int = 12): List<String> {
++        val raw = Regex("(?<=[.!?。\\n])\\s+").split(text.trim()).map { it.trim() }.filter { it.isNotEmpty() }
++        val out = ArrayList<String>()
++        for (s in raw) if (out.isNotEmpty() && out.last().length < min) out[out.lastIndex] = out.last() + " " + s else out += s
++        return out.ifEmpty { listOf(text.trim()) }
++    }
++}
+diff --git a/voice/src/test/kotlin/kr/kiosklens/voice/VoiceTest.kt b/voice/src/test/kotlin/kr/kiosklens/voice/VoiceTest.kt
+new file mode 100644
+index 0000000..94fd57e
+--- /dev/null
++++ b/voice/src/test/kotlin/kr/kiosklens/voice/VoiceTest.kt
+@@ -0,0 +1,121 @@
++package kr.kiosklens.voice
++
++import kotlinx.coroutines.CoroutineScope
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.async
++import kotlinx.coroutines.cancelAndJoin
++import kotlinx.coroutines.delay
++import kotlinx.coroutines.flow.toList
++import kotlinx.coroutines.launch
++import kotlinx.coroutines.runBlocking
++import kotlinx.coroutines.withTimeout
++import kr.kiosklens.core.model.SttError
++import kr.kiosklens.core.model.SttEvent
++import kr.kiosklens.core.port.SpeechInput
++import kr.kiosklens.core.port.SpeechOutput
++import kr.kiosklens.voice.fake.FakeSpeechInput
++import kr.kiosklens.voice.fake.FakeSpeechOutput
++import kr.kiosklens.voice.stt.SttMapping
++import kr.kiosklens.voice.tts.SpeechSplit
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++/** SpeechInput 계약 (Fake 와 실구현이 둘 다 상속). 실구현은 기기에서만 돌릴 수 있어 여기서는 Fake 로 확인한다. */
++abstract class SpeechInputContractSpec {
++    protected abstract fun ok(): SpeechInput
++    protected abstract fun failing(): SpeechInput
++
++    @Test fun `정상이면 Final 하나가 나오고 끝난다`() = runBlocking {
++        val ev = ok().start().toList()
++        assertEquals(1, ev.count { it is SttEvent.Final })
++        assertTrue(ev.last() is SttEvent.Final)
++        assertTrue(ev.dropLast(1).all { it is SttEvent.Partial })
++    }
++
++    @Test fun `실패는 예외 없이 Error 하나로 끝난다`() = runBlocking {
++        val ev = failing().start().toList()
++        assertEquals(1, ev.size)
++        assertTrue(ev.single() is SttEvent.Error)
++    }
++
++    @Test fun `취소한 뒤 다시 start 할 수 있다`() = runBlocking {
++        val inp = ok()
++        val job = launch(Dispatchers.Default) { inp.start().collect { delay(10_000) } }
++        delay(30); job.cancelAndJoin(); inp.stop()
++        assertTrue(inp.start().toList().last() is SttEvent.Final)
++    }
++}
++
++class FakeSpeechInputContractTest : SpeechInputContractSpec() {
++    override fun ok(): SpeechInput = FakeSpeechInput(List(5) { "아메리카노 주세요" }, delayMs = 5)
++    override fun failing(): SpeechInput = FakeSpeechInput(emptyList())
++}
++
++abstract class SpeechOutputContractSpec {
++    protected abstract fun make(): SpeechOutput
++
++    @Test fun `speak는 재생이 끝난 뒤 돌아온다`() = runBlocking {
++        val t0 = System.currentTimeMillis()
++        make().speak("안녕하세요")
++        assertTrue(System.currentTimeMillis() - t0 >= 80)
++    }
++
++    @Test fun `취소하면 즉시 멈춘다`() = runBlocking {
++        val out = make()
++        val job = launch(Dispatchers.Default) { out.speak("아주 긴 안내 문장입니다") }
++        delay(20)
++        val t0 = System.currentTimeMillis()
++        job.cancelAndJoin()
++        assertTrue(System.currentTimeMillis() - t0 < 70)
++    }
++}
++
++class FakeSpeechOutputContractTest : SpeechOutputContractSpec() {
++    override fun make(): SpeechOutput = FakeSpeechOutput(readMs = 100)
++}
++
++class VoiceMappingTest {
++    @Test fun `오류 번호 매핑`() {
++        assertEquals(SttError.NO_SPEECH, SttMapping.toSttError(SttMapping.ERROR_NO_MATCH))
++        assertEquals(SttError.NO_SPEECH, SttMapping.toSttError(SttMapping.ERROR_SPEECH_TIMEOUT))
++        assertEquals(SttError.NETWORK, SttMapping.toSttError(SttMapping.ERROR_NETWORK))
++        assertEquals(SttError.NETWORK, SttMapping.toSttError(SttMapping.ERROR_SERVER))
++        assertEquals(SttError.BUSY, SttMapping.toSttError(SttMapping.ERROR_RECOGNIZER_BUSY))
++        assertEquals(SttError.PERMISSION, SttMapping.toSttError(SttMapping.ERROR_INSUFFICIENT_PERMISSIONS))
++        assertEquals(SttError.NO_SPEECH, SttMapping.toSttError(SttMapping.ERROR_AUDIO))
++        assertEquals(SttError.NO_SPEECH, SttMapping.toSttError(9999))
++    }
++
++    @Test fun `재시도는 1회만 하고 권한 문제는 하지 않는다`() {
++        assertTrue(SttMapping.shouldRetry(SttError.NETWORK, false))
++        assertTrue(!SttMapping.shouldRetry(SttError.NETWORK, true))
++        assertTrue(!SttMapping.shouldRetry(SttError.PERMISSION, false))
++    }
++
++    @Test fun `인식 후보 중 신뢰도 높은 것을 고른다`() {
++        assertEquals("아메리카노", SttMapping.best(listOf("아메리카 노", "아메리카노"), floatArrayOf(0.4f, 0.9f)))
++        assertEquals("첫째", SttMapping.best(listOf("첫째", "둘째"), null))
++        assertEquals("둘째", SttMapping.best(listOf(" ", "둘째"), floatArrayOf(0.9f, 0.1f)))
++        assertNull(SttMapping.best(listOf("", " "), null))
++        assertNull(SttMapping.best(emptyList(), null))
++    }
++
++    @Test fun `에코 방지는 소리가 끝난 뒤 300ms 기다리게 한다`() {
++        var now = 1000L
++        val g = EchoGuard({ now }, 300)
++        assertEquals(0, g.waitMs())
++        g.speakingStarted(); assertTrue(g.waitMs() > 0)
++        now = 2000; g.speakingEnded()
++        now = 2100; assertEquals(200, g.waitMs())
++        now = 2300; assertEquals(0, g.waitMs())
++    }
++
++    @Test fun `긴 안내를 문장 단위로 나눈다`() {
++        assertEquals(listOf("화면 왼쪽 위 깜빡이는 아메리카노 버튼을 누르세요"), SpeechSplit.split("화면 왼쪽 위 깜빡이는 아메리카노 버튼을 누르세요"))
++        assertEquals(2, SpeechSplit.split("안내창이 떴어요. 확인 버튼을 눌러 주세요. 천천히 하셔도 돼요.").size)
++        assertEquals(listOf("네. 좋아요"), SpeechSplit.split("네. 좋아요"))                 // 짧은 조각은 합친다
++        assertEquals(listOf("가"), SpeechSplit.split("  가 "))
++    }
++}
+-- 
+2.43.0
+
