@@ -1,0 +1,92 @@
+{
+ "screenId": "s04_cart",
+ "frameId": 4,
+ "timestampMs": 0,
+ "stableFrames": 2,
+ "elements": [
+  {
+   "id": "e1",
+   "text": "주문 내역",
+   "kind": "TEXT",
+   "rect": {
+    "left": 0.3,
+    "top": 0.05,
+    "right": 0.7,
+    "bottom": 0.1
+   },
+   "confidence": 0.95
+  },
+  {
+   "id": "e2",
+   "text": "아메리카노 1잔",
+   "kind": "TEXT",
+   "rect": {
+    "left": 0.1,
+    "top": 0.2,
+    "right": 0.6,
+    "bottom": 0.26
+   },
+   "confidence": 0.95
+  },
+  {
+   "id": "e3",
+   "text": "4,500원",
+   "kind": "PRICE",
+   "rect": {
+    "left": 0.7,
+    "top": 0.2,
+    "right": 0.9,
+    "bottom": 0.26
+   },
+   "confidence": 0.95
+  },
+  {
+   "id": "e4",
+   "text": "+",
+   "kind": "BUTTON_LIKE",
+   "rect": {
+    "left": 0.1,
+    "top": 0.3,
+    "right": 0.2,
+    "bottom": 0.36
+   },
+   "confidence": 0.95
+  },
+  {
+   "id": "e5",
+   "text": "-",
+   "kind": "BUTTON_LIKE",
+   "rect": {
+    "left": 0.25,
+    "top": 0.3,
+    "right": 0.35,
+    "bottom": 0.36
+   },
+   "confidence": 0.95
+  },
+  {
+   "id": "e6",
+   "text": "결제하기",
+   "kind": "BUTTON_LIKE",
+   "rect": {
+    "left": 0.55,
+    "top": 0.88,
+    "right": 0.95,
+    "bottom": 0.96
+   },
+   "confidence": 0.95
+  },
+  {
+   "id": "e7",
+   "text": "메뉴 더 담기",
+   "kind": "BUTTON_LIKE",
+   "rect": {
+    "left": 0.05,
+    "top": 0.88,
+    "right": 0.5,
+    "bottom": 0.96
+   },
+   "confidence": 0.95
+  }
+ ]
+}

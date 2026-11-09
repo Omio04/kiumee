@@ -2,20 +2,20 @@
 
 기록 담당: P1 · 기준 문서: AI 키오스크 렌즈 시스템 설계서 (Android MVP) v0.1, 5일 개발 계획
 
-형식: 결정이 나면 `결정` 칸을 채우고 날짜를 적는다. 바꿀 때는 지우지 말고 줄을 그어 남긴다.
+형식: 결정이 나면 `결정` 칸을 채우고 날짜를 적는다. 바꿀 때는 지우지 말고 ~~줄을 그어~~ 남긴다.
 
 ---
 
-## 1. 1일차 오전 결정 사항 (09:00~11:00, 계획서 4장)
+## 1. 1일차 오전 결정 사항 (계획서 4장)
 
 | # | 결정 사항 | 제안 | 담당 | 결정 |
 |---|---|---|---|---|
-| 1 | 대상 키오스크 1종 · 주문 플로우 | 촬영 가능 + 태블릿에 재현 가능한 곳. 메뉴 → 옵션 → 장바구니 → 결제 수단 선택 | 전원 | (미정) |
+| 1 | 대상 키오스크 1종 · 주문 플로우 | 촬영 가능 + 태블릿에 재현 가능한 곳. 메뉴 → 옵션 → 장바구니 → 결제 수단 선택 | 전원 | (미정) — **가장 먼저**. 정해져야 P2 촬영 · P4 평가 시작 |
 | 2 | OCR 엔진 | ML Kit 한국어 인식 고정, 대안 평가는 보류 | P2 | (미정) |
 | 3 | STT 방식 | 온디바이스 ko-KR만, 클라우드 폴백 보류 | P3 | (미정) |
-| 4 | LLM 모델 · 서버 언어 · 호스팅 | 서버 저장소 기준 FastAPI(Python) · 기본 모델 `claude-haiku-5-5` · 클라우드 1곳 + 로컬 실행 대비 | P4 | (미정) |
-| 5 | minSdk · 시연 기기 | minSdk 26 (스켈레톤에 반영됨) · 시연 기기 1대 고정 + 예비 1대 | P1 | (미정, 기기 모델명 기입) |
-| 6 | DI 방식 | Hilt 경험자 없으면 수동 DI. 생성자 주입 원칙은 유지 | P1 | (미정) |
+| 4 | LLM 모델 · 서버 언어 · 호스팅 | 서버 구현 기준: FastAPI(Python) · 기본 모델 `claude-haiku-5-5` · 클라우드 1곳 + 로컬 실행 대비 | P4 | (미정 — 서버는 이미 이 구성으로 구현됨) |
+| 5 | minSdk · 시연 기기 | minSdk 26 · 시연 기기 1대 고정 + 예비 1대 | P1 | **minSdk 26** (2026-11-09, 빌드에 반영) · 시연 기기: (모델명 기입) |
+| 6 | DI 방식 | Hilt 경험자가 없으면 수동 DI | P1 | **수동 DI** (2026-11-09). 플레이버마다 `:app/di`에 조립 코드 하나. 생성자 주입 원칙 유지 → 나중에 Hilt로 바꾸기 쉬움. 이유: AGP 9 + Hilt는 KSP · 플러그인 호환 확인이 필요해 5일 일정에 위험 |
 | 7 | 어르신 테스트 | 4일차 오후 1~2명 · 촬영 · 녹음 동의서 | P3 | (미정) |
 
 ### 범위 조정 (계획서 2장) — 팀 확인 필요
@@ -27,63 +27,50 @@
 
 ---
 
-## 2. :core-model 확정 회의 (12:00, 30분)
+## 2. `:core-model` · 서버 계약 → **계약 v1** (12:00 회의 안건)
 
-초안 위치: `core-model/src/main/kotlin/kr/kiosklens/core/` (`model/`, `port/Ports.kt`)
-확정 후 `port/` 변경은 **전원 승인 PR**로만 한다. Fake와 계약 테스트도 함께 수정.
+**결정: 계약 v1 확정안** (P1, 2026-11-09) — 정본 [docs/contract.md](contract.md). 전원 승인 PR로 확정한다.
 
-### 2.1 설계서와 다르게 한 부분 (확인 필요)
-
-| # | 항목 | 설계서 | 초안 | 이유 |
-|---|---|---|---|---|
-| A | `CameraFrame` | `data class(imageProxy: ImageProxy, ...)` | 인터페이스 (frameId, timestampMs, rotationDegrees, width, height, close()) | `:core-model`은 순수 Kotlin이라 `ImageProxy`를 참조할 수 없음 (16.2와 5장이 충돌) |
-| B | `SpeechOutput.isSpeaking` | 5장에 있음 | 뺌 | 16.4(ISP 버전)를 따름. 16장이 우선. `speak()`가 재생 끝까지 suspend 하므로 에코 방지에 충분 |
-| C | 외부 라이브러리 | `:core-model` import 금지 | `kotlinx-coroutines-core`만 예외 | 포트 시그니처가 `Flow`를 씀 (설계서 자체가 그렇게 정의) |
-| D | JSON 직렬화 (4.4) | kotlinx.serialization | `:core-model`에는 넣지 않음. DTO와 직렬화는 `:agent/remote` (P4) | 16.3 패키지 트리에 `GuideRequestDto`가 `:agent`에 있음 |
-| E | `NormRect` 검증 | 없음 | `isValid` 속성만 추가 (생성자에서 예외 안 던짐) | OCR 가장자리 값 때문에 앱이 죽지 않게 |
-| F | `FrameMotion` | 정의 없음 | `frameId, dx, dy, scale, confidence` (정규화 단위) | 선택 기능. P5 확인 필요 |
-
-**A 후속 결정 필요:** `ImageProxy`를 감싼 Android 구현체를 어디에 두나?
-- 제안: `:vision`이 `ImageProxyFrame : CameraFrame`을 제공하고, `:app/camera`가 생성해서 `FrameSink.submit()`에 넘긴다. (`:app`은 원래 모든 모듈에 의존하므로 규칙 위반 없음. `:vision`은 자기 클래스로 다운캐스트해서 `ImageProxy`를 꺼냄.)
-- 사진 입력 디버그 모드(P2)는 같은 방식으로 `BitmapFrame : CameraFrame`을 쓴다.
-
-결정: (미정)
-
-### 2.2 서버 API와 설계서의 불일치 (P4 · 전원)
-
-`server/app/models.py`는 설계서를 보기 전에 계획서만 보고 추정해 만든 것이라 (파일 주석에 명시됨) 설계서 4.2 · 8.1과 다르다.
-
-| 항목 | 설계서 4.2 · 8.1 | 현재 서버 |
+| # | 안건 | 결정 |
 |---|---|---|
-| 응답 형태 | `{"goal", "action": {"type": "TAP", "targetId", "guideText"}}` | `{"action": "GUIDE", "targetId", "guideText", "message", "source"}` (평평한 구조, goal 없음) |
-| 행동 종류 | TAP · SCROLL · WAIT · ASK_USER · DONE · UNKNOWN | GUIDE · ASK_USER · DONE · UNKNOWN |
-| 이력 항목 | `{screenId, action, targetText}` | `{role: USER/GUIDE, text, targetId}` |
-| 스냅샷 | screenId, frameId, timestampMs, elements, stableFrames | screenId, elements (나머지 필드는 무시됨) |
-| sessionId | 필수 | 선택 |
-| 오류 본문 | `{"error": "CODE", "message": "..."}` | `{"error": {"code", "message", "requestId"}}` |
+| A | `CameraFrame` (설계서는 Android 타입 `ImageProxy`를 들고 있음) | 인터페이스 + `image: Any` (`ImageProxy` 또는 `Bitmap`). 구현체 `ImageProxyFrame`은 `:app/camera`(P1). `:vision`은 `frame.image as? ImageProxy`로 꺼냄 |
+| B | `SpeechOutput.isSpeaking` | 뺌 (설계서 16.4 따름). 에코 방지: `:domain`은 `speak()`가 끝난 뒤에만 `start()`, 300ms 지연은 `:voice` 안에서 |
+| C | `:core-model`의 외부 라이브러리 | `kotlinx-coroutines-core`만 예외 (포트가 `Flow`를 씀) |
+| D | JSON 직렬화 위치 | `:agent/remote`에서만. `:core-model`은 순수 유지 |
+| E | `NormRect` 검증 | `isValid` 속성만 (생성자에서 예외 안 던짐) |
+| F | `FrameMotion` | `frameId, dx, dy, scale, confidence` (정규화 단위, 선택 기능) |
+| G | 서버 API 불일치 (서버는 설계서를 보기 전에 추정해 만들어짐) | **서버를 계약 v1에 맞춤** (이 PR). 입출력 모양만 바꾸고 판단 로직은 그대로. 테스트 60 → 82개 통과, 평가 정확도 동일 |
+| H | 화면 전환 뒤 목표 유지 (서버는 상태를 저장하지 않음) | `GuideRequest.goal` 추가: 앱이 직전 응답의 `goal`을 돌려줌 |
+| I | `HistoryItem.action` | `String` → `ActionType` enum. 기록 규칙은 `HistoryItem.of()` 한 곳 |
+| J | 응답 `source` 필드 | 진단용 선택 필드로 유지. 앱은 무시 |
+| K | 오류 본문 | 서버 형식 유지 `{"error": {"code", "message", "requestId"}}` (설계서 8.2와 다름) |
+| L | SCROLL · WAIT | 계약에는 유지 (앱은 처리 가능해야 함). 서버 생성은 보류 — P4 판단 |
+| M | 길이 제한 | 서버가 400으로 거절하는 기준을 `:core-model` 상수로 공유 (contract.md 3.6) |
+| N | 서버 코드 위치 | zip → `server/` 폴더로 풀어서 관리 (리뷰 · CI를 위해) |
 
-선택지:
-1. **서버를 설계서 8.1에 맞춘다** — 모두가 보는 문서와 실제가 같아짐. 서버 README도 "회의에서 이름만 맞추면 된다"고 되어 있음. (P1 제안)
-2. 서버는 그대로 두고 `:agent`의 `DtoMapper`가 변환한다 — 서버 변경 없음. 대신 설계서를 고쳐야 함.
-
-어느 쪽이든 앱 쪽 `:core-model`의 `GuideAction`은 설계서대로 두고, 차이는 `:agent` 안에서만 흡수한다.
-
-결정: (미정)
-
-### 2.3 확인만 하면 되는 것
+### 확인만 하면 되는 것
 - 요소 ID 규칙 (4.3)은 `:vision`(P2) 소유
 - 좌표는 회전 보정된 분석 프레임 기준 정규화 좌표. 화면 좌표 변환은 `:overlay`만
 - 패키지 루트: `kr.kiosklens.<module>` (core-model은 `kr.kiosklens.core`)
-- 포트 9개: FrameSink · SnapshotSource · SpeechInput · SpeechOutput · GuideAgent · HighlightSurface · MotionSink · Clock · Logger
-
-결정: (미정)
+- 공용 예시 JSON: `testdata/contract/` (앱 · 서버가 같은 파일로 테스트)
 
 ---
 
 ## 3. 빌드 · 구조 (P1, 1일차)
 
 - Gradle 9.6.0 · AGP 9.5.1 · Kotlin 2.2.10 · compileSdk 37 · minSdk 26 · Java 17 바이트코드
+  - compileSdk 37: 팀원 PC · CI에 Android API 37 플랫폼 설치 필요. 어려우면 회의에서 내릴지 결정
 - 플레이버: `real` / `mock` (설계서 16.8). mixed 조합은 2일차에 DI 조립에서 처리
 - 아키텍처 검사 (설계서 16.9 일부):
   - `:core-model` · `:domain`은 `kotlin("jvm")` → Android import 시 컴파일 실패
   - 루트 `build.gradle.kts`: 어댑터끼리 의존하거나 순수 모듈이 바깥을 의존하면 빌드 실패
+- 문서: 루트 README (전체 안내 · 협업 규칙) + 모듈마다 README (담당자용 할 일 · 계약 · 계약 테스트 목록)
+
+---
+
+## 변경 이력
+
+| 날짜 | 내용 |
+|---|---|
+| 2026-11-09 | 멀티모듈 스켈레톤 · `:core-model` 초안 (PR #1, 병합) |
+| 2026-11-09 | 계약 v1 확정안 · 서버 정렬 · 팀 README (`feat/p1-contract-v1`) |

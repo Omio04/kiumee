@@ -1,0 +1,46 @@
+"""환경변수 설정. 비밀 값(LLM 키, 앱 키)은 코드에 쓰지 않고 환경변수로만 받습니다."""
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass, field
+
+VERSION = "0.2.0"   # 0.2.0: API 계약 v1 (docs/contract.md)
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    v = os.environ.get(name)
+    if v is None:
+        return default
+    return v.strip().lower() in ("1", "true", "yes", "on")
+
+
+@dataclass(frozen=True)
+class Settings:
+    app_key: str = ""                         # X-App-Key. 비어 있으면 모든 요청을 401로 거절 (안전 기본값)
+    llm_provider: str = "anthropic"           # anthropic | fake
+    anthropic_api_key: str = field(default="", repr=False)
+    llm_model: str = "claude-haiku-5-5"       # p95 2초 예산에 맞춘 빠른 모델 (바꿀 때는 평가 스크립트로 비교)
+    llm_timeout_s: float = 4.0                # 설계: LlmClient 타임아웃 4초
+    candidate_k: int = 8                      # 설계: 후보 K=8
+    fastpath: bool = True                     # 확실한 경우 LLM을 건너뜀(로컬 규칙)
+    fast_min_score: float = 0.85
+    fast_margin: float = 0.20
+    rate_limit_per_min: int = 60              # 키+IP 기준 분당 요청 수
+    max_body_bytes: int = 64 * 1024           # 이미지는 받지 않으므로 작게 제한
+
+    @staticmethod
+    def from_env() -> "Settings":
+        e = os.environ.get
+        return Settings(
+            app_key=e("APP_KEY", ""),
+            llm_provider=e("LLM_PROVIDER", "anthropic").strip().lower(),
+            anthropic_api_key=e("ANTHROPIC_API_KEY", ""),
+            llm_model=e("LLM_MODEL", "claude-haiku-5-5"),
+            llm_timeout_s=float(e("LLM_TIMEOUT_S", "4.0")),
+            candidate_k=int(e("CANDIDATE_K", "8")),
+            fastpath=_env_bool("FASTPATH", True),
+            fast_min_score=float(e("FASTPATH_MIN_SCORE", "0.85")),
+            fast_margin=float(e("FASTPATH_MARGIN", "0.20")),
+            rate_limit_per_min=int(e("RATE_LIMIT_PER_MIN", "60")),
+            max_body_bytes=int(e("MAX_BODY_BYTES", str(64 * 1024))),
+        )

@@ -1,0 +1,18 @@
+{
+  "sessionId": "8f14e45f-ceea-467f-a8f2-3c1d2b9e7a10",
+  "utterance": "따뜻한 아메리카노 한 잔 주세요",
+  "goal": null,
+  "snapshot": {
+    "screenId": "s02_menu",
+    "frameId": 1204,
+    "timestampMs": 1762675200000,
+    "stableFrames": 3,
+    "elements": [
+      {"id": "e1", "text": "커피", "rect": {"left": 0.02, "top": 0.12, "right": 0.2, "bottom": 0.18}, "confidence": 0.95, "kind": "BUTTON_LIKE"},
+      {"id": "e4", "text": "아메리카노", "rect": {"left": 0.05, "top": 0.25, "right": 0.3, "bottom": 0.4}, "confidence": 0.95, "kind": "BUTTON_LIKE"},
+      {"id": "e9", "text": "4,500원", "rect": {"left": 0.05, "top": 0.41, "right": 0.3, "bottom": 0.45}, "confidence": 0.93, "kind": "PRICE"},
+      {"id": "e11", "text": "장바구니 보기", "rect": {"left": 0.6, "top": 0.9, "right": 0.95, "bottom": 0.97}, "confidence": 0.91, "kind": "BUTTON_LIKE"}
+    ]
+  },
+  "history": []
+}
