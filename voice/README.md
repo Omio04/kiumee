@@ -69,3 +69,9 @@ cd server && pip install -r requirements-dev.txt && KL_SKIP_APP_INIT=1 pytest -q
 ## 참고
 
 설계서 7.6 (STT/TTS 규칙) · 10장 (UX · 접근성)
+
+## 구현 현황 (이 PR)
+
+- [x] `AndroidSpeechInput`(ko-KR · 부분 결과 · 1.2초 무음 종료 · 1회 자동 재시도 · 온디바이스 우선) · `AndroidSpeechOutput`(속도 0.85 · 문장 단위 · 취소 즉시 중단) · `EchoGuard`(종료 후 300ms)
+- [x] `FakeSpeechInput` · `FakeSpeechOutput` + 계약 테스트, 오류 매핑 · 후보 선택 · 문장 나누기 테스트 (10개, JVM)
+- **기기에서 확인 필요:** 실제 STT/TTS 동작 전부 (`SpeechRecognizer` · `TextToSpeech`는 JVM에서 돌릴 수 없음), 기기별 한국어 음성 데이터 설치 여부

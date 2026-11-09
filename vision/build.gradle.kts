@@ -14,5 +14,7 @@ android {
 
 dependencies {
     implementation(project(":domain"))
+    implementation(libs.androidx.camera.core)          // ImageProxy
+    implementation(libs.mlkit.text.korean)             // 기기 안 한국어 글자 인식
     testImplementation(libs.junit)
 }

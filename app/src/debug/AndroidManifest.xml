@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 개발 중 같은 와이파이의 노트북 서버(http://192.168.x.x:8000)에 붙을 수 있게. 릴리스 빌드는 https만. -->
+    <application android:usesCleartextTraffic="true" />
+</manifest>

@@ -59,3 +59,14 @@ v0.1의 "가정" 표를 설계서 · `:core-model`에 맞춰 확정했습니다.
 
 ## 미검증
 실제 Anthropic 호출, Docker 이미지 빌드(이 환경에 데몬 없음), 실제 OCR 입력, 실제 p95는 **아직 해보지 않았습니다**. Anthropic 호출부는 모의 HTTP(MockTransport)로 상태코드·타임아웃 매핑만 확인했습니다.
+
+## 무료로 쓰기: Gemini
+
+```bash
+export LLM_PROVIDER=gemini
+export GEMINI_API_KEY=...      # https://aistudio.google.com/apikey 에서 무료 키
+export APP_KEY=긴_무작위_문자열
+uvicorn app.main:app --port 8000
+```
+
+기본 모델은 `gemini-2.5-flash-lite` (`LLM_MODEL`로 변경). 무료 한도를 넘으면 429 → 앱은 잠시 뒤 다시 시도하고, 계속되면 오류 안내를 읽는다. 정확도는 `python scripts/evaluate.py --llm gemini`로 anthropic과 비교해서 정할 것 *(이 PR에서는 키가 없어 실제 호출은 확인하지 못함, MockTransport 테스트만 통과)*.

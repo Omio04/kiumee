@@ -37,3 +37,21 @@
 - [x] 1일차: 모듈 · 플레이버 뼈대
 - [ ] 1일차: mock 플레이버 조립 (각 파트 Fake가 병합되면)
 - [ ] 2일차: Compose 화면 · CameraX → FrameSink 연결 (P5 PoC 재사용) · DI
+
+## 구현 현황 (이 PR)
+
+- [x] `MainActivity`(큰 글씨 · 큰 버튼 · TalkBack 라이브 영역 · 화면 켜짐 유지 · 권한 거절 시 설정 열기) — **Compose 대신 일반 View**
+- [x] `camera/CameraController`(Preview + ImageAnalysis 4:3, 최신 한 장만 유지) · `ImageProxyFrame`
+- [x] `di/`: 플레이버별 `GraphFactory`(real: 실구현 / mock: 전부 Fake + 샘플 카페 화면 + "다음 화면" 버튼)
+- [x] 서버 주소 · 앱 키는 `local.properties`의 `kl.serverUrl` · `kl.appKey` → `BuildConfig` (저장소에 올라가지 않음)
+
+### 서버 연결
+
+```properties
+# local.properties (git에 안 올라감)
+sdk.dir=...
+kl.serverUrl=https://내-서버.example.com     # 개발 중에는 http://192.168.x.x:8000 도 가능(debug 빌드만)
+kl.appKey=서버의 APP_KEY 와 같은 값
+```
+
+서버를 무료로 돌리려면 `server/.env`에 `LLM_PROVIDER=gemini`, `GEMINI_API_KEY=...` (https://aistudio.google.com/apikey).

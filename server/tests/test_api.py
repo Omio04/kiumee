@@ -148,3 +148,42 @@ async def test_anthropic_slow_response_times_out():
         return httpx.Response(200, json={"content": []})
     with pytest.raises(LlmTimeout):
         await anth(slow).complete("s", "u", 0.1)
+
+
+# ---- GeminiLlmClient: 네트워크 없이 MockTransport로 ----
+def gem(handler):
+    from app.llm import GeminiLlmClient
+    return GeminiLlmClient("g-test", "gemini-x", http=httpx.AsyncClient(transport=httpx.MockTransport(handler)))
+
+
+async def test_gemini_ok_and_request_shape():
+    seen = {}
+    def h(req):
+        seen["h"] = req.headers; seen["b"] = req.content; seen["u"] = str(req.url)
+        return httpx.Response(200, json={"candidates": [{"content": {"parts": [{"text": '{"action":'}, {"text": '"DONE"}'}]}}]})
+    assert await gem(h).complete("s", "u", 4) == '{"action":"DONE"}'
+    assert seen["h"]["x-goog-api-key"] == "g-test" and "key=" not in seen["u"] and b"image" not in seen["b"]
+    assert b"application/json" in seen["b"] and b"gemini-x" in seen["u"].encode()
+
+
+@pytest.mark.parametrize("status,exc", [(401, LlmUpstream), (403, LlmUpstream), (400, LlmUpstream), (404, LlmUpstream),
+                                        (500, LlmUpstream), (429, LlmRateLimited)])
+async def test_gemini_status_mapping(status, exc):
+    with pytest.raises(exc):
+        await gem(lambda r: httpx.Response(status, json={"error": "x"}, headers={"retry-after": "3"})).complete("s", "u", 4)
+
+
+async def test_gemini_empty_candidates_returns_empty_text():
+    assert await gem(lambda r: httpx.Response(200, json={"candidates": []})).complete("s", "u", 4) == ""
+
+
+async def test_gemini_timeout_mapped():
+    def h(req): raise httpx.ReadTimeout("t")
+    with pytest.raises(LlmTimeout):
+        await gem(h).complete("s", "u", 4)
+
+
+def test_gemini_requires_key():
+    from app.llm import GeminiLlmClient
+    with pytest.raises(ValueError):
+        GeminiLlmClient("", "m")

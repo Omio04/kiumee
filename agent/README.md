@@ -60,3 +60,10 @@ val json = Json {
 - `http://`(로컬 서버)에 붙으려면 debug 빌드에 cleartext 허용(`networkSecurityConfig`)이 필요
 - 앱 키는 저장소에 올리지 말고 `local.properties` → `BuildConfig` 필드로 주입하는 방식을 추천
 - 키 없이 서버 띄우기: `cd server && APP_KEY=dev LLM_PROVIDER=fake uvicorn app.main:app --port 8080`
+
+## 구현 현황 (이 PR)
+
+- [x] `RemoteGuideAgent`(HttpURLConnection · 6초 · 1회 재시도 · 400/401 재시도 없음 · 429 `Retry-After`) · `FakeGuideAgent` · `DtoMapper`(보내기 전 길이 정리 포함)
+- [x] **JSON은 `kotlinx.serialization` 대신 작은 직접 구현**(`remote/Json.kt`)으로 처리했다 (외부 의존 0, 계약 필드가 적음). 바꾸고 싶으면 `DtoMapper`만 고치면 되고 테스트가 그대로 보증한다.
+- [x] 테스트 18개: `testdata/contract/*.json` 왕복, 로컬 HTTP 서버로 401 · 400 · 429 · 502 · 시간 초과 · 연결 실패 · 깨진 응답, `Tap.targetId` 방어, 길이 제한
+- 서버: **무료 Gemini 지원 추가** (`LLM_PROVIDER=gemini`, `GEMINI_API_KEY`) — [server/README.md](../server/README.md)

@@ -6,3 +6,6 @@ local.properties
 .DS_Store
 .kotlin/
 captures/
+*.apk
+*.aab
+.env

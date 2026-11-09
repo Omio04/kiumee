@@ -50,6 +50,20 @@ cd server && pip install -r requirements-dev.txt && KL_SKIP_APP_INIT=1 pytest -q
 
 필요한 것: JDK 17 이상 · Android SDK **API 37** 플랫폼 (SDK Manager에서 설치) · `local.properties`에 `sdk.dir` (Android Studio로 열면 자동 생성) · 서버는 Python 3.9 이상
 
+## 구현 현황
+
+| 모듈 | 상태 | JVM 테스트 |
+|---|---|---|
+| `:core-model` · `:domain` (+`SessionRunner`) | 구현 완료 | 35개 |
+| `:agent` | 구현 완료 (직접 JSON, Gemini 지원 서버와 연동 확인) | 18개 |
+| `:vision` | 구현 완료 (ML Kit는 기기에서 확인 필요) | 22개 |
+| `:voice` | 구현 완료 (실제 STT/TTS는 기기에서 확인 필요) | 10개 |
+| `:overlay` | 구현 완료 (View 기반) | 17개 |
+| `:app` | 조립 · 화면 · 카메라 (mock/real) | 5개 |
+| `server/` | Gemini 제공자 추가 | 92개 |
+
+이 환경에서는 Android SDK가 없어 **Android 전용 파일(ML Kit · CameraX · SpeechRecognizer · TextToSpeech · View · Activity)은 컴파일하지 못했다.** 첫 `./gradlew :app:assembleMockDebug`에서 오류가 나면 그 파일들부터 보면 된다.
+
 ## 협업 규칙 (5일 계획 9장)
 
 | 항목 | 규칙 |

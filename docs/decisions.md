@@ -87,6 +87,17 @@
 
 ---
 
+## 5. 어댑터 구현 PR (1~2일차 분량을 한 번에)
+
+| # | 항목 | 결정 |
+|---|---|---|
+| T1 | UI · 오버레이 | **Compose 대신 일반 View**. 이유: Compose 컴파일러 플러그인을 버전 카탈로그에 더하지 않아도 되고, 화면이 하나뿐이라 효과가 작다. 포트 계약은 그대로. 나중에 Compose로 바꿔도 `:domain` · 포트는 안 바뀐다 |
+| T2 | `:agent` JSON | `kotlinx.serialization` 대신 **직접 만든 작은 JSON**(`remote/Json.kt`). 외부 의존 0, 계약 필드가 적음. `DtoMapper`만 바꾸면 교체 가능 |
+| T3 | HTTP | `HttpURLConnection`. 6초 · 1회 재시도 · 400/401은 재시도 안 함 · 429는 Retry-After. (스트리밍 모드는 쓰지 않음: 401 본문이 사라지는 문제를 테스트에서 확인) |
+| T4 | LLM | 서버에 **Gemini 제공자 추가**(무료 한도). 기본은 그대로 anthropic. 평가 스크립트로 두 모델의 정확도를 비교한 뒤 정할 것 |
+| T5 | 서버 주소 · 앱 키 | `local.properties` → `BuildConfig`. 저장소에 비밀 값 없음. LLM 키는 서버에만 |
+| T6 | 화면 전환 | `ScreenDiffer`: Jaccard 0.6 · 연속 2프레임 · 요소 3개 미만 제외. 처음 화면은 stableFrames 2부터 시작 |
+
 ## 변경 이력
 
 | 날짜 | 내용 |
@@ -94,3 +105,4 @@
 | 2026-11-09 | 멀티모듈 스켈레톤 · `:core-model` 초안 (PR #1, 병합) |
 | 2026-11-09 | 계약 v1 확정안 · 서버 정렬 · 팀 README (PR #2, 병합) |
 | 2026-11-09 | 상태머신 · 위치 문구 · 안내 문장 (`feat/p1-state-machine`) |
+| 2026-11-09 | 어댑터 구현: SessionRunner · :agent · :vision · :voice · :overlay · :app · 서버 Gemini (`feat/impl-adapters`) |

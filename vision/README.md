@@ -74,3 +74,11 @@ override fun submit(frame: CameraFrame) {
 ## 참고
 
 설계서 4.3 (요소 ID) · 7.1 (샘플링 · 필터 · 분류) · 7.2 (전환 감지) · 11.1 (테스트 데이터)
+
+## 구현 현황 (이 PR)
+
+- [x] `OcrEngine` · `MlKitOcrEngine`(ImageProxy / Bitmap) · 필터 4종(`CardNumberFilter` · `LowConfidenceFilter` · `TinyAreaFilter` · `BlankFilter`) · 분류기(`PriceClassifier` · `ButtonLikeClassifier`)
+- [x] `ElementBuilder`(요소 ID = FNV-1a 해시 + 20×20 셀, 충돌 `_2`) · `ScreenDiffer`(Jaccard 0.6, 연속 2프레임, 요소 3개 미만 제외) · `FrameSampler`(3fps + 똑같은 프레임 건너뛰기) · `ImageProxyThumbnail`(64×36)
+- [x] `VisionScreenAnalyzer : FrameSink, SnapshotSource` — 밀린 프레임은 `close()`, 모든 프레임은 정확히 한 번 닫힘
+- [x] `FakeScreenAnalyzer` + `SampleScreens`(카페 5화면) + 계약 테스트(Fake · 실구현 공통)
+- 테스트 22개(JVM). **기기에서 확인 필요:** ML Kit 실제 인식률(버튼 누락), 3fps에서의 지연, 요소 ID가 실제 카메라 프레임에서 안정적인지

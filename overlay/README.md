@@ -54,3 +54,10 @@ kr.kiosklens.overlay
 ## 참고
 
 설계서 4.1 (좌표계) · 7.5 (좌표 변환 · 트래킹) · 10장 (하이라이트 스타일)
+
+## 구현 현황 (이 PR)
+
+- [x] `ViewOverlay`(**Compose 대신 일반 View** — 컴파일러 플러그인 없이 쓰려고. 포트 계약은 같다) · `HighlightHolder`(스레드 안전 · 멱등) · `FakeOverlay`
+- [x] `FillCenterMapper` · `FitCenterMapper` · `StretchMapper`(좌표 변환) · `BoxSmoother`(EMA α=0.3, 시간 보정) · `PulseCurve`(1.5Hz, 최소 밝기 유지) · `PulseBorderPainter`(6dp 이상 노랑 + 검정 외곽)
+- [x] 테스트 17개(JVM)
+- **기기에서 확인 필요:** 실제 프리뷰 위 위치 오차(목표: 버튼 크기의 20% 이내), 기기 회전 시 박스, 30fps 렌더
