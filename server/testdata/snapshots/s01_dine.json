@@ -1,0 +1,56 @@
+{
+ "screenId": "s01_dine",
+ "frameId": 1,
+ "timestampMs": 0,
+ "stableFrames": 2,
+ "elements": [
+  {
+   "id": "e1",
+   "text": "주문 방법을 선택해주세요",
+   "kind": "TEXT",
+   "rect": {
+    "left": 0.2,
+    "top": 0.1,
+    "right": 0.8,
+    "bottom": 0.18
+   },
+   "confidence": 0.95
+  },
+  {
+   "id": "e2",
+   "text": "매장에서 먹고가기",
+   "kind": "BUTTON_LIKE",
+   "rect": {
+    "left": 0.1,
+    "top": 0.4,
+    "right": 0.45,
+    "bottom": 0.6
+   },
+   "confidence": 0.95
+  },
+  {
+   "id": "e3",
+   "text": "포장하기",
+   "kind": "BUTTON_LIKE",
+   "rect": {
+    "left": 0.55,
+    "top": 0.4,
+    "right": 0.9,
+    "bottom": 0.6
+   },
+   "confidence": 0.95
+  },
+  {
+   "id": "e4",
+   "text": "처음으로",
+   "kind": "BUTTON_LIKE",
+   "rect": {
+    "left": 0.05,
+    "top": 0.9,
+    "right": 0.25,
+    "bottom": 0.97
+   },
+   "confidence": 0.95
+  }
+ ]
+}

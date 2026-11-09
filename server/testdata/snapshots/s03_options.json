@@ -1,0 +1,92 @@
+{
+ "screenId": "s03_options",
+ "frameId": 3,
+ "timestampMs": 0,
+ "stableFrames": 2,
+ "elements": [
+  {
+   "id": "e1",
+   "text": "아메리카노 옵션 선택",
+   "kind": "TEXT",
+   "rect": {
+    "left": 0.2,
+    "top": 0.08,
+    "right": 0.8,
+    "bottom": 0.15
+   },
+   "confidence": 0.95
+  },
+  {
+   "id": "e2",
+   "text": "HOT",
+   "kind": "BUTTON_LIKE",
+   "rect": {
+    "left": 0.1,
+    "top": 0.25,
+    "right": 0.4,
+    "bottom": 0.38
+   },
+   "confidence": 0.95
+  },
+  {
+   "id": "e3",
+   "text": "ICE",
+   "kind": "BUTTON_LIKE",
+   "rect": {
+    "left": 0.55,
+    "top": 0.25,
+    "right": 0.85,
+    "bottom": 0.38
+   },
+   "confidence": 0.95
+  },
+  {
+   "id": "e4",
+   "text": "샷 추가",
+   "kind": "BUTTON_LIKE",
+   "rect": {
+    "left": 0.1,
+    "top": 0.45,
+    "right": 0.4,
+    "bottom": 0.58
+   },
+   "confidence": 0.95
+  },
+  {
+   "id": "e5",
+   "text": "시럽 추가",
+   "kind": "BUTTON_LIKE",
+   "rect": {
+    "left": 0.55,
+    "top": 0.45,
+    "right": 0.85,
+    "bottom": 0.58
+   },
+   "confidence": 0.95
+  },
+  {
+   "id": "e6",
+   "text": "담기",
+   "kind": "BUTTON_LIKE",
+   "rect": {
+    "left": 0.55,
+    "top": 0.88,
+    "right": 0.95,
+    "bottom": 0.96
+   },
+   "confidence": 0.95
+  },
+  {
+   "id": "e7",
+   "text": "취소",
+   "kind": "BUTTON_LIKE",
+   "rect": {
+    "left": 0.05,
+    "top": 0.88,
+    "right": 0.45,
+    "bottom": 0.96
+   },
+   "confidence": 0.95
+  }
+ ]
+}

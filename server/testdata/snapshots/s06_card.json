@@ -1,0 +1,32 @@
+{
+ "screenId": "s06_card",
+ "frameId": 6,
+ "timestampMs": 0,
+ "stableFrames": 2,
+ "elements": [
+  {
+   "id": "e1",
+   "text": "카드를 투입구에 넣어주세요",
+   "kind": "TEXT",
+   "rect": {
+    "left": 0.15,
+    "top": 0.3,
+    "right": 0.85,
+    "bottom": 0.45
+   },
+   "confidence": 0.95
+  },
+  {
+   "id": "e2",
+   "text": "결제 취소",
+   "kind": "BUTTON_LIKE",
+   "rect": {
+    "left": 0.35,
+    "top": 0.85,
+    "right": 0.65,
+    "bottom": 0.95
+   },
+   "confidence": 0.95
+  }
+ ]
+}

@@ -1,0 +1,4 @@
+{
+  "goal": "딸기 스무디 주세요",
+  "action": {"type": "SCROLL", "direction": "DOWN", "guideText": "메뉴 목록"}
+}

@@ -1,0 +1,178 @@
+[
+ {
+  "id": "c01",
+  "screen": "s01_dine",
+  "goal": "여기서 먹고 갈래요",
+  "variant": "clean",
+  "expectAction": "TAP",
+  "answerText": "매장에서 먹고가기",
+  "requiresLlm": false
+ },
+ {
+  "id": "c02",
+  "screen": "s01_dine",
+  "goal": "포장해 주세요",
+  "variant": "clean",
+  "expectAction": "TAP",
+  "answerText": "포장하기",
+  "requiresLlm": false
+ },
+ {
+  "id": "c03",
+  "screen": "s02_menu",
+  "goal": "아메리카노 주세요",
+  "variant": "clean",
+  "expectAction": "TAP",
+  "answerText": "아메리카노",
+  "requiresLlm": false
+ },
+ {
+  "id": "c04",
+  "screen": "s02_menu",
+  "goal": "라떼 하나요",
+  "variant": "clean",
+  "expectAction": "TAP",
+  "answerText": "카페라떼",
+  "requiresLlm": false
+ },
+ {
+  "id": "c05",
+  "screen": "s02_menu",
+  "goal": "딸기 스무디 먹고 싶어",
+  "variant": "clean",
+  "expectAction": "TAP",
+  "answerText": "딸기스무디",
+  "requiresLlm": false
+ },
+ {
+  "id": "c06",
+  "screen": "s03_options",
+  "goal": "따뜻한 걸로요",
+  "variant": "clean",
+  "expectAction": "TAP",
+  "answerText": "HOT",
+  "requiresLlm": false
+ },
+ {
+  "id": "c07",
+  "screen": "s03_options",
+  "goal": "시원한 걸로 줘",
+  "variant": "clean",
+  "expectAction": "TAP",
+  "answerText": "ICE",
+  "requiresLlm": false
+ },
+ {
+  "id": "c08",
+  "screen": "s03_options",
+  "goal": "샷 하나 더요",
+  "variant": "clean",
+  "expectAction": "TAP",
+  "answerText": "샷 추가",
+  "requiresLlm": false
+ },
+ {
+  "id": "c09",
+  "screen": "s04_cart",
+  "goal": "계산할게요",
+  "variant": "clean",
+  "expectAction": "TAP",
+  "answerText": "결제하기",
+  "requiresLlm": false
+ },
+ {
+  "id": "c10",
+  "screen": "s05_payment",
+  "goal": "카드로 낼게요",
+  "variant": "clean",
+  "expectAction": "TAP",
+  "answerText": "신용카드",
+  "requiresLlm": false
+ },
+ {
+  "id": "c11",
+  "screen": "s05_payment",
+  "goal": "카톡으로 결제할래",
+  "variant": "clean",
+  "expectAction": "TAP",
+  "answerText": "카카오페이",
+  "requiresLlm": true
+ },
+ {
+  "id": "c12",
+  "screen": "s06_card",
+  "goal": "",
+  "variant": "clean",
+  "expectAction": "DONE",
+  "answerText": null,
+  "requiresLlm": false
+ },
+ {
+  "id": "n01",
+  "screen": "s02_menu",
+  "goal": "아메리카노 주세요",
+  "variant": "ocr-noise",
+  "expectAction": "TAP",
+  "answerText": "아메리키노",
+  "requiresLlm": false,
+  "mutate": {
+   "아메리카노": "아메리키노"
+  }
+ },
+ {
+  "id": "n02",
+  "screen": "s02_menu",
+  "goal": "바닐라 라떼요",
+  "variant": "ocr-noise",
+  "expectAction": "TAP",
+  "answerText": "바닐라래떼",
+  "requiresLlm": false,
+  "mutate": {
+   "바닐라라떼": "바닐라래떼"
+  }
+ },
+ {
+  "id": "a01",
+  "screen": "s02_menu",
+  "goal": "",
+  "variant": "clean",
+  "expectAction": "ASK_USER",
+  "answerText": null,
+  "requiresLlm": true
+ },
+ {
+  "id": "u01",
+  "screen": "s01_dine",
+  "goal": "비빔밥 주세요",
+  "variant": "clean",
+  "expectAction": "UNKNOWN",
+  "answerText": null,
+  "requiresLlm": true
+ },
+ {
+  "id": "u02",
+  "screen": "s05_payment",
+  "goal": "아메리카노 주세요",
+  "variant": "clean",
+  "expectAction": "UNKNOWN",
+  "answerText": null,
+  "requiresLlm": true
+ },
+ {
+  "id": "h01",
+  "screen": "s03_options",
+  "goal": "",
+  "variant": "clean",
+  "expectAction": "TAP",
+  "answerText": "ICE",
+  "requiresLlm": true,
+  "prevGoal": "아이스 아메리카노 주세요",
+  "history": [
+   {
+    "screenId": "s02_menu",
+    "action": "TAP",
+    "targetText": "아메리카노"
+   }
+  ]
+ }
+]

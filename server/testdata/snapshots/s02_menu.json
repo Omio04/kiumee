@@ -1,0 +1,152 @@
+{
+ "screenId": "s02_menu",
+ "frameId": 2,
+ "timestampMs": 0,
+ "stableFrames": 2,
+ "elements": [
+  {
+   "id": "e1",
+   "text": "커피",
+   "kind": "BUTTON_LIKE",
+   "rect": {
+    "left": 0.02,
+    "top": 0.12,
+    "right": 0.2,
+    "bottom": 0.18
+   },
+   "confidence": 0.95
+  },
+  {
+   "id": "e2",
+   "text": "음료",
+   "kind": "BUTTON_LIKE",
+   "rect": {
+    "left": 0.22,
+    "top": 0.12,
+    "right": 0.4,
+    "bottom": 0.18
+   },
+   "confidence": 0.95
+  },
+  {
+   "id": "e3",
+   "text": "디저트",
+   "kind": "BUTTON_LIKE",
+   "rect": {
+    "left": 0.42,
+    "top": 0.12,
+    "right": 0.6,
+    "bottom": 0.18
+   },
+   "confidence": 0.95
+  },
+  {
+   "id": "e4",
+   "text": "아메리카노",
+   "kind": "BUTTON_LIKE",
+   "rect": {
+    "left": 0.05,
+    "top": 0.25,
+    "right": 0.3,
+    "bottom": 0.4
+   },
+   "confidence": 0.95
+  },
+  {
+   "id": "e5",
+   "text": "카페라떼",
+   "kind": "BUTTON_LIKE",
+   "rect": {
+    "left": 0.35,
+    "top": 0.25,
+    "right": 0.6,
+    "bottom": 0.4
+   },
+   "confidence": 0.95
+  },
+  {
+   "id": "e6",
+   "text": "바닐라라떼",
+   "kind": "BUTTON_LIKE",
+   "rect": {
+    "left": 0.65,
+    "top": 0.25,
+    "right": 0.9,
+    "bottom": 0.4
+   },
+   "confidence": 0.95
+  },
+  {
+   "id": "e7",
+   "text": "녹차라떼",
+   "kind": "BUTTON_LIKE",
+   "rect": {
+    "left": 0.05,
+    "top": 0.5,
+    "right": 0.3,
+    "bottom": 0.65
+   },
+   "confidence": 0.95
+  },
+  {
+   "id": "e8",
+   "text": "딸기스무디",
+   "kind": "BUTTON_LIKE",
+   "rect": {
+    "left": 0.35,
+    "top": 0.5,
+    "right": 0.6,
+    "bottom": 0.65
+   },
+   "confidence": 0.95
+  },
+  {
+   "id": "e9",
+   "text": "4,500원",
+   "kind": "PRICE",
+   "rect": {
+    "left": 0.05,
+    "top": 0.41,
+    "right": 0.3,
+    "bottom": 0.45
+   },
+   "confidence": 0.95
+  },
+  {
+   "id": "e10",
+   "text": "5,000원",
+   "kind": "PRICE",
+   "rect": {
+    "left": 0.35,
+    "top": 0.41,
+    "right": 0.6,
+    "bottom": 0.45
+   },
+   "confidence": 0.95
+  },
+  {
+   "id": "e11",
+   "text": "장바구니 보기",
+   "kind": "BUTTON_LIKE",
+   "rect": {
+    "left": 0.6,
+    "top": 0.9,
+    "right": 0.95,
+    "bottom": 0.97
+   },
+   "confidence": 0.95
+  },
+  {
+   "id": "e12",
+   "text": "이전",
+   "kind": "BUTTON_LIKE",
+   "rect": {
+    "left": 0.05,
+    "top": 0.9,
+    "right": 0.25,
+    "bottom": 0.97
+   },
+   "confidence": 0.95
+  }
+ ]
+}

@@ -1,0 +1,5 @@
+{
+  "goal": "따뜻한 아메리카노 한 잔 주세요",
+  "action": {"type": "TAP", "targetId": "e4", "guideText": "아메리카노"},
+  "source": "fastpath"
+}
