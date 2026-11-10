@@ -63,7 +63,9 @@ cd server && pip install -r requirements-dev.txt && KL_SKIP_APP_INIT=1 pytest -q
 | `server/` | Gemini 제공자 추가 | 92개 |
 
 **Fake · mock 플레이버는 없다** (2일차 결정, [decisions.md](docs/decisions.md) 6장): 계약 테스트는 실구현으로 돌리고, JVM에서 못 도는 STT/TTS · ML Kit · 카메라는 기기에서 확인한다.
-전체 빌드 · JVM 테스트는 AGP 9.5 · SDK 37에서 통과를 확인했다 (2026-11-10). 기기 동작은 아직 확인 전이다.
+전체 빌드 · JVM 테스트는 AGP 9.5 · SDK 37에서 통과를 확인했다 (2026-11-10).
+에뮬레이터(Android 17)에서 실행 · 카메라 · ML Kit OCR · "말하기" 흐름 · 서버 연결도 확인했다. **실제 글자 인식과 음성 인식 성공 → 하이라이트 → 음성 안내는 실기기 확인이 필요하다.**
+⚠️ 알려진 문제: 한국어 온디바이스 음성 모델이 없는 기기에서는 STT가 안 된다 → [voice/README.md](voice/README.md) "알려진 문제" (P3).
 
 ## 협업 규칙 (5일 계획 9장)
 
