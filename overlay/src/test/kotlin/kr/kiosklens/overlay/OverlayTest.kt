@@ -16,31 +16,81 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/**
+ * HighlightSurface 계약 테스트 (설계서 16.7, overlay/README "계약 테스트").
+ * 실구현이 이 클래스를 상속해서 통과해야 한다. 상속하는 쪽이 [create]로 넘길 것:
+ *  - surface      테스트할 오버레이
+ *  - current      지금 보여야 할 대상 (null = 숨김)
+ *  - changes      "다시 그려라"라고 알린 횟수 (같은 값이 또 오면 늘면 안 됨 → 깜빡임이 처음부터 다시 시작되지 않음)
+ *  - lastNotified 마지막으로 "다시 그려라"라고 알린 대상 (화면에 그려질 값)
+ */
 abstract class HighlightSurfaceContractSpec {
-    protected abstract fun create(): Pair<HighlightSurface, () -> HighlightTarget?>
+    protected data class Subject(
+        val surface: HighlightSurface,
+        val current: () -> HighlightTarget?,
+        val changes: () -> Int,
+        val lastNotified: () -> HighlightTarget?,
+    )
+
+    protected abstract fun create(): Subject
     private fun t(id: String, l: Float = 0.1f) = HighlightTarget(id, NormRect(l, 0.2f, l + 0.2f, 0.3f))
 
+    @Test fun `처음에는 아무것도 보이지 않는다`() {
+        val (_, cur, changes) = create()
+        assertNull(cur())
+        assertEquals(0, changes())
+    }
+
     @Test fun `여러 스레드에서 동시에 불러도 예외 없이 마지막 값이 남는다`() {
-        val (s, cur) = create()
+        val (s, cur, _, notified) = create()
         val pool = Executors.newFixedThreadPool(8); val go = CountDownLatch(1); val done = CountDownLatch(8)
         repeat(8) { i -> pool.execute { go.await(); repeat(500) { s.setTarget(t("e$i", 0.1f + (it % 5) * 0.01f)) }; done.countDown() } }
         go.countDown(); done.await(); pool.shutdown()
+        // 동시에 불린 뒤에도 "화면에 그리라고 마지막으로 알린 값"과 "실제 상태"가 같아야 한다 (순서가 뒤바뀌면 엉뚱한 버튼이 그려진다)
+        assertEquals(cur(), notified())
         s.setTarget(t("last"))
         assertEquals("last", cur()?.elementId)
+        assertEquals("last", notified()?.elementId)
     }
 
     @Test fun `null이면 숨긴다`() { val (s, cur) = create(); s.setTarget(t("a")); s.setTarget(null); assertNull(cur()) }
+
+    @Test fun `새 대상을 넣으면 그 대상으로 바뀐다`() {
+        val (s, cur, changes) = create(); val a = t("a"); val b = t("b", 0.5f)
+        s.setTarget(a); s.setTarget(b)
+        assertEquals(b, cur())
+        assertEquals(2, changes())
+    }
 
     @Test fun `같은 값을 연속으로 넣어도 상태가 같다`() {
         val (s, cur) = create(); val a = t("a")
         s.setTarget(a); val first = cur(); s.setTarget(a.copy()); s.setTarget(a)
         assertEquals(first, cur())
     }
+
+    @Test fun `같은 값을 또 넣으면 다시 그리지 않는다 - 깜빡임이 처음부터 다시 시작되면 안 됨`() {
+        val (s, _, changes) = create(); val a = t("a")
+        s.setTarget(a)
+        s.setTarget(a.copy())        // 내용이 같은 새 객체도 "같은 값"이다
+        s.setTarget(a)
+        assertEquals("같은 값이 또 와도 다시 그리라고 알리면 안 된다", 1, changes())
+    }
+
+    @Test fun `null을 두 번 넣어도 한 번만 숨긴다`() {
+        val (s, _, changes) = create()
+        s.setTarget(t("a")); s.setTarget(null); s.setTarget(null)
+        assertEquals(2, changes())
+    }
 }
 
 /** 실제 ViewOverlay가 쓰는 HighlightHolder로 포트 계약을 확인한다 (FakeOverlay는 2일차에 지움). */
 class HighlightHolderContractTest : HighlightSurfaceContractSpec() {
-    override fun create(): Pair<HighlightSurface, () -> HighlightTarget?> = HighlightHolder().let { it to { it.target } }
+    override fun create(): Subject {
+        val count = java.util.concurrent.atomic.AtomicInteger(0)
+        val last = java.util.concurrent.atomic.AtomicReference<HighlightTarget?>(null)
+        val holder = HighlightHolder { t -> count.incrementAndGet(); last.set(t) }
+        return Subject(holder, { holder.target }, { count.get() }, { last.get() })
+    }
 }
 
 class OverlayMathTest {
