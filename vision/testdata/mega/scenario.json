@@ -1,0 +1,37 @@
+{
+  "source": "10 user-supplied Mega Coffee kiosk screenshots",
+  "evidence": "Manual visual labels; these are not measured OCR outputs",
+  "notRuntimeConfiguration": true,
+  "observedExampleChoices": {
+    "product": "(ICE)아메리카노",
+    "strength": "연하게",
+    "payment": "카드결제"
+  },
+  "handoffGuidance": {
+    "exampleIsCustomerSelectionPolicy": false,
+    "noFixedMenuTasteOrPayment": true,
+    "explainVisibleOptionsWhenUserIsUnsure": true,
+    "waitForUserAnswer": true,
+    "doNotAdvanceUnansweredChoices": true,
+    "offerOnlyVisibleOptions": true,
+    "loyaltyHandlingRequestedForThisDemo": "skip_using_verified_close"
+  },
+  "screens": [
+    {"image": 1, "scene": "new-menu", "labels": ["신메뉴", "커피", "장바구니 조회"]},
+    {"image": 2, "scene": "ade-menu", "labels": ["에이드", "메가에이드", "레몬에이드", "커피"]},
+    {"image": 3, "scene": "coffee-menu", "labels": ["(ICE)아메리카노", "2,000원", "(HOT)아메리카노", "1,700원"]},
+    {"image": 4, "scene": "product-options", "labels": ["연하게", "+0원", "샷 추가", "+600원", "주문담기"], "decision": "ask_user"},
+    {"image": 5, "scene": "product-options-selected", "labels": ["선택된 옵션", "연하게", "주문담기"], "note": "Summary text and the selectable tile must remain distinct"},
+    {"image": 6, "scene": "cart", "labels": ["(ICE)아메리카노", "1개", "결제하기"], "note": "Menu tile and cart row must remain distinct"},
+    {"image": 7, "scene": "payment", "labels": ["결제수단 선택", "카드결제", "앱카드", "결제할 금액: 2,000원"]},
+    {"image": 8, "scene": "disposables", "labels": ["선택안함", "빨대/스틱 필요", "캐리어/봉투 필요", "직접 가져 갈게요", "선택완료"], "decision": "ask_user"},
+    {"image": 9, "scene": "order-review", "labels": ["(ICE)아메리카노", "연하게", "먹고가기", "포장하기"], "decision": "ask_user"},
+    {"image": 10, "scene": "loyalty", "labels": ["스탬프 적립", "010-", "적립", "×"], "decision": "skip using a verified close control"}
+  ],
+  "limits": [
+    "Upload order is not assumed to be navigation order.",
+    "The screen after dismissing loyalty and actual card-reader instructions were not supplied.",
+    "Do not infer payment completion from the loyalty popup.",
+    "Screenshots include Photos UI; raw gallery screenshots remain only in ignored local data."
+  ]
+}

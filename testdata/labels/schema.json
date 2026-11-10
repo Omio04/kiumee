@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["image", "screen", "goal", "answerText", "variant"],
+  "properties": {
+    "image": {"type": "string", "minLength": 1},
+    "screen": {"type": "string", "minLength": 1},
+    "goal": {"type": "string", "minLength": 1},
+    "answerText": {"type": "string", "minLength": 1},
+    "variant": {"enum": ["정면", "각도", "반사", "가림", "밝기"]}
+  }
+}
