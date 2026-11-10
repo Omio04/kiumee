@@ -163,6 +163,8 @@ class LlmKind(str, Enum):
     ASK_USER = "ASK_USER"
     DONE = "DONE"
     UNKNOWN = "UNKNOWN"
+    SCROLL = "SCROLL"          # 찾는 버튼이 후보에 없지만 화면을 밀면 있을 것 같을 때
+    WAIT = "WAIT"              # 화면이 아직 바뀌는 중이거나 불러오는 중일 때
 
 
 class LlmAction(BaseModel):
@@ -171,8 +173,9 @@ class LlmAction(BaseModel):
     targetId: Optional[str] = None
     guideText: Optional[str] = None
     message: Optional[str] = None
+    direction: Optional[str] = None
 
-    @field_validator("targetId", "guideText", "message", mode="before")
+    @field_validator("targetId", "guideText", "message", "direction", mode="before")
     @classmethod
     def _null_like(cls, v):
         if isinstance(v, str) and v.strip().lower() in ("", "null", "none"):

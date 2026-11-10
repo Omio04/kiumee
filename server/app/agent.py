@@ -5,8 +5,10 @@
   2. 로컬 규칙                "카드를 넣어 주세요" 같은 결제 진행 화면이면 LLM 없이 DONE
   3. 후보 축소                JamoNgramRanker (K=8)
   4. 빠른 길(선택)            글자가 거의 똑같고 1등이 뚜렷하면 LLM 없이 TAP
-  5. LLM 판단                 JSON 강제 · 형식이 틀리면 1회만 다시 요청
+  5. LLM 판단                 JSON 강제 · 형식이 틀리면 1회만 다시 요청 (총 처리 예산 안에서만)
   6. 검증                     후보 밖 targetId → UNKNOWN
+
+앞에는 응답 캐시가 있어 같은 화면 · 목표 · 이력의 재요청(앱의 1회 재시도)은 LLM 없이 바로 답합니다.
 
 목표(goal)는 서버가 저장하지 않습니다. 앱이 직전 응답의 goal을 요청에 돌려주고, 서버는 거기에
 이번 발화(utterance)를 붙여 새 goal을 만들어 응답에 담습니다 (계약 v1, docs/contract.md).
@@ -18,6 +20,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Protocol
 
 from . import privacy
+from .cache import ResponseCache, request_key
 from .jamo import normalize
 from .llm import LlmClient
 from .models import (MAX_GOAL, ActionType, ElementKind, GuideAction, GuideRequest, GuideResponse, LlmKind,
@@ -72,6 +75,7 @@ class LlmGuideAgent:
         self.ranker = JamoNgramRanker(settings.candidate_k)
         self.parser = ActionParser()
         self.validator = ActionValidator()
+        self.cache = ResponseCache(settings.cache_size, settings.cache_ttl_s)
 
     async def next(self, req: GuideRequest) -> GuideResult:
         t0 = time.perf_counter()
@@ -82,10 +86,16 @@ class LlmGuideAgent:
         els = req.snapshot.elements
         goal = _goal_of(req)
 
+        key = request_key(goal, req)
+        cached = self.cache.get(key)
+        if cached is not None:
+            meta.update(source="cache", candidates=0)
+            return self._finish(cached, meta, t0)
+
         # 2) 로컬 규칙: 결제 진행 화면
         if _is_done_screen(els):
             meta.update(source="rule", candidates=0)
-            return self._finish(GuideResponse(goal=goal, action=GuideAction.done(MSG_DONE), source="rule"), meta, t0)
+            return self._finish(GuideResponse(goal=goal, action=GuideAction.done(MSG_DONE), source="rule"), meta, t0)  # 규칙은 이미 즉시라 캐시 불필요
 
         ranked = self.ranker.rank(els, goal)
         meta["candidates"] = len(ranked)
@@ -110,8 +120,13 @@ class LlmGuideAgent:
         user = build_user(goal, req.history, candidates, context)
 
         action = None
+        deadline = t0 + self.s.total_budget_s
         for attempt in range(2):                       # 최초 1회 + 형식 오류 시 1회
-            raw = await self.llm.complete(SYSTEM, user if attempt == 0 else user + RETRY_NOTE, self.s.llm_timeout_s)
+            remaining = deadline - time.perf_counter()
+            if attempt > 0 and remaining < self.s.min_retry_s:
+                break                                  # 앱 타임아웃(6초) 안에 답하려면 재요청을 포기하고 UNKNOWN으로
+            timeout = max(0.5, min(self.s.llm_timeout_s, remaining))
+            raw = await self.llm.complete(SYSTEM, user if attempt == 0 else user + RETRY_NOTE, timeout)
             meta["llm_calls"] = int(meta["llm_calls"]) + 1
             try:
                 action = self.parser.parse(raw)
@@ -128,6 +143,8 @@ class LlmGuideAgent:
         if action.action == LlmKind.GUIDE and resp.action.type == ActionType.UNKNOWN:
             meta["rejected"] = True                    # LLM이 후보에 없는 버튼을 말함
         meta["source"] = resp.source
+        if resp.source == "llm":
+            self.cache.put(key, resp)
         return self._finish(resp, meta, t0)
 
     @staticmethod

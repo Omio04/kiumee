@@ -70,3 +70,19 @@ val json = Json {
 - [x] **JSON은 `kotlinx.serialization` 대신 작은 직접 구현**(`remote/Json.kt`)으로 처리했다 (외부 의존 0, 계약 필드가 적음). 바꾸고 싶으면 `DtoMapper`만 고치면 되고 테스트가 그대로 보증한다.
 - [x] 테스트 18개: `testdata/contract/*.json` 왕복, 로컬 HTTP 서버로 401 · 400 · 429 · 502 · 시간 초과 · **응답이 조금씩 늦게 오는 경우** · 연결 실패 · 깨진 응답, `Tap.targetId` 방어, 길이 제한
 - 서버: **무료 Gemini 지원 추가** (`LLM_PROVIDER=gemini`, `GEMINI_API_KEY`) — [server/README.md](../server/README.md)
+
+## 실패 → 사용자 안내 (3일차, P4)
+
+`GuideFailure.kt`: `Throwable.guideFailureKind()` / `guideFailureMessage()`가 `RemoteGuideAgent`의 `Result.failure` 원인을 종류(`GuideFailureKind`)와 읽어 줄 문구로 바꾼다.
+
+| 원인 | 종류 | 다시 시도 |
+|---|---|---|
+| 400 | BAD_REQUEST | 안 함 |
+| 401 · 403 | UNAUTHORIZED | 안 함 |
+| 429 | RATE_LIMITED | `Retry-After`만큼 기다려 1회 |
+| 500 · 502 | SERVER_ERROR | 1회 |
+| 504 · 앱 시간 초과 | TIMEOUT | 1회 |
+| 연결 실패 · 호스트 없음 | OFFLINE | 1회 |
+| 깨진 응답 | BAD_RESPONSE | 1회 |
+
+⚠️ **P1에게 넘길 것**: 지금 `:domain`의 `SessionRunner`는 실패를 `GuideFailed(ticket)`로만 받아 원인을 모른다 (`:domain`은 `:agent`를 몰라야 하므로 내가 고치지 않았다). 문구를 실제로 읽게 하려면 `:app`에서 `GuideAgent`를 감싸 실패 원인을 문구로 바꾸거나, `GuideFailed`에 종류를 담는 `:core-model` 변경 PR(전원 승인)이 필요하다.

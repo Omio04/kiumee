@@ -5,7 +5,7 @@
 ## 실행
 ```
 pip install -r requirements-dev.txt
-KL_SKIP_APP_INIT=1 pytest -q                       # 테스트 82개 (키·네트워크 불필요)
+KL_SKIP_APP_INIT=1 pytest -q                       # 테스트 105개 (키·네트워크 불필요)
 APP_KEY=dev LLM_PROVIDER=fake uvicorn app.main:app --port 8080     # 키 없이 연동 연습 (Android가 바로 붙일 수 있음)
 APP_KEY=... ANTHROPIC_API_KEY=... uvicorn app.main:app             # 실제 LLM
 docker build -t kl-agent . && docker run -p 8080:8080 -e APP_KEY=... -e ANTHROPIC_API_KEY=... kl-agent
@@ -70,3 +70,22 @@ uvicorn app.main:app --port 8000
 ```
 
 기본 모델은 `gemini-2.5-flash-lite` (`LLM_MODEL`로 변경). 무료 한도를 넘으면 429 → 앱은 잠시 뒤 다시 시도하고, 계속되면 오류 안내를 읽는다. 정확도는 `python scripts/evaluate.py --llm gemini`로 anthropic과 비교해서 정할 것 *(이 PR에서는 키가 없어 실제 호출은 확인하지 못함, MockTransport 테스트만 통과)*.
+
+## 5일 계획 P4 추가 작업 (feat/p4-agent-server)
+
+| 항목 | 내용 | 왜 |
+|---|---|---|
+| 구조화 출력 | Anthropic: 도구 `decide`를 `tool_choice`로 강제 / Gemini: `responseSchema` (`llm.py` `ACTION_SCHEMA`) | 프롬프트로 "JSON만" 부탁하는 것보다 형식 오류(= 재요청 = 지연)가 줄어든다. 파서는 그대로 두어 텍스트 응답도 받는다 |
+| 총 처리 예산 | `TOTAL_BUDGET_S`(5초) 안에서만 LLM 재요청. 시도마다 `min(LLM_TIMEOUT_S, 남은 시간)` | 전엔 4초×2회=8초까지 늘어나 앱 타임아웃(6초)을 넘길 수 있었다 |
+| 응답 캐시 | `cache.py`. 같은 화면·목표·이력이면 LLM 없이 직전 답 (TTL 30초, 성공한 판단만, 메모리에만) | 앱의 1회 재시도가 첫 요청이 끝난 뒤에 오면 즉시 응답 |
+| SCROLL · WAIT | LLM이 `SCROLL`(+direction) · `WAIT`를 고를 수 있고 `ActionValidator`가 계약 형식으로 변환 | 계약 v1에 있었지만 서버가 안 보내던 두 행동 (결정 L의 "P4 판단"). 앱은 이미 처리 가능 |
+| 동의어 사전 | 확인/취소/이전/큰·작은 등 말투 보강 | 후보 축소 누락 방지 |
+| 지연 측정 | `scripts/loadtest.py` (HTTP로 p50/p95/p99, `--fail-over-ms 2000`) | 4일차 p95 2초 합격 기준 |
+| 배포 | `render.yaml` · Dockerfile `HEALTHCHECK` | 3일차 클라우드 배포 |
+
+배포(Cloud Run 예): `gcloud run deploy kiosk-lens-agent --source server --region asia-northeast3 --set-env-vars LLM_PROVIDER=gemini --set-secrets APP_KEY=app-key:latest,GEMINI_API_KEY=gemini-key:latest`
+(키는 Secret Manager에. 요청 하나가 6초 안에 끝나야 하므로 `--min-instances 1`로 콜드 스타트를 피하는 것을 권장.) **실제 배포는 이 환경에서 해보지 않았다.**
+
+### 이 작업에서 확인하지 못한 것
+- 실제 Anthropic · Gemini 호출 (키 없음): 요청 모양은 MockTransport 테스트로만 확인했다. 도구 호출/`responseSchema`가 실제 API에서 받아들여지는지, 실제 정확도(85%)와 p95(2초)는 키를 넣고 `evaluate.py` · `loadtest.py`로 재야 한다.
+- Docker 빌드, 클라우드 배포.
