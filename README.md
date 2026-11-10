@@ -55,12 +55,12 @@ cd server && pip install -r requirements-dev.txt && KL_SKIP_APP_INIT=1 pytest -q
 | 모듈 | 상태 | JVM 테스트 |
 |---|---|---|
 | `:core-model` · `:domain` (+`SessionRunner`) | 구현 완료 | 35개 |
-| `:agent` | 구현 완료 (직접 JSON, 시도 한 번 전체 6초) | 18개 |
+| `:agent` | 구현 완료 (직접 JSON, 시도 한 번 전체 6초, 실패 → 안내 문구 분류) | 23개 |
 | `:vision` | P2 구현 (메가커피 화면 · 팝업 · 닫기 아이콘 · ID 유지. ML Kit는 기기에서 확인 필요) | 40개 |
 | `:voice` | 구현 완료 (실제 STT/TTS는 기기에서 확인 필요) | 5개 |
 | `:overlay` | 구현 완료 (View 기반) | 14개 |
 | `:app` | 조립 · 화면 · 카메라 (실구현만) | 5개 |
-| `server/` | Gemini 제공자 추가 | 92개 |
+| `server/` | Gemini 제공자 · 구조화 출력 · 총 처리 예산 · 응답 캐시 · SCROLL/WAIT | 105개 |
 
 **Fake · mock 플레이버는 없다** (2일차 결정, [decisions.md](docs/decisions.md) 6장): 계약 테스트는 실구현으로 돌리고, JVM에서 못 도는 STT/TTS · ML Kit · 카메라는 기기에서 확인한다.
 전체 빌드 · JVM 테스트는 AGP 9.5 · SDK 37에서 통과를 확인했다 (2026-11-10).

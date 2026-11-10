@@ -7,5 +7,6 @@ COPY app ./app
 RUN useradd -m app && chown -R app /srv
 USER app
 EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s CMD python -c "import os,urllib.request;urllib.request.urlopen('http://127.0.0.1:%s/healthz'%os.environ.get('PORT','8080'),timeout=2)" || exit 1
 # 로그는 개수·시간만 남기고 요청 본문은 남기지 않습니다(access log도 끔: 경로만 남지만 불필요).
 CMD ["sh","-c","uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080} --no-access-log"]

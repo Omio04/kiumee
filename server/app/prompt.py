@@ -19,12 +19,13 @@ SYSTEM = """키오스크 안내 도우미의 판단기입니다. 화면 버튼 �
 규칙:
 - targetId는 반드시 [후보] 목록에 있는 id여야 합니다. 맞는 버튼이 없으면 action은 UNKNOWN.
 - 흐름: 메뉴 → 옵션 → 장바구니 → 결제 수단 선택. 결제 수단을 이미 눌렀거나 결제 진행 문구가 보이면 DONE.
+- 원하는 버튼이 후보에 없지만 목록·메뉴가 더 있을 것 같으면 SCROLL(direction: UP|DOWN|LEFT|RIGHT, 보통 DOWN). 화면이 로딩 중이거나 바뀌는 중이면 WAIT.
 - 어르신이 무엇을 원하는지 모르겠으면 ASK_USER와 40자 이내의 짧은 질문.
 - 지난 안내와 같은 버튼을 또 고를 때는 화면이 바뀌지 않았다는 뜻이니, 그대로 한 번 더 고르세요.
 - guideText는 고른 버튼의 글자 그대로. 카드번호 등 개인정보는 말하지 않습니다.
-- message는 ASK_USER, DONE, UNKNOWN일 때만, 쉬운 존댓말 한 문장 (비난·전문용어 금지).
+- message는 ASK_USER, DONE, UNKNOWN, SCROLL, WAIT일 때만, 쉬운 존댓말 한 문장 (비난·전문용어 금지).
 JSON 한 줄만 출력하세요 (설명 금지):
-{"action":"GUIDE|ASK_USER|DONE|UNKNOWN","targetId":"후보 id 또는 null","guideText":"버튼 글자 또는 null","message":"문장 또는 null"}"""
+{"action":"GUIDE|ASK_USER|DONE|UNKNOWN|SCROLL|WAIT","targetId":"후보 id 또는 null","guideText":"버튼 글자 또는 null","message":"문장 또는 null","direction":"SCROLL일 때만 UP|DOWN|LEFT|RIGHT"}"""
 
 RETRY_NOTE = "\n\n(앞 응답은 형식이 틀렸습니다. 위 JSON 한 줄만, 설명 없이 다시 출력하세요.)"
 

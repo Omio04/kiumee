@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from typing import Callable, List, Optional, Protocol, Union
 
 import httpx
@@ -14,6 +15,24 @@ import httpx
 from .ranker import expand_query, match_score
 
 ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
+
+# LLM이 내야 하는 JSON의 모양. 두 제공자 모두 "형식을 강제"하는 기능에 이 스키마를 넘깁니다:
+#   Anthropic: 도구 하나(decide)를 tool_choice로 강제 → 입력이 항상 스키마를 따르는 JSON 객체
+#   Gemini   : responseSchema (constrained decoding)
+# 프롬프트에 "JSON만 출력하세요"라고 부탁하는 것보다 형식 오류(= 재요청 = 지연)가 크게 줄어듭니다.
+_ACTIONS = ["GUIDE", "ASK_USER", "DONE", "UNKNOWN", "SCROLL", "WAIT"]
+_DIRECTIONS = ["UP", "DOWN", "LEFT", "RIGHT"]
+ACTION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "action": {"type": "string", "enum": _ACTIONS},
+        "targetId": {"type": "string", "description": "GUIDE일 때 [후보]의 id"},
+        "guideText": {"type": "string", "description": "GUIDE일 때 버튼 글자"},
+        "message": {"type": "string", "description": "ASK_USER · DONE · UNKNOWN · SCROLL · WAIT일 때 쉬운 존댓말 한 문장"},
+        "direction": {"type": "string", "enum": _DIRECTIONS, "description": "SCROLL일 때만"},
+    },
+    "required": ["action"],
+}
 
 
 class LlmError(Exception):
@@ -63,6 +82,9 @@ class AnthropicLlmClient:
                 "temperature": 0,
                 "system": system,
                 "messages": [{"role": "user", "content": user}],
+                "tools": [{"name": "decide", "description": "다음에 어르신이 할 행동 하나를 정한다.",
+                           "input_schema": ACTION_SCHEMA}],
+                "tool_choice": {"type": "tool", "name": "decide"},
             },
             timeout=timeout_s,
         )
@@ -86,12 +108,25 @@ class AnthropicLlmClient:
             raise LlmUpstream(f"http_{r.status_code}")      # 본문은 남기지 않음
         try:
             data = r.json()
-            return "".join(b.get("text", "") for b in data.get("content", []) if b.get("type") == "text")
+            blocks = data.get("content", [])
+            for b in blocks:                                  # 강제한 도구 호출: 입력이 곧 JSON 객체
+                if b.get("type") == "tool_use" and isinstance(b.get("input"), dict):
+                    return json.dumps(b["input"], ensure_ascii=False)
+            return "".join(b.get("text", "") for b in blocks if b.get("type") == "text")
         except ValueError as e:
             raise LlmUpstream("bad_body") from e
 
     async def aclose(self) -> None:
         await self._http.aclose()
+
+
+def _gemini_schema() -> dict:
+    """Gemini responseSchema는 OpenAPI 부분집합이라 대문자 type을 씁니다 (description은 그대로 허용)."""
+    def conv(n):
+        if isinstance(n, dict):
+            return {k: (v.upper() if k == "type" and isinstance(v, str) else conv(v)) for k, v in n.items()}
+        return n
+    return conv(ACTION_SCHEMA)
 
 
 class GeminiLlmClient:
@@ -115,7 +150,8 @@ class GeminiLlmClient:
             json={
                 "systemInstruction": {"parts": [{"text": system}]},
                 "contents": [{"role": "user", "parts": [{"text": user}]}],
-                "generationConfig": {"temperature": 0, "maxOutputTokens": self.max_tokens, "responseMimeType": "application/json"},
+                "generationConfig": {"temperature": 0, "maxOutputTokens": self.max_tokens, "responseMimeType": "application/json",
+                                     "responseSchema": _gemini_schema()},
             },
             timeout=timeout_s,
         )

@@ -9,11 +9,13 @@ from __future__ import annotations
 
 from typing import Dict
 
-from .models import GuideAction, GuideResponse, LlmAction, LlmKind, ScreenElement
+from .models import GuideAction, GuideResponse, LlmAction, LlmKind, ScreenElement, ScrollDir
 
 MSG_UNKNOWN = "버튼을 찾지 못했어요. 화면이 잘 보이게 정면에서 비춰주세요."
 MSG_ASK = "무엇을 드시고 싶으세요?"
 MSG_DONE = "결제 수단을 고르셨어요. 직원 또는 화면 안내를 따라주세요."
+MSG_SCROLL = "화면을 위아래로 밀어서 찾아보세요."
+MSG_WAIT = "화면이 바뀔 때까지 잠시 기다려 주세요."
 MAX_MESSAGE = 60
 
 
@@ -36,4 +38,14 @@ class ActionValidator:
             return GuideResponse(goal=goal, action=GuideAction.ask_user(_clean_message(a.message, MSG_ASK)), source=source)
         if a.action == LlmKind.DONE:
             return GuideResponse(goal=goal, action=GuideAction.done(_clean_message(a.message, MSG_DONE)), source=source)
+        if a.action == LlmKind.SCROLL:
+            try:
+                d = ScrollDir((a.direction or "DOWN").strip().upper())
+            except ValueError:
+                d = ScrollDir.DOWN                      # 모르는 방향은 가장 흔한 아래로
+            act = GuideAction(type="SCROLL", direction=d, guideText=_clean_message(a.message, MSG_SCROLL))
+            return GuideResponse(goal=goal, action=act, source=source)
+        if a.action == LlmKind.WAIT:
+            return GuideResponse(goal=goal, action=GuideAction(type="WAIT", guideText=_clean_message(a.message, MSG_WAIT)),
+                                 source=source)
         return GuideResponse(goal=goal, action=GuideAction.unknown(_clean_message(a.message, MSG_UNKNOWN)), source=source)
