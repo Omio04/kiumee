@@ -12,6 +12,7 @@ import android.graphics.RectF
 import android.os.Bundle
 import android.os.SystemClock
 import android.util.TypedValue
+import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
@@ -41,8 +42,9 @@ import kr.kiosklens.overlay.transform.FitCenterMapper
  * - 고정 노란 테두리 5개: 분석 프레임의 네 모서리 근처 + 가운데
  * - 분석 프레임 사진을 같은 변환으로 반투명하게 겹쳐 그림(하늘색 테두리 = 분석 프레임 전체).
  *   변환이 맞으면 카메라 미리보기와 정확히 겹쳐서 이중으로 보이지 않는다. 틀리면 어긋나서 겹쳐 보인다.
- * - 위쪽 글자: 분석 프레임 크기 · 회전 · 화면 크기 · 화면에 실제로 보이는 분석 프레임 범위
- * - 버튼: 채우기(FILL)/맞추기(FIT) 전환 · 같은 값 다시 보내기 · 숨김/보임 · 흔들기 (가운데 테두리 대상)
+ * - 아래쪽 회색 띠: 앱의 "말하기" 버튼판 자리(높이를 앱과 비슷하게 가정). 위쪽 글자 · 버튼 영역도 가려진 곳으로 친다
+ * - 가운데 테두리가 화면 밖이나 가려진 곳에 걸리면 "안 보임"으로 바뀐다 (ViewOverlay.onTargetVisibilityChanged)
+ * - 버튼: 채우기(FILL)/맞추기(FIT) 전환 · 같은 값 · 숨김/보임 · 흔들기 · 가운데 테두리를 왼쪽 끝/맨 아래/가운데로
  *
  * 카메라 설정은 앱의 CameraController와 같다 (미리보기 · 분석 모두 4:3).
  * 실행: adb shell am start -n kr.kiosklens.app/kr.kiosklens.overlay.debug.OverlayCalibrationActivity
@@ -52,6 +54,8 @@ class OverlayCalibrationActivity : AppCompatActivity() {
     private lateinit var preview: PreviewView
     private lateinit var ghost: GhostView
     private lateinit var info: TextView
+    private lateinit var topBar: LinearLayout
+    private lateinit var panel: TextView
     private val boxes = mutableListOf<ViewOverlay>()
 
     @Volatile private var frameW = 0
@@ -59,6 +63,8 @@ class OverlayCalibrationActivity : AppCompatActivity() {
     @Volatile private var rotation = 0
     private var fill = true
     private var centerShown = true
+    private var centerRect = CENTER_HOME
+    private var centerVisible = true
     private var lastGhostMs = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -148,10 +154,20 @@ class OverlayCalibrationActivity : AppCompatActivity() {
         val x1 = ((vw - r.left) / r.width).coerceIn(0f, 1f)
         val y0 = ((0f - r.top) / r.height).coerceIn(0f, 1f)
         val y1 = ((vh - r.top) / r.height).coerceIn(0f, 1f)
+        val center = when {
+            !centerShown -> "숨김"
+            centerVisible -> "보임"
+            else -> "안 보임 → \"휴대폰을 조금 뒤로 빼 주세요\" 안내 대상"
+        }
         info.text = String.format(
-            "방식 %s · 분석 %d×%d (회전 %d°) · 화면 %d×%d\n보이는 범위 x %.2f~%.2f · y %.2f~%.2f",
-            if (fill) "채우기(FILL)" else "맞추기(FIT)", frameW, frameH, rotation, vw.toInt(), vh.toInt(), x0, x1, y0, y1,
+            "방식 %s · 분석 %d×%d (회전 %d°) · 화면 %d×%d\n보이는 범위 x %.2f~%.2f · y %.2f~%.2f\n가운데 테두리: %s",
+            if (fill) "채우기(FILL)" else "맞추기(FIT)", frameW, frameH, rotation, vw.toInt(), vh.toInt(), x0, x1, y0, y1, center,
         )
+    }
+
+    private fun moveCenter(rect: NormRect) {
+        centerRect = rect
+        if (centerShown) boxes[CENTER].setTarget(HighlightTarget(CENTER_ID, rect))
     }
 
     // ---------------- 화면 ----------------
@@ -160,47 +176,64 @@ class OverlayCalibrationActivity : AppCompatActivity() {
 
     private fun buildUi(): View {
         val match = ViewGroup.LayoutParams.MATCH_PARENT
+        val wrap = ViewGroup.LayoutParams.WRAP_CONTENT
         val root = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
         preview = PreviewView(this).apply { scaleType = PreviewView.ScaleType.FILL_CENTER }
         root.addView(preview, FrameLayout.LayoutParams(match, match))
         ghost = GhostView(this)
         root.addView(ghost, FrameLayout.LayoutParams(match, match))
-        TARGETS.forEach { t ->
-            val v = ViewOverlay(this).also { it.setTarget(t) }
-            boxes += v
-            root.addView(v, FrameLayout.LayoutParams(match, match))
-        }
+        CORNERS.forEach { t -> boxes += ViewOverlay(this).also { it.setTarget(t) } }
+        boxes += ViewOverlay(this).also { it.setTarget(HighlightTarget(CENTER_ID, CENTER_HOME)) }
+        boxes.forEach { root.addView(it, FrameLayout.LayoutParams(match, match)) }
+        boxes[CENTER].onTargetVisibilityChanged = { visible -> centerVisible = visible; updateInfo() }
 
         info = TextView(this).apply {
-            setTextColor(Color.WHITE); setBackgroundColor(Color.argb(170, 0, 0, 0))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f); setPadding(dp(12), dp(40), dp(12), dp(8))
+            setTextColor(Color.WHITE)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f); setPadding(dp(12), dp(36), dp(12), dp(4))
             text = "카메라를 켜는 중…"
         }
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setBackgroundColor(Color.argb(170, 0, 0, 0)); setPadding(dp(4), 0, dp(4), dp(4))
+        val row1 = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; setPadding(dp(4), 0, dp(4), 0)
             addView(small("FILL/FIT") { fill = !fill; applyMapper() })
-            addView(small("같은 값") { if (centerShown) boxes[CENTER].setTarget(TARGETS[CENTER].copy()) })
+            addView(small("같은 값") { if (centerShown) boxes[CENTER].setTarget(HighlightTarget(CENTER_ID, centerRect)) })
             addView(small("숨김/보임") {
                 centerShown = !centerShown
-                boxes[CENTER].setTarget(if (centerShown) TARGETS[CENTER] else null)
+                boxes[CENTER].setTarget(if (centerShown) HighlightTarget(CENTER_ID, centerRect) else null)
+                updateInfo()
             })
             addView(small("흔들기") {
-                if (!centerShown) return@small
-                val c = TARGETS[CENTER].rect
                 val dx = (Math.random().toFloat() - 0.5f) * 0.04f
                 val dy = (Math.random().toFloat() - 0.5f) * 0.03f
-                boxes[CENTER].setTarget(HighlightTarget(TARGETS[CENTER].elementId,
-                    NormRect(c.left + dx, c.top + dy, c.right + dx, c.bottom + dy)))
+                val c = centerRect
+                moveCenter(NormRect(c.left + dx, c.top + dy, c.right + dx, c.bottom + dy))
             })
         }
-        val top = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; addView(info); addView(row) }
-        root.addView(top, FrameLayout.LayoutParams(match, ViewGroup.LayoutParams.WRAP_CONTENT))
+        val row2 = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; setPadding(dp(4), 0, dp(4), dp(4))
+            addView(small("왼쪽 끝으로") { moveCenter(NormRect(0.02f, 0.30f, 0.15f, 0.40f)) })
+            addView(small("맨 아래로") { moveCenter(NormRect(0.62f, 0.85f, 0.78f, 0.95f)) })
+            addView(small("가운데로") { moveCenter(CENTER_HOME) })
+        }
+        topBar = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.argb(170, 0, 0, 0))
+            addView(info); addView(row1); addView(row2)
+        }
+        root.addView(topBar, FrameLayout.LayoutParams(match, wrap))
+
+        panel = TextView(this).apply {
+            setBackgroundColor(Color.argb(230, 40, 40, 40)); setTextColor(Color.LTGRAY)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f); gravity = Gravity.CENTER
+            text = "버튼판 자리 (앱의 말하기 · 그만하기 영역, 높이는 가정)"
+        }
+        root.addView(panel, FrameLayout.LayoutParams(match, dp(PANEL_DP), Gravity.BOTTOM))
+
+        // 위 글자 · 버튼 영역과 아래 버튼판에 걸린 테두리는 "안 보임"으로 친다
+        root.post { boxes.forEach { it.setObstructedInsets(0, topBar.height, 0, panel.height) } }
         return root
     }
 
     private fun small(label: String, onClick: () -> Unit) = Button(this).apply {
-        text = label; isAllCaps = false; setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+        text = label; isAllCaps = false; setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
         setOnClickListener { onClick() }
         layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
     }
@@ -227,13 +260,15 @@ class OverlayCalibrationActivity : AppCompatActivity() {
     private companion object {
         const val REQ = 7
         const val CENTER = 4
+        const val CENTER_ID = "center"
+        const val PANEL_DP = 165                                         // 앱 버튼판 높이 추정 (상태 문구 + 88dp 버튼 + 여백)
         val FULL = NormRect(0f, 0f, 1f, 1f)
-        val TARGETS = listOf(
+        val CENTER_HOME = NormRect(0.40f, 0.45f, 0.60f, 0.55f)
+        val CORNERS = listOf(
             HighlightTarget("tl", NormRect(0.05f, 0.05f, 0.20f, 0.15f)),
             HighlightTarget("tr", NormRect(0.80f, 0.05f, 0.95f, 0.15f)),
             HighlightTarget("bl", NormRect(0.05f, 0.85f, 0.20f, 0.95f)),
             HighlightTarget("br", NormRect(0.80f, 0.85f, 0.95f, 0.95f)),
-            HighlightTarget("center", NormRect(0.40f, 0.45f, 0.60f, 0.55f)),
         )
     }
 }
