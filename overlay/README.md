@@ -29,7 +29,7 @@ kr.kiosklens.overlay
 
 - `setTarget()`은 **어느 스레드에서 불러도 안전** · `null`이면 숨김 · 같은 값을 또 불러도 무해 (깜빡임이 리셋되면 안 됨)
 - 입력 `HighlightTarget.rect`는 **회전 보정된 분석 프레임 기준 정규화 좌표**. 프리뷰 화면 좌표로의 변환은 `FillCenterMapper`가 한다 (프리뷰 `FILL_CENTER` 크롭 보정 포함)
-  - 전제: 프리뷰와 분석 프레임이 **같은 종횡비(4:3)** 라서 같은 시야를 본다 (`:app/camera/CameraController`가 둘 다 `RATIO_4_3`으로 설정). 이 설정을 바꾸면 위치가 어긋나니 함께 바꿀 것
+  - 전제: 프리뷰와 분석 프레임이 **같은 종횡비(4:3)** 라서 같은 시야를 본다 (`:app/camera/CameraController`: 미리보기 `RATIO_4_3`, 분석은 4:3 · 1280×960 목표 — 2026-11-11). 이 설정을 바꾸면 위치가 어긋나니 함께 바꿀 것
   - 분석 프레임 크기(회전 보정 후)는 `CameraController` → `ViewOverlay.setAnalysisSize(w, h)`로 들어온다 (이미 연결됨)
   - 설계서 7.5의 `ImageProxyTransformFactory` + `CoordinateTransform`은 쓰지 않는다. 기기 확인에서 오차가 크면 그때 바꾼다
 - 스타일 (설계서 10장): **두께 6dp 이상, 노란색 + 검은 외곽선**, 깜빡임 **1~2Hz (3Hz 초과 금지 — 광과민)**
