@@ -46,7 +46,7 @@ class VisionScreenAnalyzer(/* 생성자 주입 */) : FrameSink, SnapshotSource {
 ## 고칠 때 규칙
 
 - 이 모듈의 변경은 **전원 승인 PR**로만 한다.
-- 같은 PR에서 함께 고칠 것: `server/app/models.py` · `testdata/contract/*.json` · `docs/contract.md` · 영향받는 Fake와 계약 테스트.
+- 같은 PR에서 함께 고칠 것: `server/app/models.py` · `testdata/contract/*.json` · `docs/contract.md` · 영향받는 계약 테스트.
 - 필드를 늘리고 싶으면 먼저 "꼭 계약이어야 하나, 내 모듈 안에서 끝낼 수 있나"를 생각한다. 대부분은 모듈 안에서 끝난다.
 
 ## 테스트

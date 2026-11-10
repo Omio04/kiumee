@@ -49,11 +49,15 @@ def judge(case, snap, resp):
 async def run(args):
     s = Settings(app_key="x", llm_provider=args.llm, fastpath=not args.no_fastpath,
                  anthropic_api_key=__import__("os").environ.get("ANTHROPIC_API_KEY", ""),
-                 llm_model=__import__("os").environ.get("LLM_MODEL", "claude-haiku-5-5"))
+                 gemini_api_key=__import__("os").environ.get("GEMINI_API_KEY", ""),
+                 llm_model=__import__("os").environ.get("LLM_MODEL", "gemini-2.5-flash-lite" if args.llm == "gemini" else "claude-haiku-5-5"))
     if args.llm == "fake":
         agent = FakeGuideAgent()
     elif args.llm == "heuristic":
         agent = LlmGuideAgent(HeuristicFakeLlmClient(), s)
+    elif args.llm == "gemini":
+        from app.llm import GeminiLlmClient
+        agent = LlmGuideAgent(GeminiLlmClient(s.gemini_api_key, s.llm_model), s)
     else:
         agent = LlmGuideAgent(AnthropicLlmClient(s.anthropic_api_key, s.llm_model), s)
     cases, snaps = load_cases()
@@ -99,7 +103,7 @@ async def run(args):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--llm", choices=["fake", "heuristic", "anthropic"], default="fake")
+    ap.add_argument("--llm", choices=["fake", "heuristic", "anthropic", "gemini"], default="fake")
     ap.add_argument("--repeat", type=int, default=1)
     ap.add_argument("--no-fastpath", action="store_true")
     ap.add_argument("--fail-under", type=float, default=0.0)

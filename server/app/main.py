@@ -17,7 +17,7 @@ from fastapi.responses import JSONResponse
 
 from .agent import FakeGuideAgent, GuideAgent, LlmGuideAgent
 from .errors import ApiError, body
-from .llm import (AnthropicLlmClient, HeuristicFakeLlmClient, LlmRateLimited, LlmTimeout, LlmUpstream)
+from .llm import (AnthropicLlmClient, GeminiLlmClient, HeuristicFakeLlmClient, LlmRateLimited, LlmTimeout, LlmUpstream)
 from .models import GuideRequest
 from .ratelimit import RateLimiter
 from .settings import VERSION, Settings
@@ -34,6 +34,8 @@ if not log.handlers and not logging.getLogger().handlers:      # uvicorn은 앱 
 def build_agent(s: Settings) -> GuideAgent:
     if s.llm_provider == "fake":
         return LlmGuideAgent(HeuristicFakeLlmClient(), s)
+    if s.llm_provider == "gemini":
+        return LlmGuideAgent(GeminiLlmClient(s.gemini_api_key, s.llm_model), s)
     return LlmGuideAgent(AnthropicLlmClient(s.anthropic_api_key, s.llm_model), s)
 
 

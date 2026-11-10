@@ -64,3 +64,7 @@
 ```bash
 ./gradlew :domain:test
 ```
+
+## 구현 현황 (이 PR)
+
+- [x] `runner/SessionRunner`: 이벤트를 한 줄로 모아 한 번에 하나씩 `reduce` · 효과를 포트 호출로 실행 · 포트 예외는 이벤트로 변환 · 종료 시 정리. 테스트 9개(가짜 포트 + 실제 코루틴).

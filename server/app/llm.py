@@ -94,6 +94,60 @@ class AnthropicLlmClient:
         await self._http.aclose()
 
 
+class GeminiLlmClient:
+    """Google Gemini (무료 한도가 있는 API 키로 쓸 수 있음). 키는 서버 환경변수 GEMINI_API_KEY 에만 둔다.
+    JSON 응답을 강제(responseMimeType)하고, 오류는 AnthropicLlmClient 와 같은 예외로 바꾼다."""
+
+    URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+
+    def __init__(self, api_key: str, model: str, http: Optional[httpx.AsyncClient] = None, max_tokens: int = 256):
+        if not api_key:
+            raise ValueError("GEMINI_API_KEY is required for the gemini provider")
+        self.api_key = api_key
+        self.model = model
+        self.max_tokens = max_tokens
+        self._http = http or httpx.AsyncClient()
+
+    async def _post(self, system: str, user: str, timeout_s: float) -> httpx.Response:
+        return await self._http.post(
+            self.URL.format(model=self.model),
+            headers={"x-goog-api-key": self.api_key, "content-type": "application/json"},
+            json={
+                "systemInstruction": {"parts": [{"text": system}]},
+                "contents": [{"role": "user", "parts": [{"text": user}]}],
+                "generationConfig": {"temperature": 0, "maxOutputTokens": self.max_tokens, "responseMimeType": "application/json"},
+            },
+            timeout=timeout_s,
+        )
+
+    async def complete(self, system: str, user: str, timeout_s: float) -> str:
+        try:
+            r = await asyncio.wait_for(self._post(system, user, timeout_s), timeout=timeout_s)
+        except (asyncio.TimeoutError, httpx.TimeoutException) as e:
+            raise LlmTimeout("llm timeout") from e
+        except httpx.HTTPError as e:
+            raise LlmUpstream("network") from e
+        if r.status_code == 429:
+            try:
+                ra = int(float(r.headers.get("retry-after", "5")))
+            except ValueError:
+                ra = 5
+            raise LlmRateLimited(max(1, min(ra, 60)))
+        if r.status_code in (401, 403):
+            raise LlmUpstream("auth")
+        if r.status_code >= 400:
+            raise LlmUpstream(f"http_{r.status_code}")          # 본문은 남기지 않음
+        try:
+            cands = r.json().get("candidates") or []
+            parts = (cands[0].get("content") or {}).get("parts") or [] if cands else []
+            return "".join(p.get("text", "") for p in parts if isinstance(p, dict))
+        except (ValueError, AttributeError, IndexError) as e:
+            raise LlmUpstream("bad_body") from e
+
+    async def aclose(self) -> None:
+        await self._http.aclose()
+
+
 # ---------------- Fake들 ----------------
 Step = Union[str, Exception, Callable[[str, str], str]]
 

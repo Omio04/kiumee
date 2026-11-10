@@ -68,7 +68,7 @@
 | `Clock` | `:app` | 전부 | 시간은 `System.currentTimeMillis()`를 직접 쓰지 말고 `Clock`으로 받는다 (타임아웃 테스트용) |
 | `Logger` | `:app` | 전부 | 발화 · 화면 글자 **원문 로그 금지** · 성능 구간 로그는 tag `KL_PERF` |
 
-**Fake 의무:** 각 담당은 자기 포트의 `Fake*`와 **계약 테스트**를 만든다. 계약 테스트는 추상 클래스 하나를 Fake와 실구현이 둘 다 상속해서 통과해야 한다 (설계서 16.7).
+**계약 테스트는 실구현으로 (Fake 없음):** 각 담당은 자기 포트의 **계약 테스트**를 만들고 **실구현**으로 통과시킨다. 설계서 16.7의 "Fake와 실구현이 같은 계약 테스트를 상속"은 2일차 결정으로 바꿨다 — Fake 구현과 mock 플레이버는 두지 않는다 ([decisions.md](decisions.md) 6장 U3). JVM에서 못 돌리는 실구현(STT/TTS · ML Kit · 카메라)은 기기 확인 항목을 각 모듈 README에 적는다. 테스트 파일 안에서만 쓰는 작은 대역(stub)은 괜찮다 (앱에 들어가지 않음).
 
 ---
 
@@ -237,6 +237,6 @@ DTO는 `:agent/remote`에 두고 `:core-model`과 1:1로 변환한다. **`testda
 ## 6. 바꾸는 규칙
 
 - `:core-model/port`, `:core-model/model`, 이 문서의 JSON 형식을 바꾸는 PR은 **전원 승인**.
-- 그 PR 안에서 같이 고칠 것: `core-model/` · `server/app/models.py` · `testdata/contract/*.json` · 이 문서 · 영향받는 Fake와 계약 테스트.
+- 그 PR 안에서 같이 고칠 것: `core-model/` · `server/app/models.py` · `testdata/contract/*.json` · 이 문서 · 영향받는 계약 테스트.
 - 어댑터 내부 구현은 각 담당이 판단한다.
 - 호환이 깨지는 변경은 계약 v2로 올리고 경로도 `/v2/...`로 바꾼다.

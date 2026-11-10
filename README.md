@@ -37,11 +37,11 @@
 ```
 
 ```bash
-./gradlew :app:assembleMockDebug          # 모든 포트가 Fake인 mock 플레이버
+./gradlew :vision:testDebugUnitTest :voice:testDebugUnitTest :agent:testDebugUnitTest :overlay:testDebugUnitTest :app:testDebugUnitTest   # Android 모듈 테스트
 ```
 
 ```bash
-./gradlew :app:installMockDebug           # 연결된 기기에 설치
+./gradlew :app:installDebug               # 연결된 기기에 설치 (플레이버 없음 — 항상 실구현)
 ```
 
 ```bash
@@ -50,13 +50,30 @@ cd server && pip install -r requirements-dev.txt && KL_SKIP_APP_INIT=1 pytest -q
 
 필요한 것: JDK 17 이상 · Android SDK **API 37** 플랫폼 (SDK Manager에서 설치) · `local.properties`에 `sdk.dir` (Android Studio로 열면 자동 생성) · 서버는 Python 3.9 이상
 
+## 구현 현황
+
+| 모듈 | 상태 | JVM 테스트 |
+|---|---|---|
+| `:core-model` · `:domain` (+`SessionRunner`) | 구현 완료 | 35개 |
+| `:agent` | 구현 완료 (직접 JSON, 시도 한 번 전체 6초) | 18개 |
+| `:vision` | P2 구현 (메가커피 화면 · 팝업 · 닫기 아이콘 · ID 유지. ML Kit는 기기에서 확인 필요) | 40개 |
+| `:voice` | 구현 완료 (실제 STT/TTS는 기기에서 확인 필요) | 5개 |
+| `:overlay` | 구현 완료 (View 기반) | 14개 |
+| `:app` | 조립 · 화면 · 카메라 (실구현만) | 5개 |
+| `server/` | Gemini 제공자 추가 | 92개 |
+
+**Fake · mock 플레이버는 없다** (2일차 결정, [decisions.md](docs/decisions.md) 6장): 계약 테스트는 실구현으로 돌리고, JVM에서 못 도는 STT/TTS · ML Kit · 카메라는 기기에서 확인한다.
+전체 빌드 · JVM 테스트는 AGP 9.5 · SDK 37에서 통과를 확인했다 (2026-11-10).
+에뮬레이터(Android 17)에서 실행 · 카메라 · ML Kit OCR · "말하기" 흐름 · 서버 연결도 확인했다. **실제 글자 인식과 음성 인식 성공 → 하이라이트 → 음성 안내는 실기기 확인이 필요하다.**
+⚠️ 알려진 문제: 한국어 온디바이스 음성 모델이 없는 기기에서는 STT가 안 된다 → [voice/README.md](voice/README.md) "알려진 문제" (P3).
+
 ## 협업 규칙 (5일 계획 9장)
 
 | 항목 | 규칙 |
 |---|---|
 | 브랜치 | `main`은 항상 빌드 가능. 기능 브랜치는 `feat/p2-ocr-pipeline` 형식. **`main`에 직접 push 금지** |
 | PR | 반나절 이하 분량으로 작게. 지정 리뷰어 1명 승인 후 병합 |
-| 포트 · 계약 변경 | `:core-model` 또는 `docs/contract.md`의 JSON 형식을 바꾸는 PR은 **전원 승인**. Fake와 계약 테스트도 같이 수정 |
+| 포트 · 계약 변경 | `:core-model` 또는 `docs/contract.md`의 JSON 형식을 바꾸는 PR은 **전원 승인**. 계약 테스트도 같이 수정 |
 | 병합 시간 | 매일 13:00 · 19:00. 긴급 수정은 P1 승인 시 예외 |
 | 통합 빌드 | 19:00 병합 후 P1이 시연 기기에 설치 → 5분 데모 |
 | 성능 로그 | 구간 시작 · 끝에 `KL_PERF` 태그 로그 |
@@ -71,7 +88,7 @@ cd server && pip install -r requirements-dev.txt && KL_SKIP_APP_INIT=1 pytest -q
 PR 리뷰 체크리스트 (설계서 16.12)
 - **S** 바꿀 이유가 두 가지 이상인 클래스는 분리했는가?
 - **O** 새 동작을 `if` / `when` 추가가 아니라 새 클래스로 해결했는가?
-- **L** 계약 테스트가 Fake와 실구현 모두에서 통과하는가?
+- **L** 계약 테스트가 실구현에서 통과하는가? (Fake는 두지 않는다. JVM에서 못 돌리는 부분은 기기 확인 항목을 PR에 적는다)
 - **I** 주입받은 포트에 쓰지 않는 메서드가 있는가?
 - **D** `:domain` · `:core-model`에 플랫폼 · 라이브러리 import가 생겼는가? 생성자 주입 외의 의존 획득이 있는가?
 

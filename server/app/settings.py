@@ -17,8 +17,9 @@ def _env_bool(name: str, default: bool) -> bool:
 @dataclass(frozen=True)
 class Settings:
     app_key: str = ""                         # X-App-Key. 비어 있으면 모든 요청을 401로 거절 (안전 기본값)
-    llm_provider: str = "anthropic"           # anthropic | fake
+    llm_provider: str = "anthropic"           # anthropic | gemini | fake
     anthropic_api_key: str = field(default="", repr=False)
+    gemini_api_key: str = field(default="", repr=False)
     llm_model: str = "claude-haiku-5-5"       # p95 2초 예산에 맞춘 빠른 모델 (바꿀 때는 평가 스크립트로 비교)
     llm_timeout_s: float = 4.0                # 설계: LlmClient 타임아웃 4초
     candidate_k: int = 8                      # 설계: 후보 K=8
@@ -35,7 +36,8 @@ class Settings:
             app_key=e("APP_KEY", ""),
             llm_provider=e("LLM_PROVIDER", "anthropic").strip().lower(),
             anthropic_api_key=e("ANTHROPIC_API_KEY", ""),
-            llm_model=e("LLM_MODEL", "claude-haiku-5-5"),
+            gemini_api_key=e("GEMINI_API_KEY", ""),
+            llm_model=e("LLM_MODEL", "gemini-2.5-flash-lite" if e("LLM_PROVIDER", "anthropic").strip().lower() == "gemini" else "claude-haiku-5-5"),
             llm_timeout_s=float(e("LLM_TIMEOUT_S", "4.0")),
             candidate_k=int(e("CANDIDATE_K", "8")),
             fastpath=_env_bool("FASTPATH", True),

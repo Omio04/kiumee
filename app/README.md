@@ -6,24 +6,22 @@
 |---|---|
 | `di/` | 포트에 어떤 구현을 끼울지 정한다. **로직 금지** (if/when 없이 끼우기만) |
 | `camera/` | CameraX 프레임(1280×720)을 `ImageProxyFrame : CameraFrame`으로 감싸 `FrameSink.submit()`에 넘긴다 |
-| `ui/` | Compose 화면: 큰 "말하기" 버튼 + 상태 문구 + 종료 버튼 |
+| `ui/` | 화면 문구 (`UiTexts`). 화면은 `MainActivity` 하나: 큰 "말하기" 버튼 + 상태 문구 + 종료 버튼 |
 
-## 빌드 변형 (플레이버)
+## 빌드 (플레이버 없음 — 항상 실구현)
 
-| 플레이버 | 포트에 끼우는 것 | 쓰임 |
-|---|---|---|
-| `mock` | 모든 포트에 **Fake** | 다른 파트 없이 전체 흐름 확인 · UI 개발 |
-| `real` | 실구현 | 실제 시연 |
-| (mixed) | 내 파트만 실구현, 나머지 Fake | 각자 실구현을 앱 안에서 확인할 때 (2일차) |
+2일차 결정으로 Fake · mock 플레이버를 없앴다 ([decisions.md](../docs/decisions.md) 6장 U3). 앱은 항상 실제 카메라 · 음성 · 서버로 동작한다.
 
 ```bash
-./gradlew :app:installMockDebug
+./gradlew :app:installDebug
 ```
+
+실행하려면 서버가 필요하다 (아래 "서버 연결"). 키 없이 연습할 때는 서버를 `LLM_PROVIDER=fake`로 띄우면 된다 (서버 쪽 규칙 기반 판단, 앱 코드는 그대로).
 
 ## 각 파트가 해 줄 것
 
-1. 자기 모듈에 `Fake*` 클래스를 만든다 (예: `:voice`의 `FakeSpeechInput`). **생성자 주입**만 쓰고, 정적 싱글톤 · `object` 전역 상태는 금지.
-2. 실구현이 Android `Context`가 필요하면 생성자로 받는다. 조립은 P1이 `:app/di`에서 한다.
+1. 포트의 **실구현**을 만든다. **생성자 주입**만 쓰고, 정적 싱글톤 · `object` 전역 상태는 금지.
+2. 실구현이 Android `Context`가 필요하면 생성자로 받는다. 조립은 P1이 `:app/di/GraphFactory`에서 한다.
 3. 권한(카메라 · 마이크)은 각 모듈의 `AndroidManifest.xml`에 선언하면 합쳐진다. 런타임 권한 요청 화면은 P1이 만든다.
 
 ## UX · 접근성 기준 (설계서 10장)
@@ -34,6 +32,24 @@
 
 ## 진행 상황
 
-- [x] 1일차: 모듈 · 플레이버 뼈대
-- [ ] 1일차: mock 플레이버 조립 (각 파트 Fake가 병합되면)
-- [ ] 2일차: Compose 화면 · CameraX → FrameSink 연결 (P5 PoC 재사용) · DI
+- [x] 1일차: 모듈 뼈대
+- [x] 2일차: 화면(View) · CameraX → FrameSink 연결 · DI (JJ 패치) · P2 `:vision` 연결 · 실구현만으로 정리 (2026-11-10)
+- [ ] 기기 확인: 실제 카메라 · STT · TTS · 서버로 "말하기 → 안내 → 하이라이트 → 완료"
+
+## 구현 현황 (이 PR)
+
+- [x] `MainActivity`(큰 글씨 · 큰 버튼 · TalkBack 라이브 영역 · 화면 켜짐 유지 · 권한 거절 시 설정 열기) — **Compose 대신 일반 View**
+- [x] `camera/CameraController`(Preview + ImageAnalysis 4:3, 최신 한 장만 유지) · `ImageProxyFrame`
+- [x] `di/`: `GraphFactory` 하나 (실구현만. vision은 P2의 `createVisionScreenAnalyzer`)
+- [x] 서버 주소 · 앱 키는 `local.properties`의 `kl.serverUrl` · `kl.appKey` → `BuildConfig` (저장소에 올라가지 않음)
+
+### 서버 연결
+
+```properties
+# local.properties (git에 안 올라감)
+sdk.dir=...
+kl.serverUrl=https://내-서버.example.com     # 개발 중에는 http://192.168.x.x:8000 도 가능(debug 빌드만)
+kl.appKey=서버의 APP_KEY 와 같은 값
+```
+
+서버를 무료로 돌리려면 `server/.env`에 `LLM_PROVIDER=gemini`, `GEMINI_API_KEY=...` (https://aistudio.google.com/apikey).
