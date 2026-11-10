@@ -28,15 +28,13 @@ import kr.kiosklens.app.camera.CameraController
 import kr.kiosklens.app.di.AndroidLogger
 import kr.kiosklens.app.di.Graph
 import kr.kiosklens.app.di.GraphFactory
-import kr.kiosklens.app.ui.MockScreenView
 import kr.kiosklens.app.ui.UiTexts
 import kr.kiosklens.domain.session.Phase
 import kr.kiosklens.overlay.ViewOverlay
-import kr.kiosklens.overlay.transform.StretchMapper
 
 /**
  * 화면 하나짜리 앱: 카메라 미리보기 + 노란 테두리 + 큰 상태 문구 + "말하기" / "그만하기" 버튼.
- * 로직은 없다. 조립은 [GraphFactory](플레이버별), 흐름은 :domain 의 SessionRunner.
+ * 로직은 없다. 조립은 [GraphFactory](실구현만), 흐름은 :domain 의 SessionRunner.
  * 본문 글자 20sp 이상, 핵심 버튼 72dp 이상 (설계서 10장).
  */
 class MainActivity : AppCompatActivity() {
@@ -49,10 +47,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var note: TextView
     private lateinit var startBtn: Button
     private lateinit var stopBtn: Button
-    private lateinit var nextBtn: Button
     private lateinit var settingsBtn: Button
-    private var preview: PreviewView? = null
-    private var mockView: MockScreenView? = null
+    private lateinit var preview: PreviewView
 
     private var graph: Graph? = null
     private var camera: CameraController? = null
@@ -62,7 +58,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)          // 안내 중 화면이 꺼지지 않게
         setContentView(buildUi())
-        if (BuildConfig.MOCK) init() else ensurePermissions()
+        ensurePermissions()
     }
 
     // ---------------- 권한 ----------------
@@ -94,18 +90,11 @@ class MainActivity : AppCompatActivity() {
         graph = g
         g.setCaptionListener { text -> runOnUiThread { caption = text; render() } }
 
-        if (BuildConfig.MOCK) {
-            overlay.setMapper(StretchMapper())
-            nextBtn.visibility = View.VISIBLE
-        } else {
-            val p = preview!!
-            camera = CameraController(this, g.frameSink, logger) { w, h -> runOnUiThread { overlay.setAnalysisSize(w, h) } }.also { it.start(this, p) }
-            if (BuildConfig.SERVER_URL.isBlank()) { note.text = getString(R.string.need_server); note.visibility = View.VISIBLE }
-        }
+        camera = CameraController(this, g.frameSink, logger) { w, h -> runOnUiThread { overlay.setAnalysisSize(w, h) } }.also { it.start(this, preview) }
+        if (BuildConfig.SERVER_URL.isBlank()) { note.text = getString(R.string.need_server); note.visibility = View.VISIBLE }
         g.runner.start()
         ui.launch { g.runner.state.collect { s ->
             if (s.phase == Phase.LISTENING) caption = null
-            mockView?.snapshot = s.snapshot; mockView?.postInvalidate()
             render()
         } }
         render()
@@ -133,11 +122,7 @@ class MainActivity : AppCompatActivity() {
         val root = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
         val match = ViewGroup.LayoutParams.MATCH_PARENT
 
-        if (BuildConfig.MOCK) {
-            mockView = MockScreenView(this).also { root.addView(it, FrameLayout.LayoutParams(match, match)) }
-        } else {
-            preview = PreviewView(this).apply { scaleType = PreviewView.ScaleType.FILL_CENTER }.also { root.addView(it, FrameLayout.LayoutParams(match, match)) }
-        }
+        preview = PreviewView(this).apply { scaleType = PreviewView.ScaleType.FILL_CENTER }.also { root.addView(it, FrameLayout.LayoutParams(match, match)) }
         overlay = ViewOverlay(this).also { root.addView(it, FrameLayout.LayoutParams(match, match)) }
 
         status = TextView(this).apply {
@@ -154,9 +139,6 @@ class MainActivity : AppCompatActivity() {
             visibility = View.GONE
             setOnClickListener { startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))) }
         }
-        nextBtn = bigButton(getString(R.string.next_screen), Color.DKGRAY, Color.WHITE, 72).apply {
-            visibility = View.GONE; setOnClickListener { graph?.debugNextScreen() }
-        }
         startBtn = bigButton(getString(R.string.start), Color.rgb(255, 214, 0), Color.BLACK, 88).apply {
             contentDescription = "말하기. 누르고 원하는 것을 말씀하세요"
             setOnClickListener { graph?.runner?.pressStart() }
@@ -171,7 +153,7 @@ class MainActivity : AppCompatActivity() {
         }
         val panel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.argb(230, 0, 0, 0))
-            addView(status); addView(note); addView(settingsBtn); addView(nextBtn); addView(row)
+            addView(status); addView(note); addView(settingsBtn); addView(row)
         }
         root.addView(panel, FrameLayout.LayoutParams(match, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM))
         return root

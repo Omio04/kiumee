@@ -10,23 +10,23 @@ import kr.kiosklens.core.port.FrameSink
 import kr.kiosklens.domain.runner.SessionRunner
 import kr.kiosklens.domain.session.SessionStateMachine
 import kr.kiosklens.overlay.ViewOverlay
-import kr.kiosklens.vision.VisionScreenAnalyzer
-import kr.kiosklens.vision.ocr.MlKitOcrEngine
-import kr.kiosklens.vision.pipeline.ImageProxyThumbnail
+import kr.kiosklens.vision.createVisionScreenAnalyzer
 import kr.kiosklens.voice.EchoGuard
 import kr.kiosklens.voice.stt.AndroidSpeechInput
 import kr.kiosklens.voice.tts.AndroidSpeechOutput
 
-/** real 플레이버: 포트마다 실구현을 끼운다. (로직 없음 — 끼우기만) */
+/**
+ * 포트마다 실구현을 끼운다 (로직 없음 — 끼우기만, 설계서 16.8).
+ * 2일차 결정: Fake · mock 플레이버 없이 처음부터 실구현으로 간다 (docs/decisions.md 5장).
+ */
 object GraphFactory {
     fun create(context: Context, scope: CoroutineScope, overlay: ViewOverlay): Graph {
         val app = context.applicationContext
         val logger = AndroidLogger()
         val clock = Clock { System.currentTimeMillis() }
-        val echo = EchoGuard()
+        val echo = EchoGuard()                                                   // TTS와 STT가 같은 인스턴스를 공유 (에코 방지)
 
-        val ocr = MlKitOcrEngine()
-        val vision = VisionScreenAnalyzer(scope, ocr, clock, logger, thumbnailer = ImageProxyThumbnail::of)
+        val vision = createVisionScreenAnalyzer(logger = logger)                 // P2: ML Kit 한국어 OCR + 화면 추적 (자체 작업 스레드)
         val tts = AndroidSpeechOutput(app, echo, logger)
         var caption: (String) -> Unit = {}
         val speechOut = CaptionSpeechOutput(tts) { caption(it) }
@@ -38,7 +38,7 @@ object GraphFactory {
             override val runner = runner
             override val frameSink: FrameSink = vision
             override fun setCaptionListener(listener: (String) -> Unit) { caption = listener }
-            override fun close() { runner.close(); tts.shutdown(); ocr.close() }
+            override fun close() { runner.close(); tts.shutdown(); vision.close() }
         }
     }
 }

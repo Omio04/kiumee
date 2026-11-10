@@ -95,14 +95,3 @@ class RealFrameSinkContractTest : FrameSinkContractTest() {
         return Harness(analyzer, analyzer.snapshots, analyzer::close)
     }
 }
-
-class FakeFrameSinkContractTest : FrameSinkContractTest() {
-    override fun create(scheduler: TestCoroutineScheduler): Harness {
-        val fixtures = listOf(
-            ScreenSnapshot("menu", 0, 0, emptyList(), 1),
-            ScreenSnapshot("menu", 0, 0, emptyList(), 2),
-        )
-        val analyzer = FakeScreenAnalyzer(fixtures)
-        return Harness(analyzer, analyzer.snapshots, analyzer::close)
-    }
-}

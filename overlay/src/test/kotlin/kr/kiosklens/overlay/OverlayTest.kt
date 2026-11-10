@@ -38,9 +38,7 @@ abstract class HighlightSurfaceContractSpec {
     }
 }
 
-class FakeOverlayContractTest : HighlightSurfaceContractSpec() {
-    override fun create(): Pair<HighlightSurface, () -> HighlightTarget?> = FakeOverlay().let { it to { it.current } }
-}
+/** 실제 ViewOverlay가 쓰는 HighlightHolder로 포트 계약을 확인한다 (FakeOverlay는 2일차에 지움). */
 class HighlightHolderContractTest : HighlightSurfaceContractSpec() {
     override fun create(): Pair<HighlightSurface, () -> HighlightTarget?> = HighlightHolder().let { it to { it.target } }
 }

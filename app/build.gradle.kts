@@ -28,20 +28,7 @@ android {
     }
     buildFeatures { buildConfig = true }
 
-    // real: 실구현 / mock: 모든 포트에 Fake 바인딩 (설계서 16.8)
-    flavorDimensions += "impl"
-    productFlavors {
-        create("real") {
-            dimension = "impl"
-            buildConfigField("boolean", "MOCK", "false")
-        }
-        create("mock") {
-            dimension = "impl"
-            applicationIdSuffix = ".mock"
-            versionNameSuffix = "-mock"
-            buildConfigField("boolean", "MOCK", "true")
-        }
-    }
+    // 플레이버 없음: Fake · mock 없이 항상 실구현 (2일차 결정, docs/decisions.md 5장)
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

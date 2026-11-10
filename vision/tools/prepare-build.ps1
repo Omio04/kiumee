@@ -36,9 +36,9 @@ if ($InstallSdk) {
         Move-Item -LiteralPath $sdkSource -Destination $sdkDestination
     }
     1..30 | ForEach-Object { 'y' } | & $manager "--sdk_root=$sdkRoot" --licenses
-    & $manager "--sdk_root=$sdkRoot" 'platforms;android-35' 'build-tools;34.0.0' 'platform-tools'
+    & $manager "--sdk_root=$sdkRoot" 'platforms;android-37' 'build-tools;36.0.0' 'platform-tools'
     if ($LASTEXITCODE -ne 0) { throw 'SDK installation failed' }
 }
-if (Test-Path (Join-Path $sdkRoot 'platforms/android-35/android.jar')) { $env:ANDROID_HOME = $sdkRoot }
+if (Test-Path (Join-Path $sdkRoot 'platforms/android-37/android.jar')) { $env:ANDROID_HOME = $sdkRoot }
 Write-Output "JAVA_HOME=$env:JAVA_HOME"
 Write-Output "ANDROID_HOME=$env:ANDROID_HOME"

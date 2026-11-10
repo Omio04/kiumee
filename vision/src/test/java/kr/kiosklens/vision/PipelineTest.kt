@@ -48,20 +48,20 @@ class PipelineTest {
     }
 
     @Test fun slowSubscriberDoesNotBlockAndEventuallyReceivesLatestSnapshot() = runTest {
-        val fake = FakeScreenAnalyzer()
+        // 실제 VisionScreenAnalyzer가 내보내는 스트림으로 확인한다 (Fake는 2일차에 지움)
+        val stream = SnapshotStream()
         val received = mutableListOf<Long>()
         val collector = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            fake.snapshots.collect {
+            stream.collect {
                 received += it.frameId
                 delay(1_000)
             }
         }
-        repeat(50) { fake.show(ScreenSnapshot("s1", it.toLong(), 0, emptyList(), 2)) }
+        repeat(50) { stream.publish(ScreenSnapshot("s1", it.toLong(), 0, emptyList(), 2)) }
         advanceTimeBy(1_001)
         runCurrent()
         assertEquals(49L, received.last())
         collector.cancel()
-        fake.close()
     }
 
     @Test fun samplerForcesHeartbeatConfirmationAndRotationButHonorsRateLimit() {
