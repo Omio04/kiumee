@@ -5,13 +5,15 @@
 
 ## 만들 것
 
-| 포트 | 실구현 | Fake |
-|---|---|---|
-| `GuideAgent` | `RemoteGuideAgent` | `FakeGuideAgent` — 규칙 기반 고정 응답 (예: 1등 BUTTON_LIKE 요소로 TAP, 요소 없으면 UNKNOWN) |
+| 포트 | 실구현 |
+|---|---|
+| `GuideAgent` | `RemoteGuideAgent` |
+
+Fake는 두지 않는다 (2일차 결정, [decisions.md](../docs/decisions.md) 6장 U3). 서버 없이 연습할 때는 서버를 `LLM_PROVIDER=fake`로 띄운다.
 
 ```
 kr.kiosklens.agent
-├─ remote/   GuideApi · GuideRequestDto · GuideResponseDto · DtoMapper
+├─ remote/   Json(작은 JSON 도구) · DtoMapper
 └─ RemoteGuideAgent : GuideAgent
 ```
 
@@ -19,7 +21,7 @@ kr.kiosklens.agent
 
 - **예외 대신 `Result.failure`** (네트워크 · 타임아웃 · 4xx/5xx 모두)
 - 성공이면 `Tap.targetId`는 **요청 스냅샷에 있다**. 서버가 보장하지만 앱에서도 한 번 더 확인하고, 없으면 `Unknown`으로 바꾼다
-- 타임아웃 **6초**, 실패 시 **1회 재시도** (400 · 401은 재시도하지 않음, 429는 `Retry-After`만큼 기다림)
+- 타임아웃: **시도 한 번 전체 6초** (connect · read 구간별이 아니라 합쳐서), 실패 시 **1회 재시도** (400 · 401은 재시도하지 않음, 429는 `Retry-After`만큼 기다림)
 - 헤더 `X-App-Key`. **LLM 키는 절대 앱에 넣지 않는다**
 - 보내기 전에 길이를 맞춘다: 요소 글자 80자 · 요소 300개 · utterance · goal 200자 · history 5개 (넘으면 서버가 400)
 - 응답의 모르는 필드(`source` 등)는 무시
@@ -36,7 +38,7 @@ val json = Json {
 
 ## 계약 테스트 (먼저 쓰기)
 
-1. 실패는 예외가 아니라 `Result.failure`다 (MockWebServer 500 · 타임아웃)
+1. 실패는 예외가 아니라 `Result.failure`다 (로컬 HTTP 서버 500 · 타임아웃)
 2. 성공이면 `Tap.targetId`가 요청 스냅샷에 있거나 액션이 `Unknown`이다
 3. **`testdata/contract/*.json` 왕복**: 요청 DTO를 직렬화하면 `request_*.json`과 같고, `response_*.json`을 읽으면 `GuideResponse`로 맞게 바뀐다 → 서버와 형식이 어긋나지 않는 보증 (서버는 `server/tests/test_contract.py`가 같은 파일로 검사 중)
 
@@ -50,7 +52,7 @@ val json = Json {
 
 ## 할 일 (5일 계획)
 
-- **1일차**: 서버 스켈레톤 ✅ · 스키마 검증 ✅ · 오류 형식 ✅ · X-App-Key ✅ · FakeLlmClient ✅ (서버) / **`FakeGuideAgent` + 계약 테스트 (앱)** ⬜
+- **1일차**: 서버 스켈레톤 ✅ · 스키마 검증 ✅ · 오류 형식 ✅ · X-App-Key ✅ · FakeLlmClient ✅ (서버) / ~~`FakeGuideAgent`~~ (2일차에 Fake 없이 가기로 함) · 계약 테스트 (앱) ✅
 - **2일차**: 후보 축소 · 프롬프트 · LlmClient 실구현 · 응답 검증 (서버에 대부분 있음) · **`RemoteGuideAgent` 초안** · 평가 스크립트
 - **3일차**: 클라이언트 오류 처리 (400 · 401 · 429 · 502 · 504 → 사용자 안내) · 서버 클라우드 배포 · 지연 로그
 
@@ -63,7 +65,8 @@ val json = Json {
 
 ## 구현 현황 (이 PR)
 
-- [x] `RemoteGuideAgent`(HttpURLConnection · 6초 · 1회 재시도 · 400/401 재시도 없음 · 429 `Retry-After`) · `FakeGuideAgent` · `DtoMapper`(보내기 전 길이 정리 포함)
+- [x] `RemoteGuideAgent`(HttpURLConnection · **시도 한 번 전체 6초** · 1회 재시도 · 400/401 재시도 없음 · 429 `Retry-After`) · `DtoMapper`(보내기 전 길이 정리 포함)
+- [x] 2026-11-10 (P1): 6초를 connect · read에 따로 걸어 한 번에 12초 넘게 걸릴 수 있던 것을 **전체 6초**로 고침 (계약 3장). `FakeGuideAgent`는 지움
 - [x] **JSON은 `kotlinx.serialization` 대신 작은 직접 구현**(`remote/Json.kt`)으로 처리했다 (외부 의존 0, 계약 필드가 적음). 바꾸고 싶으면 `DtoMapper`만 고치면 되고 테스트가 그대로 보증한다.
-- [x] 테스트 18개: `testdata/contract/*.json` 왕복, 로컬 HTTP 서버로 401 · 400 · 429 · 502 · 시간 초과 · 연결 실패 · 깨진 응답, `Tap.targetId` 방어, 길이 제한
+- [x] 테스트 18개: `testdata/contract/*.json` 왕복, 로컬 HTTP 서버로 401 · 400 · 429 · 502 · 시간 초과 · **응답이 조금씩 늦게 오는 경우** · 연결 실패 · 깨진 응답, `Tap.targetId` 방어, 길이 제한
 - 서버: **무료 Gemini 지원 추가** (`LLM_PROVIDER=gemini`, `GEMINI_API_KEY`) — [server/README.md](../server/README.md)

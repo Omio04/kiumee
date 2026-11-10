@@ -6,17 +6,20 @@
 
 ## 만들 것
 
-| 포트 | 실구현 | Fake |
-|---|---|---|
-| `HighlightSurface` (그리기) | `ComposeOverlay` | `FakeOverlay` — 받은 대상을 로그로 출력 |
-| `MotionSink` (트래킹 입력, 선택) | `ComposeOverlay` | — |
+| 포트 | 실구현 |
+|---|---|
+| `HighlightSurface` (그리기) | `ViewOverlay` (상태는 `HighlightHolder`) |
+| `MotionSink` (트래킹 입력, 선택) | `ViewOverlay` |
+
+Fake는 두지 않는다 (2일차 결정, [decisions.md](../docs/decisions.md) 6장 U3). 계약 테스트는 실제 `ViewOverlay`가 쓰는 `HighlightHolder`로 돌린다.
 
 ```
 kr.kiosklens.overlay
-├─ transform/  CoordinateMapper(interface) · CameraXCoordinateMapper
+├─ transform/  CoordinateMapper(interface) · FillCenterMapper · FitCenterMapper · StretchMapper
 ├─ tracking/   BoxSmoother  (MotionEstimator · LkMotionEstimator는 보류)
-├─ style/      HighlightPainter(interface) · PulseBorderPainter   (MagnifyPainter는 보류)
-└─ ComposeOverlay : HighlightSurface, MotionSink
+├─ style/      PulseCurve · PulseBorderPainter   (MagnifyPainter는 보류)
+├─ HighlightHolder : HighlightSurface   (스레드 안전 · 멱등)
+└─ ViewOverlay : HighlightSurface, MotionSink   (Compose 대신 일반 View)
 ```
 
 ## 반드시 지킬 것
@@ -36,7 +39,7 @@ kr.kiosklens.overlay
 
 ## 할 일 (5일 계획)
 
-- **1일차**: CameraX 프리뷰 위에 **고정 `NormRect`를 정확히 그리는 PoC** (회전 · 크롭 확인) · `FakeOverlay` + `HighlightSurface` 계약 테스트 → 완료 기준: 고정 박스가 프리뷰 위 의도한 위치에 그려짐
+- **1일차**: CameraX 프리뷰 위에 **고정 `NormRect`를 정확히 그리는 PoC** (회전 · 크롭 확인) · `HighlightSurface` 계약 테스트 → 완료 기준: 고정 박스가 프리뷰 위 의도한 위치에 그려짐
 - **2일차**: `CameraXCoordinateMapper` · `PulseBorderPainter` · `BoxSmoother` · 픽스처로 하이라이트 표시
 - **3일차**: P2와 짝으로 하이라이트 위치 오차 확인 (목표: 버튼 크기의 20% 이내)
 
@@ -57,7 +60,7 @@ kr.kiosklens.overlay
 
 ## 구현 현황 (이 PR)
 
-- [x] `ViewOverlay`(**Compose 대신 일반 View** — 컴파일러 플러그인 없이 쓰려고. 포트 계약은 같다) · `HighlightHolder`(스레드 안전 · 멱등) · `FakeOverlay`
+- [x] `ViewOverlay`(**Compose 대신 일반 View** — 컴파일러 플러그인 없이 쓰려고. 포트 계약은 같다) · `HighlightHolder`(스레드 안전 · 멱등)
 - [x] `FillCenterMapper` · `FitCenterMapper` · `StretchMapper`(좌표 변환) · `BoxSmoother`(EMA α=0.3, 시간 보정) · `PulseCurve`(1.5Hz, 최소 밝기 유지) · `PulseBorderPainter`(6dp 이상 노랑 + 검정 외곽)
-- [x] 테스트 17개(JVM)
+- [x] 테스트 14개(JVM). `FakeOverlay`와 그 계약 테스트는 2026-11-10에 지움 (Fake 없이 실구현으로)
 - **기기에서 확인 필요:** 실제 프리뷰 위 위치 오차(목표: 버튼 크기의 20% 이내), 기기 회전 시 박스, 30fps 렌더

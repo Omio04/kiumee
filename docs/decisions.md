@@ -15,7 +15,7 @@
 | 3 | STT 방식 | 온디바이스 ko-KR만, 클라우드 폴백 보류 | P3 | (미정) |
 | 4 | LLM 모델 · 서버 언어 · 호스팅 | 서버 구현 기준: FastAPI(Python) · 기본 모델 `claude-haiku-5-5` · 클라우드 1곳 + 로컬 실행 대비 | P4 | (미정 — 서버는 이미 이 구성으로 구현됨) |
 | 5 | minSdk · 시연 기기 | minSdk 26 · 시연 기기 1대 고정 + 예비 1대 | P1 | **minSdk 26** (2026-11-09, 빌드에 반영) · 시연 기기: (모델명 기입) |
-| 6 | DI 방식 | Hilt 경험자가 없으면 수동 DI | P1 | **수동 DI** (2026-11-09). 플레이버마다 `:app/di`에 조립 코드 하나. 생성자 주입 원칙 유지 → 나중에 Hilt로 바꾸기 쉬움. 이유: AGP 9 + Hilt는 KSP · 플러그인 호환 확인이 필요해 5일 일정에 위험 |
+| 6 | DI 방식 | Hilt 경험자가 없으면 수동 DI | P1 | **수동 DI** (2026-11-09). ~~플레이버마다~~ `:app/di`에 조립 코드 하나 (플레이버 없음, 6장 U3). 생성자 주입 원칙 유지 → 나중에 Hilt로 바꾸기 쉬움. 이유: AGP 9 + Hilt는 KSP · 플러그인 호환 확인이 필요해 5일 일정에 위험 |
 | 7 | 어르신 테스트 | 4일차 오후 1~2명 · 촬영 · 녹음 동의서 | P3 | (미정) |
 
 ### 범위 조정 (계획서 2장) — 팀 확인 필요
@@ -60,7 +60,7 @@
 
 - Gradle 9.6.0 · AGP 9.5.1 · Kotlin 2.2.10 · compileSdk 37 · minSdk 26 · Java 17 바이트코드
   - compileSdk 37: 팀원 PC · CI에 Android API 37 플랫폼 설치 필요. 어려우면 회의에서 내릴지 결정
-- 플레이버: `real` / `mock` (설계서 16.8). mixed 조합은 2일차에 DI 조립에서 처리
+- ~~플레이버: `real` / `mock` (설계서 16.8). mixed 조합은 2일차에 DI 조립에서 처리~~ → 플레이버 없음, 앱은 실구현만 (2026-11-10, 6장 U3)
 - 아키텍처 검사 (설계서 16.9 일부):
   - `:core-model` · `:domain`은 `kotlin("jvm")` → Android import 시 컴파일 실패
   - 루트 `build.gradle.kts`: 어댑터끼리 의존하거나 순수 모듈이 바깥을 의존하면 빌드 실패
@@ -96,7 +96,22 @@
 | T3 | HTTP | `HttpURLConnection`. 6초 · 1회 재시도 · 400/401은 재시도 안 함 · 429는 Retry-After. (스트리밍 모드는 쓰지 않음: 401 본문이 사라지는 문제를 테스트에서 확인) |
 | T4 | LLM | 서버에 **Gemini 제공자 추가**(무료 한도). 기본은 그대로 anthropic. 평가 스크립트로 두 모델의 정확도를 비교한 뒤 정할 것 |
 | T5 | 서버 주소 · 앱 키 | `local.properties` → `BuildConfig`. 저장소에 비밀 값 없음. LLM 키는 서버에만 |
-| T6 | 화면 전환 | `ScreenDiffer`: Jaccard 0.6 · 연속 2프레임 · 요소 3개 미만 제외. 처음 화면은 stableFrames 2부터 시작 |
+| T6 | 화면 전환 | ~~`ScreenDiffer`: Jaccard 0.6 · 연속 2프레임 · 요소 3개 미만 제외. 처음 화면은 stableFrames 2부터 시작~~ → P2의 `ScreenTracker`로 대체 (6장 U2) |
+
+---
+
+## 6. 2일차 통합 (P1, 2026-11-10)
+
+P2 브랜치(`origin/P2`)와 main에 올라온 `kiumee-impl.patch` · `.zip`(작성자 JJ)을 계약 v1 기준으로 검토하고 하나로 합쳤다.
+
+| # | 항목 | 결정 |
+|---|---|---|
+| U1 | JJ 패치 | **그대로 적용** (작성자 JJ로 커밋). 계약 v1을 지킴 (`:core-model` 변경 없음, 서버 계약 테스트 통과). zip은 patch의 일부와 내용이 같아서 저장소에서 지움. `SessionRunner` · `:app`은 원래 P1 몫이지만 규칙(domain/README)을 지켜서 그대로 씀 |
+| U2 | `:vision` | **P2 구현 채택**, JJ 구현은 지움. 둘 다 계약을 지키지만 담당자 코드이고, 메가커피 화면 · 팝업 · 닫기(X) 아이콘 인식 · 프레임 간 ID 유지 · 전화번호 필터가 더 있음. P2 브랜치는 옛 바탕이라 `vision/`과 `testdata/`(라벨 스키마 · OCR 평가)만 가져옴 (작성자 yjb578로 커밋) |
+| U3 | Fake · mock | **Fake 구현 없이 바로 실구현.** `FakeScreenAnalyzer` · `FakeSpeechInput/Output` · `FakeGuideAgent` · `FakeOverlay`와 그것을 쓰는 테스트, mock 플레이버를 지움. 앱은 항상 실제 카메라 · 음성 · 서버로 동작. 계약 테스트는 실구현으로 돌림 (JVM에서 못 도는 STT/TTS · ML Kit · 카메라는 기기에서 확인). 테스트 파일 안의 대역(`SessionRunnerTest`의 `Src` · `Ear` 등)은 앱에 안 들어가므로 유지 |
+| U4 | `:agent` 시간 제한 | 계약 3장(앱 → 서버 6초) 위반을 고침: connect · read를 따로 6초씩 잡아 한 번에 최대 12초 이상 걸릴 수 있었음 → **시도 한 번 전체 6초**. 응답이 조금씩 오는 경우를 재현하는 테스트 추가 |
+| U5 | 계약 정본은 한 곳 | P2의 단독 빌드용 `core-model` 복사본(`vision/src/standalone`)과 계약 예시 JSON 복사본을 지움. `:vision` 테스트도 루트 `testdata/contract`를 읽음 |
+| U6 | 대상 키오스크 (결정 #1) | P2가 **메가커피** 화면 10장으로 검증 중 (`vision/docs/mega-coffee-handoff.md`). **팀에서 확정 필요** |
 
 ## 변경 이력
 
@@ -104,5 +119,6 @@
 |---|---|
 | 2026-11-09 | 멀티모듈 스켈레톤 · `:core-model` 초안 (PR #1, 병합) |
 | 2026-11-09 | 계약 v1 확정안 · 서버 정렬 · 팀 README (PR #2, 병합) |
-| 2026-11-09 | 상태머신 · 위치 문구 · 안내 문장 (`feat/p1-state-machine`) |
-| 2026-11-09 | 어댑터 구현: SessionRunner · :agent · :vision · :voice · :overlay · :app · 서버 Gemini (`feat/impl-adapters`) |
+| 2026-11-09 | 상태머신 · 위치 문구 · 안내 문장 (PR #3, 병합) |
+| 2026-11-09 | 어댑터 구현: SessionRunner · :agent · :vision · :voice · :overlay · :app · 서버 Gemini (JJ, patch 업로드) |
+| 2026-11-10 | 2일차 통합: JJ 패치 적용 · P2 `:vision` 채택 · Fake · mock 삭제 · `:agent` 6초 수정 (`feat/p1-day2-integration`) |

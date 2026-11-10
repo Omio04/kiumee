@@ -5,10 +5,12 @@
 
 ## 만들 것
 
-| 포트 | 실구현 | Fake |
-|---|---|---|
-| `SpeechInput` | `AndroidSpeechInput` (SpeechRecognizer, ko-KR) | `FakeSpeechInput` — 미리 정한 문장을 Partial → Final로 발행 |
-| `SpeechOutput` | `AndroidSpeechOutput` (TextToSpeech, ko-KR) | `FakeSpeechOutput` — 말한 문장을 기록 (mock 플레이버용) |
+| 포트 | 실구현 |
+|---|---|
+| `SpeechInput` | `AndroidSpeechInput` (SpeechRecognizer, ko-KR) |
+| `SpeechOutput` | `AndroidSpeechOutput` (TextToSpeech, ko-KR) |
+
+Fake는 두지 않는다 (2일차 결정, [decisions.md](../docs/decisions.md) 6장 U3). 실구현은 JVM에서 돌릴 수 없어서 아래 계약은 **기기에서** 확인한다.
 
 ## 반드시 지킬 것
 
@@ -28,7 +30,7 @@
 - **에코 방지**: `:domain`은 `speak()`가 끝난 뒤에만 `start()`를 부른다. **TTS 종료 후 300ms 지연은 `:voice` 안에서 보장**한다 (예: 마지막 TTS 종료 시각을 모듈 안에서 공유)
 - 문구 (3일차, LOST · ERROR · ASKING): 비난 · 전문용어 금지, 쉬운 존댓말
 
-## 계약 테스트 (먼저 쓰기)
+## 계약 확인 항목 (기기에서)
 
 `SpeechInput`
 1. 정상이면 `Final` 하나가 나오고 플로우가 끝난다
@@ -42,14 +44,14 @@
 
 ## 할 일 (5일 계획)
 
-- **1일차**: 키오스크 촬영 · `FakeSpeechInput` + 계약 테스트 · 실기기 STT(ko-KR) / TTS 확인 · **GitHub Actions CI** · **PR 템플릿** (루트 README의 16.12 체크리스트) · 어르신 테스트 섭외, 동의서 초안
+- **1일차**: 키오스크 촬영 · ~~`FakeSpeechInput` + 계약 테스트~~ (2일차에 Fake 없이 가기로 함) · 실기기 STT(ko-KR) / TTS 확인 · **GitHub Actions CI** · **PR 템플릿** (루트 README의 16.12 체크리스트) · 어르신 테스트 섭외, 동의서 초안
 - **2일차**: 오전 STT 규칙 · TTS · 에코 방지 · 계약 테스트 통과 / 오후 태블릿 키오스크 재현 · P1 UI 지원
 - **3일차**: LOST · ERROR · ASKING 음성 문구 · AskUser → LISTENING 흐름 · 무음 8초 안내
 
 ## CI에서 돌릴 명령 (참고)
 
 ```bash
-./gradlew :core-model:test :domain:test :app:assembleMockDebug
+./gradlew :core-model:test :domain:test :app:assembleDebug
 ```
 
 ```bash
@@ -73,5 +75,5 @@ cd server && pip install -r requirements-dev.txt && KL_SKIP_APP_INIT=1 pytest -q
 ## 구현 현황 (이 PR)
 
 - [x] `AndroidSpeechInput`(ko-KR · 부분 결과 · 1.2초 무음 종료 · 1회 자동 재시도 · 온디바이스 우선) · `AndroidSpeechOutput`(속도 0.85 · 문장 단위 · 취소 즉시 중단) · `EchoGuard`(종료 후 300ms)
-- [x] `FakeSpeechInput` · `FakeSpeechOutput` + 계약 테스트, 오류 매핑 · 후보 선택 · 문장 나누기 테스트 (10개, JVM)
+- [x] 오류 매핑 · 재시도 · 후보 선택 · 에코 방지 · 문장 나누기 테스트 (5개, JVM). `FakeSpeechInput` · `FakeSpeechOutput`과 그 계약 테스트는 2026-11-10에 지움 (Fake 없이 실구현으로)
 - **기기에서 확인 필요:** 실제 STT/TTS 동작 전부 (`SpeechRecognizer` · `TextToSpeech`는 JVM에서 돌릴 수 없음), 기기별 한국어 음성 데이터 설치 여부

@@ -16,7 +16,7 @@ jobs:
       - run: ./gradlew :core-model:test :domain:test
 
   android:
-    name: Android 모듈 테스트 · mock 빌드
+    name: Android 모듈 테스트 · 앱 빌드
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,7 +25,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Android API 37 플랫폼
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37" "build-tools;37.0.0" || true
-      - run: ./gradlew :vision:testDebugUnitTest :voice:testDebugUnitTest :agent:testDebugUnitTest :overlay:testDebugUnitTest :app:testMockDebugUnitTest :app:assembleMockDebug
+      - run: ./gradlew :vision:testDebugUnitTest :voice:testDebugUnitTest :agent:testDebugUnitTest :overlay:testDebugUnitTest :app:testDebugUnitTest :app:assembleDebug
 
   server:
     name: 서버 테스트

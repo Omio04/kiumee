@@ -1,8 +1,7 @@
 # P2 비전 모듈
 
-계약 기준: [Omio04/kiumee main docs/contract.md](https://github.com/Omio04/kiumee/blob/65727cc886909ea5f061606d4f5f69f842372541/docs/contract.md),
-커밋 `65727cc886909ea5f061606d4f5f69f842372541` (2026-11-09 확인).
-GitHub main에는 변경하지 않았다. 이 폴더는 Git 저장소가 없는 ZIP 작업본이다.
+계약 정본: [docs/contract.md](../docs/contract.md) (계약 v1).
+2026-11-10 P1이 P2 브랜치(`5641769`)의 `vision/`을 main 통합 브랜치로 옮겼다 (작성자 yjb578로 커밋, [decisions.md](../docs/decisions.md) 6장 U2).
 
 메가커피 10장 예시를 반영한 개선·사용자 선택 흐름·담당 간 연결 사항:
 [메가커피 검증 및 인계](docs/mega-coffee-handoff.md).
@@ -11,11 +10,9 @@ GitHub main에는 변경하지 않았다. 이 폴더는 Git 저장소가 없는 
 
 ## 공용 계약과 연결
 
-- 팀 프로젝트에서는 실제 `:core-model`의 `CameraFrame`, `UiElement`, `ScreenSnapshot`, `FrameSink`, `SnapshotSource`, `Clock`, `Logger`를 사용한다.
-- 현재 ZIP에는 `:core-model`이 없어서 `src/standalone/kotlin`에 해당 커밋의 공용 소스 7개를 그대로 보관한다. `:core-model`이 존재하면 이 디렉터리는 **컴파일에서 제외**한다. 공용 계약을 수정한 것이 아니다.
-- 기존 `app/`을 수정하지 않고 실행하기 위한 타입 별칭과 `ScreenAnalyzer` 진입점을 유지한다. 새 팀 앱은 `VisionScreenAnalyzer`를 포트로 주입한다.
-- AGP 8에서는 Kotlin Android 플러그인을 적용하고 AGP 9 이상에서는 내장 Kotlin을 사용한다. 로컬 ZIP은 compileSdk 35, 팀 프로젝트는 main과 같은 37을 사용한다. 이 둘의 루트 Gradle 설정은 변경하지 않는다.
-- `src/standalone`은 팀의 공용 모델과 함께 빌드하지 않는다. main에 반영할 때도 P2의 `vision/` 파일만 전달하면 된다.
+- 실제 `:core-model`의 `CameraFrame`, `UiElement`, `ScreenSnapshot`, `FrameSink`, `SnapshotSource`, `Clock`, `Logger`만 쓴다. **계약 타입은 `:core-model` 한 곳에만 있다** — 단독 빌드용 복사본(`src/standalone`)은 통합하면서 지웠다.
+- 옛 데모와의 호환을 위한 타입 별칭(`VisionModels.kt`)과 `ScreenAnalyzer` 진입점은 남아 있다. 팀 앱은 `createVisionScreenAnalyzer()`로 만든 `VisionScreenAnalyzer`를 포트로 주입한다 (`app/.../di/GraphFactory.kt`).
+- 빌드는 저장소 규칙을 따른다: AGP 9 내장 Kotlin · compileSdk 37 · 라이브러리 버전은 `gradle/libs.versions.toml`.
 
 ## 동작
 
@@ -47,34 +44,37 @@ val source: kr.kiosklens.core.port.SnapshotSource = analyzer
 입력 CameraFrame의 값을 그대로 사용한다. 기본 Android 조립기는 elapsedRealtime을 사용한다.
 엔진·필터·분류기·dispatcher·signature 함수를 주입하여 JVM에서도 검증할 수 있다.
 
-## 사진과 Fake
+## 사진 · JSON
 
 - `PhotoAnalyzer`는 같은 사진에 OCR을 두 번 실행해 안정 결과만 반환한다. 읽을 수 있는 글자가 없거나 두 결과가 불안정하면 실패한다. 사진 프리뷰의 Bitmap은 재활용하지 않는다.
-- `FakeScreenAnalyzer(fixtures)`는 제출 프레임마다 다음 픽스처로 진행하고 입력을 반환한다. `show(snapshot)`로 직접 표시할 수도 있다. 불안정한 픽스처는 발행하지 않는다.
+- `FakeScreenAnalyzer`는 2일차 결정(Fake 없이 실구현으로)에 따라 지웠다 ([decisions.md](../docs/decisions.md) 6장 U3).
 - `SnapshotJson`은 Android `org.json` 대신 kotlinx.serialization을 사용하여 JVM 테스트에서도 동작한다. 프로덕션 HTTP 직렬화는 P4의 `:agent`가 담당한다.
 - 옛 손 픽스처를 읽을 때만 누락된 frameId/timestampMs는 0, stableFrames는 2로 보완한다. 실시간 결과는 이 기본값을 사용하지 않는다.
 - `SnapshotStream.value`는 기존 데모에서 최신 값을 조회하는 편의 속성이다. 포트의 Flow에서는 null을 발행하지 않는다.
 
-## 실행과 검증 (PowerShell)
+## 실행과 검증
 
-현재 PC의 JDK 25는 로컬 Gradle 8.9와 호환되지 않아, `vision/.local`에 JDK 17과 SDK를 별도로 준비했다.
-시스템 환경변수를 영구 변경하지 않는다. 새 환경에서 준비하려면 다음을 실행한다
-(공식 배포본 다운로드, 체크섬 확인, Android SDK 라이선스 동의 포함).
+```bash
+./gradlew :vision:testDebugUnitTest
+```
+
+```bash
+./gradlew :app:installDebug
+```
+
+Windows에서 JDK · SDK를 따로 준비해야 할 때만 (`vision/.local`에 설치, 시스템 환경변수는 바꾸지 않음):
 
 ```powershell
 . ./vision/tools/prepare-build.ps1 -InstallSdk
 ./vision/tools/verify.ps1
-. ./vision/tools/prepare-build.ps1
-./gradlew.bat :app:installDebug
-& "$env:ANDROID_HOME/platform-tools/adb.exe" shell am start -n kr.kiosklens.demo/.MainActivity
 ```
 
 테스트 보고서: `vision/build/reports/tests/testDebugUnitTest/index.html`.
-APK: `app/build/outputs/apk/debug/app-debug.apk`.
+APK: `app/build/outputs/apk/debug/app-debug.apk` (팀 앱, 실구현만).
 
-테스트는 Fake와 실제 파이프라인이 같은 추상 계약 테스트를 상속한다. 실제 파이프라인 테스트의
+계약 테스트(`FrameSinkContractTest`)는 실제 파이프라인(`RealFrameSinkContractTest`)으로 돌린다.
 OCR 엔진은 주입한 테스트 엔진이다. ML Kit 기기 인식 자체를 JVM 테스트로 검증한 것은 아니다.
-원본 main의 요청 JSON 3개를 테스트 리소스로 보관해 스냅샷 왕복 변환을 검사한다.
+스냅샷 왕복 변환은 저장소 루트 `testdata/contract`의 요청 JSON 3개를 읽어 검사한다 (서버 · `:agent`와 같은 정답지, 복사본 없음).
 
 실기기에서 별도로 측정할 것:
 
@@ -82,4 +82,4 @@ OCR 엔진은 주입한 테스트 엔진이다. ML Kit 기기 인식 자체를 J
 - `adb logcat -s KL_PERF`에서 OCR 처리 시간 (목표 500ms 이하).
 - 첫 화면·전환 확정 지연은 두 관측을 기다리는 시간이 있으므로 별도로 측정.
 - 회전·각도·반사·가림에서 박스 위치와 ID 유지. 버튼 후보 박스는 실제 버튼 전체가 아닌 OCR 글자 영역이다.
-- 본 ZIP에서 테스트·APK 빌드가 통과해도 팀 앱 전체 조립과 AGP 9/SDK 37 빌드는 별도 확인이 필요하다.
+- 팀 저장소(AGP 9.5 · SDK 37)에서 테스트 40개 · 앱 빌드 통과는 확인했다 (2026-11-10). 기기 동작은 위 항목으로 확인한다.
