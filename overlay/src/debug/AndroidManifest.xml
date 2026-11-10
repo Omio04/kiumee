@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 디버그 빌드 전용: 하이라이트 위치 확인 화면 (P5 PoC). 실행: adb shell am start -n kr.kiosklens.app/kr.kiosklens.overlay.debug.OverlayCalibrationActivity -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.CAMERA" />
+    <application>
+        <activity
+            android:name="kr.kiosklens.overlay.debug.OverlayCalibrationActivity"
+            android:exported="true"
+            android:label="하이라이트 위치 확인"
+            android:screenOrientation="portrait" />
+    </application>
+</manifest>

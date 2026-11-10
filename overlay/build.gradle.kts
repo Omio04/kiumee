@@ -15,4 +15,11 @@ android {
 dependencies {
     implementation(project(":domain"))
     testImplementation(libs.junit)
+
+    // 디버그 빌드 전용: 하이라이트 위치 확인 화면 (src/debug, OverlayCalibrationActivity). 릴리스 앱에는 들어가지 않는다.
+    debugImplementation(libs.androidx.appcompat)
+    debugImplementation(libs.androidx.camera.core)
+    debugImplementation(libs.androidx.camera.camera2)
+    debugImplementation(libs.androidx.camera.lifecycle)
+    debugImplementation(libs.androidx.camera.view)
 }
