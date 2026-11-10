@@ -37,6 +37,8 @@ object GraphFactory {
         return object : Graph {
             override val runner = runner
             override val frameSink: FrameSink = vision
+            override val snapshots = vision.snapshots
+            override val scanStatus = vision.status
             override fun setCaptionListener(listener: (String) -> Unit) { caption = listener }
             override fun close() { runner.close(); tts.shutdown(); vision.close() }
         }

@@ -58,8 +58,8 @@ cd server && pip install -r requirements-dev.txt && KL_SKIP_APP_INIT=1 pytest -q
 | `:agent` | 구현 완료 (직접 JSON, 시도 한 번 전체 6초, 실패 → 안내 문구 분류) | 23개 |
 | `:vision` | P2 구현 (메가커피 화면 · 팝업 · 닫기 아이콘 · ID 유지. ML Kit는 기기에서 확인 필요) | 40개 |
 | `:voice` | 구현 완료 (실제 STT/TTS는 기기에서 확인 필요) | 5개 |
-| `:overlay` | 구현 완료 (View 기반) · 위치 확인 화면(디버그 빌드) · 안 보임 신호 | 32개 |
-| `:app` | 조립 · 화면 · 카메라 (실구현만) | 5개 |
+| `:overlay` | 구현 완료 (View 기반) · 위치 확인 화면(디버그 빌드) · 안 보임 신호 · 인식 표시 | 35개 |
+| `:app` | 조립 · 화면 · 카메라 (실구현만) · 디버그 빌드는 카메라가 인식한 글자 · 버튼을 화면에 표시 | 8개 |
 | `server/` | Gemini 제공자 · 구조화 출력 · 총 처리 예산 · 응답 캐시 · SCROLL/WAIT · 짧은 대답 동의어 | 127개 |
 
 **Fake · mock 플레이버는 없다** (2일차 결정, [decisions.md](docs/decisions.md) 6장): 계약 테스트는 실구현으로 돌리고, JVM에서 못 도는 STT/TTS · ML Kit · 카메라는 기기에서 확인한다.

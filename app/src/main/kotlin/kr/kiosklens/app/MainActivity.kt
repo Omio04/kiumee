@@ -28,9 +28,13 @@ import kr.kiosklens.app.camera.CameraController
 import kr.kiosklens.app.di.AndroidLogger
 import kr.kiosklens.app.di.Graph
 import kr.kiosklens.app.di.GraphFactory
+import kr.kiosklens.app.ui.RecognitionStatus
 import kr.kiosklens.app.ui.UiTexts
+import kr.kiosklens.core.model.ScreenSnapshot
 import kr.kiosklens.domain.session.Phase
+import kr.kiosklens.overlay.RecognitionView
 import kr.kiosklens.overlay.ViewOverlay
+import kr.kiosklens.vision.ScanStatus
 
 /**
  * 화면 하나짜리 앱: 카메라 미리보기 + 노란 테두리 + 큰 상태 문구 + "말하기" / "그만하기" 버튼.
@@ -53,6 +57,13 @@ class MainActivity : AppCompatActivity() {
     private var graph: Graph? = null
     private var camera: CameraController? = null
     private var caption: String? = null
+
+    // 확인용 (디버그 빌드만): 카메라가 인식한 글자 · 버튼을 미리보기 위에 그리고, 위쪽 줄에 인식 상태를 보여 준다
+    private var recognition: RecognitionView? = null
+    private var debugLine: TextView? = null
+    private var showRecognition = true
+    private var lastScan = ScanStatus.SCANNING
+    private var lastSnapshot: ScreenSnapshot? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -90,8 +101,14 @@ class MainActivity : AppCompatActivity() {
         graph = g
         g.setCaptionListener { text -> runOnUiThread { caption = text; render() } }
 
-        camera = CameraController(this, g.frameSink, logger) { w, h -> runOnUiThread { overlay.setAnalysisSize(w, h) } }.also { it.start(this, preview) }
+        camera = CameraController(this, g.frameSink, logger) { w, h ->
+            runOnUiThread { overlay.setAnalysisSize(w, h); recognition?.setAnalysisSize(w, h) }
+        }.also { it.start(this, preview) }
         if (BuildConfig.SERVER_URL.isBlank()) { note.text = getString(R.string.need_server); note.visibility = View.VISIBLE }
+        if (BuildConfig.DEBUG) {
+            ui.launch { g.snapshots.collect { s -> lastSnapshot = s; recognition?.show(s); renderDebug() } }
+            ui.launch { g.scanStatus.collect { st -> lastScan = st; renderDebug() } }
+        }
         g.runner.start()
         ui.launch { g.runner.state.collect { s ->
             if (s.phase == Phase.LISTENING) caption = null
@@ -106,6 +123,10 @@ class MainActivity : AppCompatActivity() {
         status.text = UiTexts.status(phase, caption)
         startBtn.isEnabled = UiTexts.canStart(phase)
         stopBtn.visibility = if (UiTexts.canStop(phase)) View.VISIBLE else View.INVISIBLE
+    }
+
+    private fun renderDebug() {
+        debugLine?.text = RecognitionStatus.text(lastScan, lastSnapshot, showRecognition)
     }
 
     override fun onDestroy() {
@@ -123,6 +144,7 @@ class MainActivity : AppCompatActivity() {
         val match = ViewGroup.LayoutParams.MATCH_PARENT
 
         preview = PreviewView(this).apply { scaleType = PreviewView.ScaleType.FILL_CENTER }.also { root.addView(it, FrameLayout.LayoutParams(match, match)) }
+        if (BuildConfig.DEBUG) recognition = RecognitionView(this).also { root.addView(it, FrameLayout.LayoutParams(match, match)) }   // 노란 테두리보다 아래
         overlay = ViewOverlay(this).also { root.addView(it, FrameLayout.LayoutParams(match, match)) }
 
         status = TextView(this).apply {
@@ -156,6 +178,18 @@ class MainActivity : AppCompatActivity() {
             addView(status); addView(note); addView(settingsBtn); addView(row)
         }
         root.addView(panel, FrameLayout.LayoutParams(match, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM))
+        if (BuildConfig.DEBUG) {
+            debugLine = TextView(this).apply {
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f); setTextColor(Color.WHITE); setBackgroundColor(Color.argb(170, 0, 0, 0))
+                setPadding(dp(12), dp(36), dp(12), dp(8))                                       // 위 상태 표시줄 아래로
+                text = "[확인용] 카메라를 켜는 중"
+                setOnClickListener {
+                    showRecognition = !showRecognition
+                    recognition?.visibility = if (showRecognition) View.VISIBLE else View.INVISIBLE
+                    renderDebug()
+                }
+            }.also { root.addView(it, FrameLayout.LayoutParams(match, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP)) }
+        }
         return root
     }
 
