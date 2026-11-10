@@ -2,11 +2,16 @@ package kr.kiosklens.agent
 
 import java.io.IOException
 import java.net.HttpURLConnection
+import java.net.SocketTimeoutException
 import java.net.URL
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.runInterruptible
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kr.kiosklens.agent.remote.DtoMapper
 import kr.kiosklens.core.model.GuideAction
 import kr.kiosklens.core.model.GuideRequest
@@ -42,6 +47,9 @@ class RemoteGuideAgent(
     private val nowMs: () -> Long = System::currentTimeMillis,
 ) : GuideAgent {
 
+    /** 네트워크 읽기 전용. 시간이 다 된 읽기는 여기서 혼자 끝나게 두고 기다리지 않는다 ([postWithin]). */
+    private val io = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     override suspend fun next(request: GuideRequest): Result<GuideResponse> {
         val sent = DtoMapper.sanitize(request)
         val body = DtoMapper.requestJson(sent).toByteArray(Charsets.UTF_8)
@@ -49,7 +57,7 @@ class RemoteGuideAgent(
         for (attempt in 0..config.retries) {
             val t0 = nowMs()
             try {
-                val resp = runInterruptible(Dispatchers.IO) { post(body) }
+                val resp = postWithin(body)
                 logger.d("KL_PERF", "agent attempt=$attempt status=200 ms=${nowMs() - t0}")
                 return Result.success(guard(resp, sent))
             } catch (e: CancellationException) {
@@ -83,28 +91,47 @@ class RemoteGuideAgent(
         return resp
     }
 
-    private fun post(body: ByteArray): GuideResponse {
-        val url = URL(config.baseUrl.trimEnd('/') + "/v1/guide/next")
-        val c = url.openConnection() as HttpURLConnection
+    /**
+     * 한 번의 시도는 **전체** [AgentConfig.timeoutMs] 안에 끝난다 (계약 3장: 앱 → 서버 6초).
+     * connect · read 타임아웃은 구간별이라 응답이 조금씩 늦게 오면 그보다 길어질 수 있고,
+     * 읽는 중인 연결을 끊는 것(disconnect)도 JVM에서는 남은 응답을 다 읽느라 멈출 수 있다.
+     * 그래서 읽기는 [io]에서 따로 돌리고, 시간이 다 되면 기다리지 않고 바로 시간 초과로 돌아온다.
+     * 남은 읽기와 연결 끊기는 [io]에서 혼자 끝난다.
+     */
+    private suspend fun postWithin(body: ByteArray): GuideResponse {
+        val c = open()                                                      // 아직 네트워크를 쓰지 않음
+        val call = io.async { exchange(c, body) }
         try {
-            c.requestMethod = "POST"
-            c.connectTimeout = config.timeoutMs
-            c.readTimeout = config.timeoutMs
-            c.doOutput = true
-            c.setRequestProperty("Content-Type", "application/json; charset=utf-8")
-            c.setRequestProperty("Accept", "application/json")
-            c.setRequestProperty("X-App-Key", config.appKey)
-            c.outputStream.use { it.write(body) }
-            val status = c.responseCode
-            if (status != 200) {
-                val text = runCatching { c.errorStream?.use { it.readBytes().toString(Charsets.UTF_8) } }.getOrNull().orEmpty()
-                val wait = c.getHeaderField("Retry-After")?.toDoubleOrNull()?.let { (it * 1000).toLong() }
-                throw GuideHttpException(status, DtoMapper.errorCode(text), wait)
-            }
-            val text = c.inputStream.use { it.readBytes().toString(Charsets.UTF_8) }
-            return DtoMapper.parseResponse(text)
+            return withTimeoutOrNull(config.timeoutMs.toLong()) { call.await() }
+                ?: throw SocketTimeoutException("전체 ${config.timeoutMs}ms 초과")
         } finally {
-            c.disconnect()
+            if (!call.isCompleted) call.cancel()
+            io.launch { runCatching { c.disconnect() } }                    // 끊기가 오래 걸려도 부른 쪽은 기다리지 않음
         }
+    }
+
+    private fun open(): HttpURLConnection {
+        val c = URL(config.baseUrl.trimEnd('/') + "/v1/guide/next").openConnection() as HttpURLConnection
+        c.requestMethod = "POST"
+        c.connectTimeout = config.timeoutMs
+        c.readTimeout = config.timeoutMs
+        c.doOutput = true
+        c.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+        c.setRequestProperty("Accept", "application/json")
+        c.setRequestProperty("X-App-Key", config.appKey)
+        return c
+    }
+
+    /** 요청을 쓰고 응답을 읽는다. 연결은 [postWithin]이 끊는다. */
+    private fun exchange(c: HttpURLConnection, body: ByteArray): GuideResponse {
+        c.outputStream.use { it.write(body) }
+        val status = c.responseCode
+        if (status != 200) {
+            val text = runCatching { c.errorStream?.use { it.readBytes().toString(Charsets.UTF_8) } }.getOrNull().orEmpty()
+            val wait = c.getHeaderField("Retry-After")?.toDoubleOrNull()?.let { (it * 1000).toLong() }
+            throw GuideHttpException(status, DtoMapper.errorCode(text), wait)
+        }
+        val text = c.inputStream.use { it.readBytes().toString(Charsets.UTF_8) }
+        return DtoMapper.parseResponse(text)
     }
 }

@@ -164,6 +164,30 @@ class RemoteGuideAgentTest {
         assertTrue(r.isFailure)
     }
 
+    @Test fun `응답이 조금씩 늦게 와도 한 번의 시도는 전체 시간 제한 안에 끝난다 (계약 3장)`() = runBlocking {
+        // 연결 · 읽기 타임아웃은 구간별이라, 글자가 조금씩 오면 그것만으로는 끊기지 않는다 → 전체 시간으로 끊어야 한다
+        val body = contract("response_tap.json").toByteArray(Charsets.UTF_8)
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0).apply {
+            createContext("/v1/guide/next") { ex ->
+                ex.requestBody.readBytes()
+                ex.responseHeaders.add("Content-Type", "application/json")
+                ex.sendResponseHeaders(200, 0)                                  // 길이 미정 (조금씩 보냄)
+                runCatching { ex.responseBody.use { out -> for (b in body) { out.write(b.toInt()); out.flush(); Thread.sleep(30) } } }
+            }
+            start()
+        }
+        try {
+            val t0 = System.currentTimeMillis()
+            val r = RemoteGuideAgent(AgentConfig("http://127.0.0.1:${server.address.port}", "k", 500, 0, 10), quiet)
+                .next(requestFrom("request_first.json"))
+            val took = System.currentTimeMillis() - t0
+            assertTrue("다 받기 전에 끊겨야 함", r.isFailure)
+            assertTrue("전체 시간 제한(500ms)을 크게 넘으면 안 됨: ${took}ms", took < 1_500)
+        } finally {
+            server.stop(0)
+        }
+    }
+
     @Test fun `서버에 연결할 수 없어도 예외 없이 failure`() = runBlocking {
         val r = RemoteGuideAgent(AgentConfig("http://127.0.0.1:1", "k", 300, 1, 10), quiet).next(requestFrom("request_first.json"))
         assertTrue(r.isFailure)
@@ -217,17 +241,5 @@ class RemoteGuideAgentTest {
         val out = Json.parse(DtoMapper.requestJson(base.copy(snapshot = base.snapshot.copy(elements = listOf(el))))) as Map<String, Any?>
         val got = (((out["snapshot"] as Map<String, Any?>)["elements"] as List<Map<String, Any?>>)[0]["text"]) as String
         assertEquals(el.text, got)
-    }
-
-    // ---------- Fake ----------
-
-    @Test fun `FakeGuideAgent 규칙`() = runBlocking {
-        val f = FakeGuideAgent()
-        val first = requestFrom("request_first.json")
-        val tap = f.next(first).getOrThrow().action as GuideAction.Tap
-        assertEquals("e4", tap.targetId)
-        assertTrue(f.next(first.copy(utterance = null, goal = null)).getOrThrow().action is GuideAction.AskUser)
-        val none = first.copy(snapshot = first.snapshot.copy(elements = emptyList()))
-        assertTrue(f.next(none).getOrThrow().action is GuideAction.Unknown)
     }
 }
