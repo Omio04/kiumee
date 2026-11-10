@@ -14,7 +14,8 @@ import kr.kiosklens.overlay.transform.FillCenterMapper
  * 카메라가 지금 무엇을 인식했는지 미리보기 위에 그려 보이는 **확인용** View (`:app`이 디버그 빌드에서만 붙인다).
  *
  * - 인식한 글자 덩어리마다 얇은 테두리 + 글자. 버튼으로 본 것(BUTTON_LIKE)은 하늘색, 그 밖의 글자는 흰색
- * - 새 인식이 [STALE_MS]보다 오래 없으면 지운다 (카메라를 다른 데로 돌렸을 때 옛 결과가 남지 않게)
+ * - 카메라를 다른 데로 돌리면 `:app`이 [clear]로 바로 지운다 (인식 상태가 '인식됨'이 아니게 될 때).
+ *   그래도 새 인식이 [STALE_MS]보다 오래 없으면 스스로 지운다 (안전장치)
  * - 좌표 변환은 [ViewOverlay]와 같은 [FillCenterMapper] → 노란 하이라이트와 같은 자리에 그려진다
  * - [show] · [setAnalysisSize]는 어느 스레드에서 불러도 된다
  */
@@ -37,6 +38,9 @@ class RecognitionView(context: Context) : View(context) {
     /** 새 인식 결과. */
     fun show(s: ScreenSnapshot) { snapshot = s; shownAt = SystemClock.uptimeMillis(); postInvalidate() }
 
+    /** 지금 그린 것을 지운다 (카메라가 다른 데를 비출 때). */
+    fun clear() { snapshot = null; postInvalidate() }
+
     override fun onDraw(canvas: Canvas) {
         val s = snapshot ?: return
         val m = mapper ?: return
@@ -55,5 +59,8 @@ class RecognitionView(context: Context) : View(context) {
 
     private fun stroke(c: Int) = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 2f * density; color = c }
 
-    companion object { const val STALE_MS = 1_500L }
+    companion object {
+        /** `:vision`은 화면이 그대로면 2초에 한 번만 다시 읽는다(FrameSampler) → 그보다 넉넉하게. 짧으면 가만히 비출수록 깜빡인다 */
+        const val STALE_MS = 3_500L
+    }
 }

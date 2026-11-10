@@ -107,7 +107,11 @@ class MainActivity : AppCompatActivity() {
         if (BuildConfig.SERVER_URL.isBlank()) { note.text = getString(R.string.need_server); note.visibility = View.VISIBLE }
         if (BuildConfig.DEBUG) {
             ui.launch { g.snapshots.collect { s -> lastSnapshot = s; recognition?.show(s); renderDebug() } }
-            ui.launch { g.scanStatus.collect { st -> lastScan = st; renderDebug() } }
+            ui.launch { g.scanStatus.collect { st ->
+                lastScan = st
+                if (st != ScanStatus.READY) recognition?.clear()                    // 카메라를 돌리면 옛 테두리를 바로 지운다
+                renderDebug()
+            } }
         }
         g.runner.start()
         ui.launch { g.runner.state.collect { s ->
