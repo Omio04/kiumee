@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Sequence
+from typing import List, Optional, Sequence
 
 from .jamo import dice, normalize
 from .models import ElementKind, ScreenElement
@@ -17,7 +17,7 @@ OPTION_WORDS = ("hot", "ice", "핫", "아이스", "따뜻", "차가", "시원", 
 NAV_BOOST = 0.12
 OPTION_BOOST = 0.08
 
-# 발화 속 말을 화면 글자로 바꿔 주는 작은 사전 (예: "따뜻한" → HOT)
+# 발화 속 말을 화면 글자로 바꿔 주는 작은 사전 (예: "따뜻한" → HOT). 질문 안에 들어 있기만 하면 붙인다.
 SYNONYMS = {
     "따뜻": "hot", "뜨거": "hot", "뜨겁": "hot", "핫": "hot",
     "아이스": "ice", "차가": "ice", "차갑": "ice", "시원": "ice", "냉": "ice",
@@ -26,17 +26,36 @@ SYNONYMS = {
     "계산": "결제", "돈낼": "결제", "카톡": "카카오", "카카오톡": "카카오",
     "하나 더": "추가", "더요": "추가", "더 넣": "추가", "더 주": "추가",
     "신용": "카드", "체크": "카드",
-    "네": "확인", "맞아": "확인", "좋아": "확인", "그래": "확인", "다 됐": "결제", "끝": "결제", "다음": "다음",
-    "아니": "취소", "그만": "취소", "뒤로": "이전", "처음": "처음", "현금": "현금", "쿠폰": "쿠폰", "영수증": "영수증",
+    "다음": "다음", "뒤로": "이전", "처음": "처음", "현금": "현금", "쿠폰": "쿠폰", "영수증": "영수증",
     "큰거": "큰", "큰 거": "큰", "작은거": "작은", "작은 거": "작은", "보통": "보통",
 }
+
+# 짧은 대답 → 버튼 글자. "네" · "좋아" · "끝" · "아니" 같은 말은 다른 말 속에도 흔해서
+# ("아메리카노 네 잔", "제가 좋아하는 라떼", "끝까지 시원한 걸로 하나 더", "아니 아이스로 주세요")
+# 위 사전처럼 "들어 있으면 붙이기"를 하면 결제 · 취소 같은 엉뚱한 버튼을 고른다.
+# 그래서 이번 요청에 새로 들어온 발화(utterance) 전체가 대답일 때만 붙인다 (화면만 바뀐 요청에는 붙이지 않음).
+ANSWERS = {
+    "확인": ("네", "네네", "예", "응", "맞아", "맞아요", "좋아", "좋아요", "그래", "그래요", "네 맞아요", "네 좋아요", "네 그래요"),
+    "결제": ("다 됐어", "다 됐어요", "다 됐습니다", "끝", "끝이에요", "끝났어요"),
+    "취소": ("아니", "아니요", "아니에요", "아뇨", "그만", "그만할래요"),
+}
+_ANSWER_OF = {normalize(w): button for button, words in ANSWERS.items() for w in words}
 
 _NAV = tuple(normalize(w) for w in NAV_WORDS)
 _OPT = tuple(normalize(w) for w in OPTION_WORDS)
 
 
-def expand_query(query: str) -> str:
+def answer_button(utterance: Optional[str]) -> Optional[str]:
+    """발화 전체가 짧은 대답("네", "다 됐어요", "아니요" …)이면 그 대답이 가리키는 버튼 글자, 아니면 None."""
+    return _ANSWER_OF.get(normalize(utterance)) if utterance else None
+
+
+def expand_query(query: str, utterance: Optional[str] = None) -> str:
+    """질문(목표)에 화면 글자 쪽 말을 덧붙인다. utterance = 이번 요청에 새로 들어온 말 (짧은 대답 판단에만 씀)."""
     extra = [v for k, v in SYNONYMS.items() if k in query]
+    answer = answer_button(utterance)
+    if answer:
+        extra.append(answer)
     return (query + " " + " ".join(extra)).strip() if extra else query
 
 
@@ -74,8 +93,8 @@ class JamoNgramRanker:
     def __init__(self, k: int = 8):
         self.k = k
 
-    def rank(self, elements: Sequence[ScreenElement], query: str) -> List[Scored]:
-        q = expand_query(query)
+    def rank(self, elements: Sequence[ScreenElement], query: str, utterance: Optional[str] = None) -> List[Scored]:
+        q = expand_query(query, utterance)
         scored: List[Scored] = []
         for e in elements:
             if e.kind != ElementKind.BUTTON_LIKE:

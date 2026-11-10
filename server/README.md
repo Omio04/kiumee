@@ -24,7 +24,7 @@ docker build -t kl-agent . && docker run -p 8080:8080 -e APP_KEY=... -e ANTHROPI
  "history":[{"screenId":"s01_dine","action":"TAP","targetText":"포장하기"}]}
 ```
 응답 200: `{"goal":"아메리카노 주세요","action":{"type":"TAP","targetId":"e4","guideText":"아메리카노"},"source":"fastpath"}`
-- `action.type`: TAP(`targetId`+`guideText`) · ASK_USER(`question`) · DONE(`guideText`) · UNKNOWN(`reason`) · SCROLL · WAIT(계약에만 있음, 아직 안 보냄)
+- `action.type`: TAP(`targetId`+`guideText`) · ASK_USER(`question`) · DONE(`guideText`) · UNKNOWN(`reason`) · SCROLL(`direction`+`guideText`=**찾는 대상 이름**, 문장 아님) · WAIT(`guideText`=읽을 문장)
 - 후보 밖 targetId는 절대 나가지 않음(→UNKNOWN). 문장 필드는 60자 이내 쉬운 존댓말.
 - **목표는 서버가 기억하지 않습니다.** 앱이 직전 응답의 `goal`을 다음 요청에 돌려주고, 서버는 `goal + utterance`로 새 goal을 만듭니다.
 - LLM은 예전처럼 `GUIDE|ASK_USER|DONE|UNKNOWN` + `message`로 답하고, `ActionValidator`가 위 형식으로 바꿔서 내보냅니다.
@@ -80,6 +80,10 @@ uvicorn app.main:app --port 8000
 | 응답 캐시 | `cache.py`. 같은 화면·목표·이력이면 LLM 없이 직전 답 (TTL 30초, 성공한 판단만, 메모리에만) | 앱의 1회 재시도가 첫 요청이 끝난 뒤에 오면 즉시 응답 |
 | SCROLL · WAIT | LLM이 `SCROLL`(+direction) · `WAIT`를 고를 수 있고 `ActionValidator`가 계약 형식으로 변환 | 계약 v1에 있었지만 서버가 안 보내던 두 행동 (결정 L의 "P4 판단"). 앱은 이미 처리 가능 |
 | 동의어 사전 | 확인/취소/이전/큰·작은 등 말투 보강 | 후보 축소 누락 방지 |
+
+**P1 보완 (2026-11-10, [decisions.md](../docs/decisions.md) 7장)**
+- SCROLL `guideText`는 **찾는 대상 이름**이다 (앱: "화면을 아래로 밀어서 {guideText} 찾아 주세요"). LLM의 `guideText`를 쓰고, 문장 · 20자 초과 · 개인정보로 보이면 "원하시는 메뉴". 프롬프트 · `ACTION_SCHEMA` 설명도 맞춤
+- 짧은 대답("네" · "좋아요" · "다 됐어요" · "끝" · "아니요" · "그만")은 **이번 발화 전체가 대답일 때만** 버튼 글자로 바꾼다(`ranker.ANSWERS`). "들어 있으면 붙이기"로는 "끝까지 시원한 걸로 하나 더요" → 결제하기를 골랐다 (`tests/test_answers.py`)
 | 지연 측정 | `scripts/loadtest.py` (HTTP로 p50/p95/p99, `--fail-over-ms 2000`) | 4일차 p95 2초 합격 기준 |
 | 배포 | `render.yaml` · Dockerfile `HEALTHCHECK` | 3일차 클라우드 배포 |
 

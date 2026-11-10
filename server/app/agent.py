@@ -97,7 +97,7 @@ class LlmGuideAgent:
             meta.update(source="rule", candidates=0)
             return self._finish(GuideResponse(goal=goal, action=GuideAction.done(MSG_DONE), source="rule"), meta, t0)  # 규칙은 이미 즉시라 캐시 불필요
 
-        ranked = self.ranker.rank(els, goal)
+        ranked = self.ranker.rank(els, goal, req.utterance)          # 짧은 대답("네" 등)은 이번 발화로만 판단
         meta["candidates"] = len(ranked)
         if not ranked:
             meta["source"] = "fallback"
@@ -163,7 +163,7 @@ class FakeGuideAgent:
     async def next(self, req: GuideRequest) -> GuideResult:
         req, dropped = privacy.sanitize(req)
         goal = _goal_of(req)
-        ranked = self.ranker.rank(req.snapshot.elements, goal)
+        ranked = self.ranker.rank(req.snapshot.elements, goal, req.utterance)
         if _is_done_screen(req.snapshot.elements):
             r = GuideResponse(goal=goal, action=GuideAction.done(MSG_DONE), source="fake")
         elif not ranked:

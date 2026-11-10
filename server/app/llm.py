@@ -27,8 +27,8 @@ ACTION_SCHEMA = {
     "properties": {
         "action": {"type": "string", "enum": _ACTIONS},
         "targetId": {"type": "string", "description": "GUIDE일 때 [후보]의 id"},
-        "guideText": {"type": "string", "description": "GUIDE일 때 버튼 글자"},
-        "message": {"type": "string", "description": "ASK_USER · DONE · UNKNOWN · SCROLL · WAIT일 때 쉬운 존댓말 한 문장"},
+        "guideText": {"type": "string", "description": "GUIDE일 때 버튼 글자, SCROLL일 때 찾는 메뉴 이름 (문장 아님)"},
+        "message": {"type": "string", "description": "ASK_USER · DONE · UNKNOWN · WAIT일 때 쉬운 존댓말 한 문장"},
         "direction": {"type": "string", "enum": _DIRECTIONS, "description": "SCROLL일 때만"},
     },
     "required": ["action"],
@@ -225,7 +225,7 @@ class HeuristicFakeLlmClient:
             goal = ""
         if not goal:
             return '{"action":"ASK_USER","targetId":null,"guideText":null,"message":"무엇을 드시고 싶으세요?"}'
-        q = expand_query(goal)
+        q = expand_query(goal, goal.rsplit(",", 1)[-1])     # 가짜라 이번 발화를 따로 모름 → 목표의 마지막 쉼표 뒤를 이번 발화로 봄
         best = max(cands, key=lambda c: match_score(c[1], q), default=None)
         if best is None or match_score(best[1], q) < self.UNKNOWN_BELOW:
             return '{"action":"UNKNOWN","targetId":null,"guideText":null,"message":"버튼을 찾지 못했어요. 화면을 위로 밀어 찾아보세요."}'

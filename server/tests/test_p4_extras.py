@@ -90,13 +90,27 @@ def test_cache_ttl_and_size():
 
 
 async def test_scroll_and_wait_reach_the_app_contract(snaps):
-    ag = LlmGuideAgent(ScriptedFakeLlmClient(['{"action":"SCROLL","direction":"down","message":"아래로 밀어 보세요."}']), S())
+    """SCROLL의 guideText = 찾는 대상 이름 (앱: "화면을 아래로 밀어서 {guideText} 찾아 주세요"). WAIT의 guideText = 읽을 문장."""
+    ag = LlmGuideAgent(ScriptedFakeLlmClient(['{"action":"SCROLL","direction":"down","guideText":"딸기 스무디"}']), S())
     r = await ag.next(GuideRequest.model_validate(make_req(snaps, "s02_menu", "아무거나")))
     a = r.response.action
-    assert a.type.value == "SCROLL" and a.direction.value == "DOWN" and a.guideText == "아래로 밀어 보세요."
+    assert a.type.value == "SCROLL" and a.direction.value == "DOWN" and a.guideText == "딸기 스무디"
     ag = LlmGuideAgent(ScriptedFakeLlmClient(['{"action":"WAIT"}']), S())
     r = await ag.next(GuideRequest.model_validate(make_req(snaps, "s02_menu", "아무거나")))
     assert r.response.action.type.value == "WAIT" and r.response.action.guideText
+
+
+@pytest.mark.parametrize("llm_out", [
+    '{"action":"SCROLL","direction":"down","message":"아래로 밀어 보세요."}',           # 문장은 message에만 → 이름 없음
+    '{"action":"SCROLL","direction":"down","guideText":"아래로 밀어서 찾아보세요."}',    # 이름 자리에 문장
+    '{"action":"SCROLL","direction":"down","guideText":"화면을 밀어 주세요"}',
+    '{"action":"SCROLL","direction":"down","guideText":"1234 5678 9012 3456"}',          # 개인정보처럼 보임
+])
+async def test_scroll_never_puts_a_sentence_in_guide_text(snaps, llm_out):
+    """문장이 들어가면 앱이 "화면을 아래로 밀어서 아래로 밀어 보세요. 찾아 주세요"처럼 읽게 된다 → 기본 이름으로."""
+    ag = LlmGuideAgent(ScriptedFakeLlmClient([llm_out]), S())
+    r = await ag.next(GuideRequest.model_validate(make_req(snaps, "s02_menu", "아무거나")))
+    assert r.response.action.type.value == "SCROLL" and r.response.action.guideText == "원하시는 메뉴"
 
 
 async def test_scroll_with_bad_direction_defaults_to_down(snaps):
