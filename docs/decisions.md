@@ -117,6 +117,31 @@ P2 브랜치(`origin/P2`)와 main에 올라온 `kiumee-impl.patch` · `.zip`(작
 에뮬레이터 실행 확인 (P1, 2026-11-10, Android 17 · 소리 · 마이크 끔): 설치 · 실행(크래시 0) · 카메라 미리보기 · ML Kit OCR(약 3회/초, 글자 없으면 발행 안 함) · 화면 구성 · "말하기" → LISTENING → 인식 실패 → 1회 재시도 → ERROR → IDLE · 에뮬레이터 → 서버 연결 확인.
 확인 못 함: 카메라로 실제 글자 인식(에뮬레이터 가상 장면이 포스터를 그리지 않음) · STT 성공 → 서버 요청 → 하이라이트 → 음성 안내 · 실제 LLM. **실기기에서 확인 필요.**
 
+## 7. P4 · P5 통합 (P1, 2026-11-10 저녁)
+
+P5 PR #6(`feat/p5-overlay-poc`)과 P4 브랜치(`feat/p4-agent-server`)를 계약 v1 기준으로 검토해 `feat/p1-p4-p5-integration`으로 합쳤다. 두 작업 모두 포트 · 공용 모델(`:core-model`)은 건드리지 않았다.
+
+| # | 항목 | 결정 |
+|---|---|---|
+| V1 | P5 overlay | **그대로 채택**: 계약 테스트 보강 · `HighlightHolder.setTarget` `@Synchronized`(동시 호출 때 알림 순서가 뒤바뀌어 상태와 화면이 달라지는 문제) · 위치 확인 화면(`OverlayCalibrationActivity`, 디버그 빌드 전용) · 안 보임 신호(`VisibleArea` · `VisibilityTracker` · `onTargetVisibilityChanged`). 잠그는 순서가 한 방향뿐이라 막힘(데드락) 없음 |
+| V2 | 동시 호출 테스트 | P5의 "여러 스레드 동시 호출" 확인은 `@Synchronized`를 뺀 코드로 15번 돌려도 15번 통과(버그를 못 잡음) → **결정적 테스트 추가**(`HighlightHolderOrderTest`: A를 알리는 도중에 B를 넣음). 잠금을 빼면 5/5 실패, 있으면 통과 |
+| V3 | 좌표 변환 | 설계서 7.5의 `ImageProxyTransformFactory` + `CoordinateTransform` 대신 **`FillCenterMapper` + 미리보기 · 분석 모두 4:3** (JJ 구현, P5가 확인 · 문서화). 실기기 오차가 크면 그때 바꾼다 |
+| V4 | P4 서버 | **채택**: 구조화 출력(Anthropic 도구 강제 · Gemini responseSchema) · 총 처리 예산 5초 · 응답 캐시(30초, LLM 판단만) · SCROLL/WAIT 생성 · 배포 설정 · 부하 측정 스크립트 |
+| V5 | SCROLL `guideText` | P4 서버가 문장("화면을 위아래로 밀어서 찾아보세요.")을 넣어 계약과 어긋남 → 앱이 "화면을 아래로 밀어서 화면을 위아래로 밀어서 찾아보세요. 찾아 주세요"로 읽게 됨. **찾는 대상 이름**(LLM의 `guideText`)으로 고치고, 문장 · 20자 초과 · 개인정보로 보이면 "원하시는 메뉴" (contract.md 3.2) |
+| V6 | 짧은 대답 동의어 | P4가 넣은 "네→확인 · 좋아→확인 · 끝→결제 · 아니→취소 …"가 "질문 안에 들어 있으면 붙이기"라 **"끝까지 시원한 걸로 하나 더요"(장바구니) → 결제하기**를 고름. "아니 아이스로 주세요" · "아이스로 네 잔"은 빠른 길을 놓침 → **이번 발화(`utterance`) 전체가 대답일 때만** 붙임(`ranker.ANSWERS`). 화면만 바뀐 요청에는 안 붙음. "네" → 확인 · "다 됐어요" → 결제하기는 그대로 됨 (`tests/test_answers.py`) |
+| V7 | 실패 → 안내 문구 | P4의 `GuideFailure.kt`(`:agent`)는 아직 아무 데도 연결되지 않음(지금은 어떤 실패든 `networkError()` 한 문장). 연결하려면 실패 종류가 `:domain`까지 가야 해서 아래 "P1이 정할 것"으로. 연결할 때 사용자에게 읽는 문장은 `:domain`의 `GuideTextComposer`로 옮긴다 (안내 문장은 `:domain`에서만 만든다) |
+
+### P1이 정할 것
+
+| 항목 | 지금 상황 | 추천 |
+|---|---|---|
+| 채우기 / 맞추기 | 채우기(FILL) + 4:3이면 세로로 긴 폰(1080×2400)에서 분석 프레임 좌우 20%씩이 화면 밖, 아래 버튼판이 화면 아래 15~20%를 가림 (P5 계산) | 실기기에서 어르신이 비추는 모습을 보고 결정. 그 전까지 FILL 유지 |
+| 안 보임 신호 → 음성 | `ViewOverlay.onTargetVisibilityChanged`가 있지만 받는 쪽이 없음 | `:domain`에 이벤트를 더해 안내 중(GUIDING · WAIT_CHANGE)일 때만 "휴대폰을 조금 뒤로 빼 주세요" (5~10초 간격 제한). 포트 변경 없음 (P5 제안, overlay/README) |
+| 실패 종류 → 안내 문구 | 위 V7 | `:core-model`에 실패 종류를 두고(전원 승인) `:agent`가 분류, `:domain`이 문장을 만든다 |
+| 추적 1초 실패 → 반투명 | 같은 화면에서 버튼이 안 보여도 마지막 위치에 그대로 둠 (`SessionStateMachine`, S5) | `:domain`이 판단하고 오버레이는 흐리게만. `HighlightTarget`에 흐림 여부를 더하는 계약 변경 필요 |
+
+참고: `VisibilityTracker`는 "안 보임"을 알린 뒤 **다른 버튼으로 바뀌어** 보이게 되면 "다시 보임"을 알리지 않는다. 받는 쪽은 이 신호를 상태로 쓰지 말고 "안 보일 때 한 번 안내"로만 쓰거나, 연결할 때 함께 고칠 것.
+
 ## 변경 이력
 
 | 날짜 | 내용 |
@@ -126,3 +151,4 @@ P2 브랜치(`origin/P2`)와 main에 올라온 `kiumee-impl.patch` · `.zip`(작
 | 2026-11-09 | 상태머신 · 위치 문구 · 안내 문장 (PR #3, 병합) |
 | 2026-11-09 | 어댑터 구현: SessionRunner · :agent · :vision · :voice · :overlay · :app · 서버 Gemini (JJ, patch 업로드) |
 | 2026-11-10 | 2일차 통합: JJ 패치 적용 · P2 `:vision` 채택 · Fake · mock 삭제 · `:agent` 6초 수정 (`feat/p1-day2-integration`) |
+| 2026-11-10 | P4 · P5 통합: P5 overlay(PR #6) · P4 서버 채택, SCROLL `guideText` · 짧은 대답 동의어 · 결정적 순서 테스트 보완 (`feat/p1-p4-p5-integration`) |

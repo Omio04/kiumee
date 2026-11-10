@@ -22,7 +22,7 @@ class GuideTextComposer(private val phraser: PositionPhraser = PositionPhraser()
         return "${phraser.phrase(rect)} 깜빡이는 $obj 누르세요"
     }
 
-    /** SCROLL (서버는 아직 안 보냄): "화면을 아래로 밀어서 딸기스무디 찾아 주세요" */
+    /** SCROLL: "화면을 아래로 밀어서 딸기스무디 찾아 주세요". guideText는 찾는 대상 이름 (문장 아님, contract.md 3.2) */
     fun scroll(direction: ScrollDir, guideText: String): String {
         val where = when (direction) {
             ScrollDir.UP -> "위로"
