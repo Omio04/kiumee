@@ -48,6 +48,9 @@ class GuideTextComposer(private val phraser: PositionPhraser = PositionPhraser()
     /** 서버 요청 실패 (재시도까지 끝난 뒤) */
     fun networkError(): String = "연결이 잠시 불안정해요. 다시 말하기 버튼을 눌러 주세요."
 
+    /** 서버 요청이 실패해서 잠시 뒤 다시 물을 때 (세션은 이어간다) */
+    fun retrying(): String = "답이 조금 늦어지고 있어요. 잠시만 기다려 주세요."
+
     /** TAP의 targetId가 화면에 없을 때 (계약 위반 방어용, 정상이면 안 쓰임) */
     fun notFound(): String = "버튼을 찾지 못했어요. 화면이 잘 보이게 비춰 주세요."
 }

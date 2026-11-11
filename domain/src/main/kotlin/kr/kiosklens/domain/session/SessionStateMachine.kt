@@ -54,11 +54,32 @@ class SessionStateMachine(
 
     // ---------------- 버튼 ----------------
 
-    private fun onStart(state: SessionState, sessionId: String): Transition {
-        if (state.phase != Phase.IDLE) return stay(state)          // 진행 중 "말하기"는 2일차에 정함
+    /**
+     * "말하기" 버튼.
+     * - 대기 · 마무리 안내(DONE) · 오류 안내 중: 새 세션을 시작한다.
+     * - 안내가 진행 중(묻는 중 · 화면 찾는 중 · 안내 · 기다림 · 되물음 · 화면 놓침): 같은 세션에 말을 보탠다.
+     *   "따뜻한 걸로요", "라떼도 하나 주세요"처럼 중간에 바꾸거나 더할 말이 있다 (2026-11-11 시험: 처음 한 번만 말할 수 있었다).
+     *   읽던 안내를 끊고 듣는다. 목표 · 이력은 그대로 두고, 들은 말은 다음 요청의 utterance가 되어 서버가 목표에 붙인다.
+     * - 이미 듣는 중이면 무시한다.
+     */
+    private fun onStart(state: SessionState, sessionId: String): Transition = when (state.phase) {
+        Phase.IDLE, Phase.DONE, Phase.ERROR -> newSession(state, sessionId)
+        Phase.LISTENING -> stay(state)
+        else -> listenMore(state)
+    }
+
+    private fun newSession(state: SessionState, sessionId: String): Transition {
         val t = state.ticket + 1
         val next = SessionState(phase = Phase.LISTENING, ticket = t, sessionId = sessionId, snapshot = state.snapshot)
         return Transition(next, listOf(StopSpeaking, ClearHighlight, StartListening(t), StartTimer(timeouts.listenSilenceMs, t)))
+    }
+
+    private fun listenMore(state: SessionState): Transition {
+        val t = state.ticket + 1
+        return Transition(
+            state.copy(phase = Phase.LISTENING, ticket = t, guide = null, listeningToAdd = true),
+            listOf(StopSpeaking, CancelPending, ClearHighlight, StartListening(t), StartTimer(timeouts.listenSilenceMs, t)),
+        )
     }
 
     private fun stop(state: SessionState): Transition {
@@ -120,19 +141,31 @@ class SessionStateMachine(
     private fun onSpeech(state: SessionState, text: String): Transition {
         if (state.phase != Phase.LISTENING) return stay(state)
         val utterance = text.trim()
-        if (utterance.isEmpty()) return toIdleSaying(state, texts.silence())
-        return requestOrScan(state.copy(pendingUtterance = utterance), listOf(CancelPending))
+        if (utterance.isEmpty()) return heardNothing(state)
+        // 서버가 아직 답하지 않은 말이 있으면(묻는 사이 또 말함) 이어 붙인다 — 앞의 말을 잃지 않게
+        val said = listOfNotNull(state.pendingUtterance, utterance).joinToString(", ").takeLast(GuideRequest.MAX_UTTERANCE_LENGTH)
+        return requestOrScan(state.copy(pendingUtterance = said, listeningToAdd = false), listOf(CancelPending))
     }
 
     private fun onSpeechFailed(state: SessionState, error: SttError): Transition {
         if (state.phase != Phase.LISTENING) return stay(state)
+        if (state.listeningToAdd) return resume(state)                     // 보태려던 말만 실패: 하던 안내는 계속
         return if (error == SttError.NO_SPEECH) toIdleSaying(state, texts.silence()) else toError(state, texts.speechError(error))
     }
+
+    /** 아무 말도 못 들었다. 안내 중에 보태려던 거였으면 하던 안내로 돌아가고, 처음 말하기였으면 세션을 끝낸다. */
+    private fun heardNothing(state: SessionState): Transition =
+        if (state.listeningToAdd) resume(state) else toIdleSaying(state, texts.silence())
+
+    /** 하던 안내로 돌아간다: 최신 화면으로 서버에 다시 묻는다 (목표 · 이력은 그대로라 같은 단계가 다시 나온다). */
+    private fun resume(state: SessionState): Transition =
+        requestOrScan(state.copy(listeningToAdd = false), listOf(StopListening, CancelPending))
 
     private fun onSpeechFinished(state: SessionState): Transition {
         val t = state.ticket + 1
         return when (state.phase) {
-            Phase.GUIDING -> Transition(state.copy(phase = Phase.WAIT_CHANGE, ticket = t), listOf(StartTimer(timeouts.waitChangeRepeatMs, t)))
+            Phase.GUIDING -> Transition(state.copy(phase = Phase.WAIT_CHANGE, ticket = t),
+                listOf(StartTimer(state.guide?.waitMs ?: timeouts.waitChangeRepeatMs, t)))
             Phase.ASKING -> Transition(state.copy(phase = Phase.LISTENING, ticket = t),        // 다 읽은 뒤에야 듣기 시작 (에코 방지)
                 listOf(StartListening(t), StartTimer(timeouts.listenSilenceMs, t)))
             Phase.LOST -> Transition(state.copy(phase = Phase.SCANNING, ticket = t), listOf(StartTimer(timeouts.scanningMs, t)))
@@ -150,6 +183,7 @@ class SessionStateMachine(
         val base = state.copy(
             goal = response.goal,
             pendingUtterance = null,
+            guideFailures = 0,
             history = (state.history + HistoryItem.of(asked.screenId, action)).takeLast(GuideRequest.MAX_HISTORY),
         )
         return when (action) {
@@ -175,23 +209,53 @@ class SessionStateMachine(
         }
     }
 
-    private fun onGuideFailed(state: SessionState): Transition =
-        if (state.phase == Phase.PLANNING) toError(state, texts.networkError()) else stay(state)
+    /**
+     * 서버 요청 실패 (앱의 재시도까지 끝난 뒤). 무료 LLM은 가끔 늦거나 혼잡해서 한 번 실패로 세션을 끝내면
+     * 처음부터 다시 말해야 한다 (2026-11-12). "잠시만요"를 읽고 잠깐 뒤 같은 내용(들은 말 · 목표 · 이력)으로 다시 묻는다.
+     * 연달아 [TimeoutPolicy.maxGuideFailures]번 실패하면 그때 오류 안내 뒤 끝낸다.
+     */
+    private fun onGuideFailed(state: SessionState): Transition {
+        if (state.phase != Phase.PLANNING) return stay(state)
+        val failures = state.guideFailures + 1
+        val asked = state.requestedSnapshot
+        if (failures >= timeouts.maxGuideFailures || asked == null) return toError(state, texts.networkError())
+        val t = state.ticket + 1
+        val g = Guidance(asked.screenId, spokenText = texts.retrying(), retryOnTimeout = true, waitMs = timeouts.retryAfterFailureMs)
+        return Transition(
+            state.copy(phase = Phase.GUIDING, ticket = t, guide = g, guideFailures = failures),
+            listOf(Speak(g.spokenText, t)),                                   // 하이라이트는 그대로 둔다 (하던 안내가 있으면 계속 보이게)
+        )
+    }
 
     // ---------------- 시간 초과 ----------------
 
     private fun onTimeout(state: SessionState): Transition {
         val t = state.ticket + 1
         return when (state.phase) {
-            Phase.LISTENING -> toIdleSaying(state, texts.silence())                             // 무음 8초
+            Phase.LISTENING -> heardNothing(state)                                              // 무음 8초
             Phase.SCANNING -> Transition(state.copy(phase = Phase.LOST, ticket = t), listOf(Speak(texts.lost(), t)))   // 10초
             Phase.WAIT_CHANGE -> {                                                               // 15초
                 val g = state.guide ?: return stay(state)
-                if (g.retryOnTimeout) requestOrScan(state.copy(guide = null), listOf(ClearHighlight))   // UNKNOWN 뒤: 최신 화면으로 다시 묻기
+                if (g.retryOnTimeout || missedChange(state, g)) requestOrScan(state.copy(guide = null), listOf(ClearHighlight))   // 최신 화면으로 다시 묻기
                 else Transition(state.copy(phase = Phase.GUIDING, ticket = t), listOf(Speak(g.spokenText, t)))   // 다시 읽기
             }
             else -> stay(state)
         }
+    }
+
+    /**
+     * 화면 번호는 그대로인데 안내한 버튼이 안 보이고 처음 보는 글자가 [MISSED_CHANGE_NEW_TEXTS]개 이상 보이면
+     * 화면 전환을 놓친 것으로 본다 (메뉴 위에 옵션 창이 떠서 뒤 글자가 그대로 읽히는 경우 등).
+     * 2026-11-11 시험: 아메리카노를 눌렀는데도 4분 동안 15초마다 같은 안내만 되풀이했다.
+     * 손가락이 버튼을 가린 것뿐이면 처음 보는 글자가 없어서 다시 묻지 않는다.
+     */
+    private fun missedChange(state: SessionState, g: Guidance): Boolean {
+        val id = g.targetId ?: return false
+        val now = state.snapshot?.takeIf { it.screenId == g.screenId } ?: return false
+        val asked = state.requestedSnapshot ?: return false
+        if (now.findElement(id) != null) return false
+        val seen = asked.elements.mapTo(HashSet()) { it.text }
+        return now.elements.count { it.text !in seen } >= MISSED_CHANGE_NEW_TEXTS
     }
 
     // ---------------- 공통 도우미 ----------------
@@ -241,4 +305,9 @@ class SessionStateMachine(
     }
 
     private fun stay(state: SessionState) = Transition(state)
+
+    private companion object {
+        /** 화면 전환을 놓쳤다고 볼 "처음 보는 글자" 수 (옵션 창: 제목 · 옵션 · 취소 · 담기 …) */
+        const val MISSED_CHANGE_NEW_TEXTS = 3
+    }
 }

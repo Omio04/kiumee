@@ -24,7 +24,9 @@ class UiTextsTest {
 
     @Test fun `말하기는 대기 중에만 그만하기는 진행 중에만`() {
         assertTrue(UiTexts.canStart(Phase.IDLE)); assertFalse(UiTexts.canStop(Phase.IDLE))
-        for (p in Phase.values().filter { it != Phase.IDLE }) { assertFalse(UiTexts.canStart(p)); assertTrue(UiTexts.canStop(p)) }
+        for (p in Phase.values().filter { it != Phase.IDLE }) assertTrue(UiTexts.canStop(p))
+        // 안내 중에도 "말하기"로 말을 보탤 수 있다. 듣는 중에만 막는다 (2026-11-11 시험 요청)
+        for (p in Phase.values()) assertEquals("$p", p != Phase.LISTENING, UiTexts.canStart(p))
     }
 
     @Test fun `문구에 비난이나 전문용어가 없다`() {

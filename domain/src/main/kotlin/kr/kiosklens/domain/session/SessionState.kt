@@ -60,6 +60,10 @@ data class SessionState(
     val requestedSnapshot: ScreenSnapshot? = null,
     /** 지금 안내 중인 내용 (GUIDING · WAIT_CHANGE) */
     val guide: Guidance? = null,
+    /** 안내 중에 "말하기"를 다시 눌러 듣는 중. 못 들으면 세션을 끝내지 않고 하던 안내로 돌아간다 */
+    val listeningToAdd: Boolean = false,
+    /** 서버 요청이 연달아 실패한 횟수. 답을 받으면 0 */
+    val guideFailures: Int = 0,
 )
 
 /** 지금 안내 중인 내용. 화면 전환 판단 · 하이라이트 따라가기 · 다시 읽기에 쓴다. */
@@ -74,4 +78,6 @@ data class Guidance(
     val spokenText: String,
     /** true면 15초 뒤 다시 읽는 대신 서버에 다시 묻는다 (UNKNOWN 응답 뒤) */
     val retryOnTimeout: Boolean = false,
+    /** 다 읽은 뒤 기다릴 시간. null이면 15초 (서버 실패 뒤에는 짧게) */
+    val waitMs: Long? = null,
 )

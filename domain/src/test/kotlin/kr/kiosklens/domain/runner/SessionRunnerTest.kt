@@ -121,19 +121,19 @@ class SessionRunnerTest {
         assertEquals(1, second.history.size)
     }
 
-    @Test fun `서버 실패는 오류 안내로 끝난다`() {
+    @Test fun `서버 실패는 잠시만요 뒤 다시 묻고, 계속 실패하면 오류 안내로 끝난다`() {
         brain.answer = { Result.failure(RuntimeException("x")) }
-        val r = runner(); r.start()
+        val r = runner(TimeoutPolicy(retryAfterFailureMs = 20)); r.start()
         src.snaps.tryEmit(Screens.menu)
         waitUntil { r.state.value.snapshot != null }
         r.pressStart()
-        waitUntil { r.state.value.phase == Phase.IDLE && mouth.said.isNotEmpty() }
-        assertTrue(mouth.said.first().contains("연결"))
+        waitUntil { r.state.value.phase == Phase.IDLE && mouth.said.any { it.contains("연결") } }
+        assertTrue(mouth.said.first().contains("잠시만"))                       // 한 번 실패로 바로 끝내지 않는다
     }
 
     @Test fun `에이전트가 예외를 던져도 앱이 죽지 않는다`() {
         brain.answer = { throw IllegalStateException("계약 위반") }
-        val r = runner(); r.start()
+        val r = runner(TimeoutPolicy(retryAfterFailureMs = 20)); r.start()
         src.snaps.tryEmit(Screens.menu)
         waitUntil { r.state.value.snapshot != null }
         r.pressStart()
