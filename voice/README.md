@@ -83,7 +83,7 @@ cd server && pip install -r requirements-dev.txt && KL_SKIP_APP_INIT=1 pytest -q
 
 2026-11-10 P1이 에뮬레이터(Android 17 · API 37 Google Play 이미지, 소리 · 마이크 끔)에서 앱을 실행해 찾았다. [decisions.md](../docs/decisions.md) 6장 U7.
 
-**수정안 작성, 검증 대기 (2026-11-11, `feat/p3-stt-fallback`)** — 결정 #3 제안 (팀 확인 대기): 온디바이스 우선, 없으면 일반 인식기. `:voice` JVM 테스트와 아래 기기 확인 4번은 아직 하지 않았다
+**수정안 작성, 검증 대기 (2026-11-11, `feat/p3-stt-fallback`)** — 결정 #3 확정 (2026-11-11, 팀 동의): 온디바이스 우선, 없으면 일반 인식기. `:voice` JVM 테스트와 아래 기기 확인 4번은 아직 하지 않았다
 - 온디바이스 인식기가 12 · 13을 내면 `SttMapping.next()`가 `FALL_BACK_TO_STANDARD`를 골라, **1회 자동 재시도를 쓰지 않고** 일반 인식기(`createSpeechRecognizer` + `EXTRA_PREFER_OFFLINE`)로 다시 듣는다. 듣기 전에 바로 나는 오류라 어르신의 말을 잃지 않는다
 - 한 번 12 · 13을 겪으면 같은 `AndroidSpeechInput` 인스턴스는 이후 처음부터 일반 인식기를 쓴다
 - 로그: `ko-KR on-device model missing (error=13), falling back to standard recognizer` · 인식 서비스 자체가 없으면 `recognition service unavailable`
@@ -104,7 +104,7 @@ cd server && pip install -r requirements-dev.txt && KL_SKIP_APP_INIT=1 pytest -q
 **영향**: 한국어 음성 팩을 받지 않은 실기기에서는 음성 인식이 전혀 안 된다 → 시연 위험
 
 **고칠 방향 (P3가 결정 #3 "온디바이스 ko-KR만"과 함께 정할 것)**
-1. 12 · 13이면 일반 인식기(`SpeechRecognizer.createSpeechRecognizer`)로 한 번 더 시도 — 시연 안정성에 가장 효과적. 대신 네트워크를 쓸 수 있다 (결정 #3 수정 필요) → **제안 (팀 확인 대기)**, 수정안에 반영
+1. 12 · 13이면 일반 인식기(`SpeechRecognizer.createSpeechRecognizer`)로 한 번 더 시도 — 시연 안정성에 가장 효과적. 대신 네트워크를 쓸 수 있다 (결정 #3 수정 필요) → **확정 (2026-11-11, 팀 동의)**, 수정안에 반영
 2. API 33+에서 `checkRecognitionSupport` · `triggerModelDownload`로 한국어 팩을 미리 받게 안내 → 여유가 있으면 1번 위에 추가
 3. 안내 문구: 지금 `SttError` 4종으로는 "모델 없음"을 구분할 수 없다. 새 값을 넣으려면 `:core-model` 변경이라 **전원 승인 PR**이 필요하다 (아니면 `:voice` 안에서 1번으로 해결) → 후속 제안
 
