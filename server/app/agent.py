@@ -15,6 +15,7 @@
 """
 from __future__ import annotations
 
+import asyncio
 import time
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Protocol
@@ -22,12 +23,12 @@ from typing import Dict, List, Optional, Protocol
 from . import privacy
 from .cache import ResponseCache, request_key
 from .jamo import normalize
-from .llm import LlmClient
+from .llm import LlmClient, LlmRateLimited, LlmTimeout, LlmUpstream
 from .models import (MAX_GOAL, ActionType, ElementKind, GuideAction, GuideRequest, GuideResponse, LlmKind,
                      ScreenElement)
 from .parser import ActionParser, ParseError
 from .prompt import RETRY_NOTE, SYSTEM, build_user
-from .ranker import JamoNgramRanker, same_item
+from .ranker import JamoNgramRanker, answer_button, is_flow_button, same_item
 from .settings import Settings
 from .validator import MSG_ASK, MSG_DONE, MSG_UNKNOWN, ActionValidator
 
@@ -70,6 +71,27 @@ def _pressed_text(req: GuideRequest) -> Optional[str]:
     if last and last.action == ActionType.TAP and last.targetText and last.screenId != req.snapshot.screenId:
         return last.targetText
     return None
+
+
+def _chosen_items(req: GuideRequest) -> List[str]:
+    """이번 세션에서 이미 고른 메뉴: '누르기' 안내 뒤 화면이 바뀐(= 눌렀음) 버튼 중 진행 · 옵션 버튼을 뺀 것.
+
+    직전 버튼만 보면, 주문담기를 누르고 메뉴 화면으로 돌아왔을 때 빠른 길이 아메리카노를 또 고른다.
+    '다음' · '확인' · '담기'는 화면마다 또 눌러야 할 수 있어서 넣지 않는다 (2026-11-11 시험)."""
+    out: List[str] = []
+    for h in req.history:
+        t = h.targetText
+        if (h.action == ActionType.TAP and t and h.screenId != req.snapshot.screenId and not is_flow_button(t)
+                and not any(same_item(t, o) for o in out)):
+            out.append(t)
+    return out
+
+
+def _retryable(e: Optional[BaseException]) -> bool:
+    """겹쳐 보내도 되는 실패인가: 시간 초과 · 혼잡 · 네트워크. 인증 오류와 사용량 제한(429)은 다시 보내 봐야 소용없다."""
+    if isinstance(e, LlmRateLimited):
+        return False
+    return isinstance(e, LlmTimeout) or (isinstance(e, LlmUpstream) and e.kind != "auth")
 
 
 def _is_done_screen(elements: List[ScreenElement]) -> bool:
@@ -116,12 +138,16 @@ class LlmGuideAgent:
             return self._finish(GuideResponse(goal=goal, action=GuideAction.unknown(MSG_UNKNOWN), source="fallback"),
                                 meta, t0)
 
-        # 4) 빠른 길 — 방금 누른 버튼과 같은 글자면 쓰지 않는다 (화면이 바뀌었으니 다음 단계는 LLM이 이력으로 판단)
+        # 4) 빠른 길 — 쓰지 않는 경우:
+        #    · 이미 고른 메뉴 (화면이 바뀌었으니 다음 단계는 LLM이 이력으로 판단)
+        #    · 짧은 대답("네" · "아니요" …): 무엇에 대한 대답인지는 직전 질문을 봐야 안다.
+        #      "샷 추가하실래요?" → "아니요"를 '취소' 버튼으로 누르면 주문이 취소된다 (2026-11-12)
         pressed = _pressed_text(req)
-        if self.s.fastpath and goal:
+        chosen = _chosen_items(req)
+        if self.s.fastpath and goal and answer_button(req.utterance) is None:
             top = ranked[0]
             second = ranked[1].match if len(ranked) > 1 else 0.0
-            repeat = pressed is not None and same_item(top.element.text, pressed)
+            repeat = any(same_item(top.element.text, c) for c in chosen)
             if not repeat and top.match >= self.s.fast_min_score and top.match - second >= self.s.fast_margin:
                 meta["source"] = "fastpath"
                 return self._finish(GuideResponse(goal=goal, action=GuideAction.tap(top.element.id, top.element.text),
@@ -131,7 +157,7 @@ class LlmGuideAgent:
         candidates = [r.element for r in ranked]
         by_id = {c.id: c for c in candidates}
         context = [e.text for e in els if e.kind == ElementKind.TEXT][:6]
-        user = build_user(goal, req.history, candidates, context, pressed=pressed)
+        user = build_user(goal, req.history, candidates, context, pressed=pressed, chosen=chosen)
 
         action = None
         deadline = t0 + self.s.total_budget_s
@@ -140,7 +166,7 @@ class LlmGuideAgent:
             if attempt > 0 and remaining < self.s.min_retry_s:
                 break                                  # 앱 타임아웃(6초) 안에 답하려면 재요청을 포기하고 UNKNOWN으로
             timeout = max(0.5, min(self.s.llm_timeout_s, remaining))
-            raw = await self.llm.complete(SYSTEM, user if attempt == 0 else user + RETRY_NOTE, timeout)
+            raw = await self._complete(user if attempt == 0 else user + RETRY_NOTE, timeout, list(by_id), meta)
             meta["llm_calls"] = int(meta["llm_calls"]) + 1
             try:
                 action = self.parser.parse(raw)
@@ -160,6 +186,37 @@ class LlmGuideAgent:
         if resp.source == "llm":
             self.cache.put(key, resp)
         return self._finish(resp, meta, t0)
+
+    async def _complete(self, user: str, timeout: float, ids: List[str], meta: Dict[str, object]) -> str:
+        """LLM 한 번 부르기 (버튼 번호는 후보 안에서만 고르게 형식 강제).
+
+        겹쳐 보내기: hedge_after_s 안에 답이 없거나 그 전에 일시 오류(혼잡 503 · 시간 초과 등)로 실패하면
+        같은 요청을 하나 더 보내고 먼저 온 답을 쓴다. Gemini 무료 한도는 보통 1초인데 가끔 4초를 넘겨서
+        서버 시간 초과 → 앱 오류가 잦았다 (2026-11-12 평가: LLM 판단 12건 중 5건 시간 초과).
+        사용량 제한(429) · 인증 오류는 다시 보내지 않는다."""
+        call = lambda t: asyncio.ensure_future(self.llm.complete(SYSTEM, user, t, target_ids=ids))
+        t0 = time.perf_counter()
+        tasks = [call(timeout)]
+        hedge = self.s.hedge_after_s
+        try:
+            if 0 < hedge < timeout:
+                done, _ = await asyncio.wait(tasks, timeout=hedge)
+                first_failed = bool(done) and _retryable(tasks[0].exception())
+                left = timeout - (time.perf_counter() - t0)
+                if (not done or first_failed) and left > 0.5:
+                    tasks.append(call(left))
+                    meta["hedged"] = True
+            error: Optional[BaseException] = None
+            for fut in asyncio.as_completed(tasks):
+                try:
+                    return await fut
+                except (LlmTimeout, LlmUpstream) as e:          # 하나가 실패하면 남은 쪽을 기다린다
+                    error = e
+            raise error if error else LlmTimeout("llm timeout")
+        finally:
+            for t in tasks:
+                if not t.done():
+                    t.cancel()
 
     @staticmethod
     def _finish(resp: GuideResponse, meta: Dict[str, object], t0: float) -> GuideResult:

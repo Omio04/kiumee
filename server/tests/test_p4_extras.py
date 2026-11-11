@@ -69,7 +69,7 @@ async def test_cache_not_used_when_goal_or_screen_differs(snaps):
 
 async def test_failures_are_not_cached(snaps):
     llm = ScriptedFakeLlmClient([LlmTimeout("t"), GOOD % first_button(snaps, "s02_menu")["id"]])
-    ag = LlmGuideAgent(llm, S())
+    ag = LlmGuideAgent(llm, S(hedge_after_s=0))       # 캐시만 본다 (겹쳐 보내기를 켜면 첫 요청이 두 번째 호출로 성공해 버림)
     req = GuideRequest.model_validate(make_req(snaps, "s02_menu", "아무거나"))
     with pytest.raises(LlmTimeout):
         await ag.next(req)
@@ -135,6 +135,8 @@ async def test_anthropic_forces_tool_use_and_unwraps_it():
     assert json.loads(out)["targetId"] == "e1"
     assert seen["b"]["tool_choice"] == {"type": "tool", "name": "decide"}
     assert seen["b"]["tools"][0]["input_schema"] == ACTION_SCHEMA
+    # claude-haiku-5-5는 temperature · top_p · top_k를 기본값이 아니게 보내면 400 (키를 넣자마자 모든 판단이 실패하던 원인)
+    assert not {"temperature", "top_p", "top_k"} & seen["b"].keys()
 
 
 async def test_gemini_sends_response_schema_with_upper_case_types():
@@ -148,6 +150,26 @@ async def test_gemini_sends_response_schema_with_upper_case_types():
     schema = seen["b"]["generationConfig"]["responseSchema"]
     assert schema["type"] == "OBJECT" and schema["properties"]["action"]["type"] == "STRING"
     assert "GUIDE" in schema["properties"]["action"]["enum"] and schema["required"] == ["action"]
+    # Gemini 3 계열은 temperature를 낮추면 출력이 망가진다 (0일 때 번호 칸에 문장이 섞임, 2026-11-12) → 보내지 않는다
+    assert "temperature" not in seen["b"]["generationConfig"]
+    assert "enum" not in schema["properties"]["targetId"]                     # 후보를 안 주면 묶지 않는다
+
+
+async def test_both_llm_clients_restrict_target_id_to_the_candidates():
+    seen = {}
+
+    def gem(req):
+        seen["g"] = json.loads(req.content)
+        return httpx.Response(200, json={"candidates": [{"content": {"parts": [{"text": '{"action":"DONE"}'}]}}]})
+
+    def ant(req):
+        seen["a"] = json.loads(req.content)
+        return httpx.Response(200, json={"content": [{"type": "tool_use", "name": "decide", "id": "t", "input": {"action": "DONE"}}]})
+    await GeminiLlmClient("g", "m", http=httpx.AsyncClient(transport=httpx.MockTransport(gem))).complete("s", "u", 4, target_ids=["e1", "e6"])
+    await AnthropicLlmClient("sk", "m", http=httpx.AsyncClient(transport=httpx.MockTransport(ant))).complete("s", "u", 4, target_ids=["e1", "e6"])
+    assert seen["g"]["generationConfig"]["responseSchema"]["properties"]["targetId"]["enum"] == ["e1", "e6"]
+    assert seen["a"]["tools"][0]["input_schema"]["properties"]["targetId"]["enum"] == ["e1", "e6"]
+    assert "enum" not in ACTION_SCHEMA["properties"]["targetId"]                 # 공용 스키마는 그대로
 
 
 async def test_api_returns_cached_answer_on_client_retry(snaps):

@@ -66,6 +66,16 @@ class Scored:
     rank: float         # match + 흐름 가산 — 후보 순서에 사용
 
 
+_OPT_EXACT = frozenset(_OPT)
+
+
+def is_flow_button(text: str) -> bool:
+    """진행 · 옵션 버튼인가 ("다음" · "확인" · "주문담기" · "HOT" · "샷 추가" …). 이런 버튼은 화면마다 또 눌러야 할 수 있어서
+    '이미 고른 메뉴'로 치지 않는다. 옵션 낱말은 글자 전체가 그 낱말일 때만 본다 ("아이스 아메리카노" · "핫초코"는 메뉴)."""
+    nt = normalize(text)
+    return bool(nt) and (any(w and w in nt for w in _NAV) or nt in _OPT_EXACT or nt.endswith(("추가", "선택")))
+
+
 def same_item(text: str, pressed: str) -> bool:
     """방금 누른 버튼과 같은 메뉴인가. 한쪽이 다른 쪽을 품으면 같다 ("(ICE)아메리카노" ⊃ "아메리카노":
     옵션 창 제목 · 담은 목록처럼 이름에 꾸밈말이 붙어도 같은 메뉴). 글자 유사도 0.85 이상도 같다."""

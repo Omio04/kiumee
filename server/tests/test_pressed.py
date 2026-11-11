@@ -1,9 +1,10 @@
 """방금 누른 버튼 (P1, 2026-11-11): '누르기' 안내 뒤 화면이 바뀌었으면 어르신이 이미 누른 것이다.
 새 화면에도 같은 글자(담은 목록 · 옵션 창 제목 등)가 있을 때 빠른 길이 또 고르면 "아메리카노를 누르세요"가 되풀이된다."""
-from app.agent import LlmGuideAgent, _pressed_text
+from app.agent import LlmGuideAgent, _chosen_items, _pressed_text
 from app.llm import HeuristicFakeLlmClient, ScriptedFakeLlmClient
 from app.models import GuideRequest
-from app.prompt import PRESSED_PREFIX, build_user
+from app.prompt import CHOSEN_PREFIX, PRESSED_PREFIX, build_user
+from app.ranker import is_flow_button
 from app.settings import Settings
 from .conftest import make_req
 
@@ -52,3 +53,45 @@ def test_decorated_name_of_the_pressed_item_counts_as_the_same_item():
 def test_prompt_mentions_pressed_button_only_when_given():
     assert PRESSED_PREFIX not in build_user("g", [], [], [])
     assert (PRESSED_PREFIX + "아메리카노") in build_user("g", [], [], [], pressed="아메리카노")
+    assert CHOSEN_PREFIX not in build_user("g", [], [], [])
+    assert (CHOSEN_PREFIX + "아메리카노, 카페라떼") in build_user("g", [], [], [], chosen=["아메리카노", "카페라떼"])
+
+
+# ---- 이미 고른 메뉴 (2026-11-12): 직전 버튼만 보면 주문담기 뒤 메뉴 화면에서 아메리카노를 또 고른다 ----
+
+ADDED = [{"screenId": "s1", "action": "TAP", "targetText": "아메리카노"},     # 앱의 화면 번호는 들를 때마다 새로 붙는다
+         {"screenId": "s2", "action": "TAP", "targetText": "담기"}]
+
+
+async def test_menu_chosen_two_steps_ago_is_not_fastpathed_again(snaps):
+    llm = ScriptedFakeLlmClient(['{"action":"UNKNOWN"}'])
+    r = await LlmGuideAgent(llm, Settings(app_key="k")).next(_req(snaps, ADDED))     # 담기 → 다시 메뉴 화면
+    assert r.meta["source"] != "fastpath"
+    assert CHOSEN_PREFIX + "아메리카노" in llm.calls[0]["user"]
+    assert PRESSED_PREFIX + "담기" in llm.calls[0]["user"]
+
+
+def test_progress_and_option_buttons_are_not_chosen_menus(snaps):
+    for t in ("다음", "확인", "주문담기", "담기", "결제하기", "HOT", "ice", "샷 추가", "사이즈 선택"):
+        assert is_flow_button(t), t
+    for t in ("아메리카노", "(ICE)아메리카노", "아이스 아메리카노", "핫초코", "카페라떼"):
+        assert not is_flow_button(t), t
+    hist = [{"screenId": "s1", "action": "TAP", "targetText": "다음"}, *ADDED]
+    assert _chosen_items(_req(snaps, hist)) == ["아메리카노"]                 # '다음' · '담기'는 화면마다 또 누를 수 있다
+
+
+async def test_short_answer_never_takes_the_fastpath(snaps):
+    """'샷 추가하실래요?' → '아니요'를 '취소' 버튼으로 누르면 주문이 취소된다. 질문을 아는 LLM이 판단한다."""
+    llm = ScriptedFakeLlmClient(['{"action":"UNKNOWN"}'])
+    hist = [{"screenId": "s03_options", "action": "ASK_USER", "targetText": "샷이나 시럽을 추가하실래요?"}]
+    req = GuideRequest.model_validate(make_req(snaps, "s03_options", utterance="아니요", goal="아메리카노 주세요", history=hist))
+    r = await LlmGuideAgent(llm, Settings(app_key="k")).next(req)
+    assert r.meta["source"] != "fastpath" and len(llm.calls) == 1
+    assert "샷이나 시럽을 추가하실래요?" in llm.calls[0]["user"]                # 무엇에 대한 대답인지 LLM이 본다
+
+
+async def test_llm_gets_candidate_ids_to_restrict_its_answer(snaps):
+    llm = ScriptedFakeLlmClient(['{"action":"UNKNOWN"}'])
+    await LlmGuideAgent(llm, Settings(app_key="k", fastpath=False)).next(_req(snaps, []))
+    ids = llm.calls[0]["target_ids"]
+    assert ids and all(i in llm.calls[0]["user"] for i in ids)
