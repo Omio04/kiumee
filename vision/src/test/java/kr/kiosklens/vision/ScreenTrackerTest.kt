@@ -95,6 +95,54 @@ class ScreenTrackerTest {
         assertEquals(3, tracker.update(partial)!!.snapshot.elements.size)
     }
 
+    // ---- 화면 일부만 바뀜 (2026-11-11 시험: 메뉴 위에 옵션 창이 떴는데 4분 동안 같은 안내만 되풀이) ----
+
+    private fun at(text: String, x: Float, y: Float) = OcrLine(text, NormRect(x - 0.06f, y - 0.02f, x + 0.06f, y + 0.02f), 0.95f)
+    private fun OcrLine.moved(dx: Float) = copy(rect = NormRect(rect.left + dx, rect.top, rect.right + dx, rect.bottom))
+
+    /** 3열 메뉴 격자 (가격은 화면 구분에서 빠지니 이름만) */
+    private val menuGrid = listOf(
+        at("커피", 0.15f, 0.1f), at("음료", 0.35f, 0.1f), at("디저트", 0.55f, 0.1f),
+        at("아메리카노", 0.2f, 0.3f), at("카페라떼", 0.5f, 0.3f), at("바닐라라떼", 0.8f, 0.3f),
+        at("카푸치노", 0.2f, 0.5f), at("에스프레소", 0.5f, 0.5f), at("카라멜마끼아또", 0.8f, 0.5f),
+        at("녹차라떼", 0.2f, 0.7f), at("초코라떼", 0.5f, 0.7f), at("딸기스무디", 0.8f, 0.7f),
+        at("선택한 메뉴", 0.2f, 0.9f), at("결제하기", 0.8f, 0.9f),
+    )
+
+    /** 옵션 창이 가운데 메뉴 몇 개를 가리고 뜬다. 가장자리 메뉴 글자는 그대로 읽힌다 (전체 유사도 0.58 → 예전엔 같은 화면) */
+    private val optionPopup = menuGrid.filterNot { it.text in setOf("카페라떼", "에스프레소", "초코라떼") } + listOf(
+        at("옵션을 선택해 주세요", 0.5f, 0.35f), at("(ICE)아메리카노", 0.5f, 0.42f),
+        at("샷 추가", 0.5f, 0.5f), at("취소", 0.4f, 0.65f), at("주문담기", 0.6f, 0.65f),
+    )
+
+    @Test fun popupOverTheMenuIsANewScreenAndClosingItIsAnother() {
+        val tracker = ScreenTracker()
+        tracker.update(menuGrid)
+        assertEquals("s1", tracker.update(menuGrid)!!.snapshot.screenId)
+        assertNull(tracker.update(optionPopup))                         // 한 프레임만으로는 확정하지 않는다
+        val opened = tracker.update(optionPopup)!!
+        assertTrue(opened.changed)
+        assertEquals("s2", opened.snapshot.screenId)
+        assertFalse(tracker.update(optionPopup)!!.changed)               // 창이 떠 있는 동안은 그대로
+
+        assertNull(tracker.update(menuGrid))                            // 주문담기 → 창이 닫히고 메뉴가 다시 보임
+        val closed = tracker.update(menuGrid)!!
+        assertTrue(closed.changed)
+        assertEquals("s3", closed.snapshot.screenId)
+    }
+
+    @Test fun movingTheCameraOrCoveringAButtonIsNotANewScreen() {
+        val tracker = ScreenTracker()
+        tracker.update(menuGrid); tracker.update(menuGrid)
+        // 휴대폰을 옆으로 옮김: 왼쪽 열은 화면 밖으로 나가고 오른쪽 밖의 메뉴가 들어온다
+        val panned = menuGrid.map { it.moved(-0.15f) }.filter { it.rect.centerX > 0.08f } +
+            listOf(at("스콘", 0.92f, 0.3f), at("마카롱", 0.92f, 0.5f), at("쿠키", 0.92f, 0.7f))
+        repeat(2) { assertEquals("s1", tracker.update(panned)!!.snapshot.screenId) }
+        // 손가락이 메뉴 두 개를 가림: 사라지기만 하고 새 글자는 없다
+        val covered = menuGrid.filterNot { it.text in setOf("아메리카노", "카푸치노") }
+        repeat(2) { assertEquals("s1", tracker.update(covered)!!.snapshot.screenId) }
+    }
+
     @Test fun filtersSensitiveTextAndClassifiesPrice() {
         val clean = Elements.filter(screen("카드 １２３４-５６７８-９０１２-３４５６", "!!!", "4,500원", "HOT") +
             line("흐린 글자", 0.2f, 0.1f))
