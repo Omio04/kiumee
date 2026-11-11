@@ -39,8 +39,9 @@ class ViewOverlay(context: Context) : View(context), HighlightSurface, MotionSin
     private var lastDraw = 0L
 
     /**
-     * 하이라이트가 보이는지가 바뀔 때 메인 스레드에서 불린다. false = 화면 밖이나 가려진 곳이라 안 보임, true = 다시 보임.
-     * 같은 버튼이 계속 안 보이면 다시 부르지 않는다 ([VisibilityTracker]). 하이라이트가 없을 때는 부르지 않는다.
+     * 하이라이트가 보이는지가 바뀔 때 메인 스레드에서 불린다. false = 화면 밖이나 가려진 곳이라 안 보임,
+     * true = 안 보임이 끝남 (다시 보임 · 보이는 다른 버튼으로 바뀜 · 하이라이트가 없어짐).
+     * 같은 버튼이 계속 안 보이면 다시 부르지 않는다 ([VisibilityTracker]). 마지막으로 받은 값이 지금 상태다.
      */
     var onTargetVisibilityChanged: ((visible: Boolean) -> Unit)? = null
 
