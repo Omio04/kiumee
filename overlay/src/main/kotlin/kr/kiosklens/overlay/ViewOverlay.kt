@@ -6,11 +6,13 @@ import android.os.SystemClock
 import android.view.View
 import kr.kiosklens.core.model.FrameMotion
 import kr.kiosklens.core.model.HighlightTarget
+import kr.kiosklens.core.model.NormRect
 import kr.kiosklens.core.port.HighlightSurface
 import kr.kiosklens.core.port.MotionSink
 import kr.kiosklens.overlay.style.PulseBorderPainter
 import kr.kiosklens.overlay.style.PulseCurve
 import kr.kiosklens.overlay.tracking.BoxSmoother
+import kr.kiosklens.overlay.tracking.TrackingHealth
 import kr.kiosklens.overlay.transform.CoordinateMapper
 import kr.kiosklens.overlay.transform.FillCenterMapper
 import kr.kiosklens.overlay.transform.ScreenInsets
@@ -25,6 +27,10 @@ import kr.kiosklens.overlay.transform.VisibleArea
  * - 새 위치가 오면 EMA 로 부드럽게 옮긴다([BoxSmoother]).
  * - 하이라이트가 화면 밖이나 가려진 곳(아래 버튼판 등)에 걸려 어르신 눈에 안 보이게 되면 [onTargetVisibilityChanged]로 알린다.
  *   가려진 영역은 [setObstructedInsets]로 알려 준다. 음성 안내("휴대폰을 조금 뒤로 빼 주세요")는 이 신호를 받은 쪽(:app → :domain)이 한다.
+ * - 흔들림 따라가기: [onFrameMotion](MotionSink)에 카메라 움직임을 넣으면 다음 OCR 결과가 올 때까지 테두리가 흔들림만큼 따라간다
+ *   (움직임은 tracking.CameraMotionTracker가 만든다). 믿을 만한 움직임이 1초 넘게 없으면 테두리를 흐리게 그리고
+ *   [onTrackingLost]를 한 번 부른다 (재인식 요청용). 움직임을 넣지 않으면 이 동작은 꺼진 것과 같다.
+ * - 그리기 속도: [renderStats] · [onRenderStats] (합격 기준 30fps 이상).
  */
 class ViewOverlay(context: Context) : View(context), HighlightSurface, MotionSink {
     private val painter = PulseBorderPainter(context.resources.displayMetrics.density)
@@ -35,8 +41,24 @@ class ViewOverlay(context: Context) : View(context), HighlightSurface, MotionSin
     @Volatile private var mapper: CoordinateMapper? = null
     @Volatile private var insets = ScreenInsets.NONE
     private val visibility = VisibilityTracker()                     // 메인 스레드에서만 쓴다
+    private val health = TrackingHealth()                            // lock 안에서만 쓴다
+    private val stats = RenderStats()                                // 메인 스레드에서만 쓴다
     private var shownSince = 0L
     private var lastDraw = 0L
+    private var lastStatsReport = 0L
+
+    /** 지금 테두리를 흐리게 그리는 중인지 (추적 실패). 메인 스레드에서 읽는다. */
+    var isTrackingLost = false
+        private set
+
+    /** 추적 실패(믿을 만한 움직임이 1초 넘게 없음)로 바뀐 순간 메인 스레드에서 한 번 불린다. 재인식 요청 등에 쓴다. */
+    var onTrackingLost: (() -> Unit)? = null
+
+    /** 하이라이트를 그리는 동안 약 1초마다 메인 스레드에서 불린다. 예: KL_PERF 로그. */
+    var onRenderStats: ((RenderStats.Snapshot) -> Unit)? = null
+
+    /** 최근 1초의 그리기 속도. 메인 스레드에서 읽는다. */
+    val renderStats: RenderStats.Snapshot get() = stats.snapshot()
 
     /**
      * 하이라이트가 보이는지가 바뀔 때 메인 스레드에서 불린다. false = 화면 밖이나 가려진 곳이라 안 보임,
@@ -72,22 +94,32 @@ class ViewOverlay(context: Context) : View(context), HighlightSurface, MotionSin
     private fun checkVisibility() {
         val t = holder.target
         val m = mapper
-        val visible = if (t == null || m == null) true
-        else VisibleArea.isVisible(t.rect, m, width.toFloat(), height.toFloat(), insets)
+        val rect = if (t == null) null else synchronized(lock) { smoother.target } ?: t.rect   // 흔들림만큼 옮겨진 자리
+        val visible = if (rect == null || m == null) true
+        else VisibleArea.isVisible(rect, m, width.toFloat(), height.toFloat(), insets)
         visibility.update(t?.elementId, visible)?.let { onTargetVisibilityChanged?.invoke(it) }
     }
 
+    /** 카메라 움직임 (분석 스레드 등 어느 스레드에서 불러도 된다). 믿을 만하면 테두리를 그만큼 옮긴다. */
     override fun onFrameMotion(motion: FrameMotion) {
-        if (motion.confidence < 0.5f) return
-        synchronized(lock) { smoother.nudge(motion.dx, motion.dy) }
-        postInvalidateOnAnimation()
+        val now = SystemClock.uptimeMillis()
+        val moved = synchronized(lock) {
+            health.onMotion(motion.confidence, now)
+            val ok = motion.confidence >= MIN_MOTION_CONFIDENCE && (motion.dx != 0f || motion.dy != 0f)
+            if (ok) smoother.nudge(motion.dx, motion.dy)
+            ok
+        }
+        if (holder.target == null) return
+        if (moved) refresh() else postInvalidateOnAnimation()        // 옮겼으면 보이는지도 다시 판단
     }
 
     private fun onTargetChanged(t: HighlightTarget?) {
         synchronized(lock) {
             val firstShow = smoother.current == null
             smoother.setTarget(t?.rect)
-            if (t != null && firstShow) shownSince = SystemClock.uptimeMillis()
+            val now = SystemClock.uptimeMillis()
+            if (t != null && firstShow) shownSince = now
+            health.onTargetUpdated(now)                              // 새 위치가 왔으니 믿을 수 있다
         }
         refresh()                                                    // 어느 스레드든 안전
     }
@@ -97,10 +129,35 @@ class ViewOverlay(context: Context) : View(context), HighlightSurface, MotionSin
         val now = SystemClock.uptimeMillis()
         val dt = if (lastDraw == 0L) 16L else now - lastDraw
         lastDraw = now
-        val rect = synchronized(lock) { smoother.step(dt); smoother.current } ?: run { lastDraw = 0L; return }
+        var rect: NormRect? = null
+        var lost = false
+        var lostEvent = false
+        synchronized(lock) {
+            smoother.step(dt)
+            rect = smoother.current
+            lost = health.isLost(now)
+            lostEvent = health.takeLostEvent(now)
+        }
+        val r = rect
+        if (r == null) { lastDraw = 0L; stats.pause(); isTrackingLost = false; return }
+        isTrackingLost = lost
+        if (lostEvent) post { onTrackingLost?.invoke() }
         if (m != null) {
-            painter.draw(canvas, m.map(rect, width.toFloat(), height.toFloat()), PulseCurve.level(now - shownSince))
+            painter.draw(canvas, m.map(r, width.toFloat(), height.toFloat()), PulseCurve.level(now - shownSince),
+                if (lost) DIM_ALPHA else 1f)
+        }
+        stats.onFrame(now)
+        if (now - lastStatsReport >= 1_000L) {
+            lastStatsReport = now
+            onRenderStats?.let { cb -> val s = stats.snapshot(); post { cb(s) } }
         }
         postInvalidateOnAnimation()                                  // 보이는 동안 계속 깜빡임
+    }
+
+    private companion object {
+        /** 이보다 믿기 어려운 움직임으로는 테두리를 옮기지 않는다 */
+        const val MIN_MOTION_CONFIDENCE = 0.5f
+        /** 추적 실패 때 테두리 진하기 (1 = 원래대로) */
+        const val DIM_ALPHA = 0.35f
     }
 }
