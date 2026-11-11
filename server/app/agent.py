@@ -27,7 +27,7 @@ from .models import (MAX_GOAL, ActionType, ElementKind, GuideAction, GuideReques
                      ScreenElement)
 from .parser import ActionParser, ParseError
 from .prompt import RETRY_NOTE, SYSTEM, build_user
-from .ranker import JamoNgramRanker, match_score
+from .ranker import JamoNgramRanker, same_item
 from .settings import Settings
 from .validator import MSG_ASK, MSG_DONE, MSG_UNKNOWN, ActionValidator
 
@@ -121,7 +121,7 @@ class LlmGuideAgent:
         if self.s.fastpath and goal:
             top = ranked[0]
             second = ranked[1].match if len(ranked) > 1 else 0.0
-            repeat = pressed is not None and match_score(top.element.text, pressed) >= self.s.fast_min_score
+            repeat = pressed is not None and same_item(top.element.text, pressed)
             if not repeat and top.match >= self.s.fast_min_score and top.match - second >= self.s.fast_margin:
                 meta["source"] = "fastpath"
                 return self._finish(GuideResponse(goal=goal, action=GuideAction.tap(top.element.id, top.element.text),

@@ -66,6 +66,17 @@ class Scored:
     rank: float         # match + 흐름 가산 — 후보 순서에 사용
 
 
+def same_item(text: str, pressed: str) -> bool:
+    """방금 누른 버튼과 같은 메뉴인가. 한쪽이 다른 쪽을 품으면 같다 ("(ICE)아메리카노" ⊃ "아메리카노":
+    옵션 창 제목 · 담은 목록처럼 이름에 꾸밈말이 붙어도 같은 메뉴). 글자 유사도 0.85 이상도 같다."""
+    a, b = normalize(text), normalize(pressed)
+    if not a or not b:
+        return False
+    if a == b or (len(b) >= 2 and b in a) or (len(a) >= 2 and a in b):
+        return True
+    return match_score(text, pressed) >= 0.85
+
+
 def match_score(text: str, query: str) -> float:
     """질문(query)과 버튼 글자(text)의 유사도 0~1."""
     nt, nq = normalize(text), normalize(query)

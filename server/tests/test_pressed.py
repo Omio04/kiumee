@@ -39,6 +39,16 @@ async def test_fake_llm_skips_the_pressed_button(snaps):
     assert r.response.action.guideText != "아메리카노"
 
 
+def test_decorated_name_of_the_pressed_item_counts_as_the_same_item():
+    """옵션 창 제목 "(ICE)아메리카노" · 담은 목록처럼 꾸밈말이 붙어도 방금 누른 메뉴다 (2026-11-11 시험)."""
+    from app.ranker import same_item
+    assert same_item("(ICE)아메리카노", "아메리카노")
+    assert same_item("아메리카노", "아메리카노")
+    assert not same_item("주문담기", "아메리카노")
+    assert not same_item("카페라떼", "아메리카노")
+    assert not same_item("", "아메리카노")
+
+
 def test_prompt_mentions_pressed_button_only_when_given():
     assert PRESSED_PREFIX not in build_user("g", [], [], [])
     assert (PRESSED_PREFIX + "아메리카노") in build_user("g", [], [], [], pressed="아메리카노")

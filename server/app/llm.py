@@ -13,7 +13,7 @@ from typing import Callable, List, Optional, Protocol, Union
 import httpx
 
 from .prompt import PRESSED_PREFIX
-from .ranker import expand_query, match_score
+from .ranker import expand_query, match_score, same_item
 
 ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
 
@@ -227,7 +227,7 @@ class HeuristicFakeLlmClient:
         if goal == "(없음)":
             goal = ""
         if pressed:                                          # 방금 누른 버튼은 다시 고르지 않는다 (화면이 바뀜)
-            cands = [c for c in cands if match_score(c[1], pressed) < 0.85]
+            cands = [c for c in cands if not same_item(c[1], pressed)]
         if not goal:
             return '{"action":"ASK_USER","targetId":null,"guideText":null,"message":"무엇을 드시고 싶으세요?"}'
         q = expand_query(goal, goal.rsplit(",", 1)[-1])     # 가짜라 이번 발화를 따로 모름 → 목표의 마지막 쉼표 뒤를 이번 발화로 봄
