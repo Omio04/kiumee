@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Typeface
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.util.TypedValue
@@ -28,6 +29,7 @@ import kr.kiosklens.app.camera.CameraController
 import kr.kiosklens.app.di.AndroidLogger
 import kr.kiosklens.app.di.Graph
 import kr.kiosklens.app.di.GraphFactory
+import kr.kiosklens.app.net.LocalNetwork
 import kr.kiosklens.app.ui.RecognitionStatus
 import kr.kiosklens.app.ui.UiTexts
 import kr.kiosklens.core.model.ScreenSnapshot
@@ -81,8 +83,24 @@ class MainActivity : AppCompatActivity() {
         else requestPermissions(needed, REQ)
     }
 
+    /**
+     * 디버그 빌드: 서버가 같은 와이파이의 노트북 · 에뮬레이터의 Mac(사설 IP)이면 Android 17+ 로컬 네트워크 권한을 받는다.
+     * 없으면 서버 요청이 조용히 막혀 6초 뒤 "연결이 잠시 불안정해요"로 끝난다. 카메라 · 마이크와 달리 없어도 앱은 켜진다.
+     */
+    private fun ensureLocalNetworkPermission() {
+        if (Build.VERSION.SDK_INT < 37 || !LocalNetwork.isLocal(BuildConfig.SERVER_URL)) return       // 37 = Android 17
+        if (checkSelfPermission(Manifest.permission.ACCESS_LOCAL_NETWORK) == PackageManager.PERMISSION_GRANTED) return
+        requestPermissions(arrayOf(Manifest.permission.ACCESS_LOCAL_NETWORK), REQ_LOCAL)
+    }
+
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQ_LOCAL) {
+            if (grantResults.firstOrNull() != PackageManager.PERMISSION_GRANTED) {
+                note.text = getString(R.string.need_local_network); note.visibility = View.VISIBLE
+            }
+            return
+        }
         if (requestCode != REQ) return
         if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) init()
         else {
@@ -105,6 +123,7 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread { overlay.setAnalysisSize(w, h); recognition?.setAnalysisSize(w, h) }
         }.also { it.start(this, preview) }
         if (BuildConfig.SERVER_URL.isBlank()) { note.text = getString(R.string.need_server); note.visibility = View.VISIBLE }
+        if (BuildConfig.DEBUG) ensureLocalNetworkPermission()
         if (BuildConfig.DEBUG) {
             ui.launch { g.snapshots.collect { s -> lastSnapshot = s; recognition?.show(s); renderDebug() } }
             ui.launch { g.scanStatus.collect { st ->
@@ -202,5 +221,5 @@ class MainActivity : AppCompatActivity() {
         setBackgroundColor(bg); minHeight = dp(heightDp); minimumHeight = dp(heightDp); isAllCaps = false
     }
 
-    private companion object { const val REQ = 100 }
+    private companion object { const val REQ = 100; const val REQ_LOCAL = 101 }
 }

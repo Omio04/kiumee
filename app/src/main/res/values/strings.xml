@@ -6,4 +6,5 @@
     <string name="open_settings">설정 열기</string>
     <string name="need_permission">카메라와 마이크를 쓸 수 있게 허용해 주세요.</string>
     <string name="need_server">서버 주소가 설정되지 않았어요. README의 \'서버 연결\'을 따라 설정해 주세요.</string>
+    <string name="need_local_network">서버에 연결하려면 \'로컬 네트워크\' 권한이 필요해요. 설정 → 앱 → 키오스크 렌즈 → 권한에서 허용해 주세요.</string>
 </resources>
