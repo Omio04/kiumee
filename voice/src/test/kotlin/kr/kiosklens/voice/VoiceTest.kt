@@ -2,6 +2,7 @@ package kr.kiosklens.voice
 
 import kr.kiosklens.core.model.SttError
 import kr.kiosklens.voice.stt.SttMapping
+import kr.kiosklens.voice.stt.SttNext
 import kr.kiosklens.voice.tts.SpeechSplit
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -23,6 +24,23 @@ class VoiceMappingTest {
         assertEquals(SttError.PERMISSION, SttMapping.toSttError(SttMapping.ERROR_INSUFFICIENT_PERMISSIONS))
         assertEquals(SttError.NO_SPEECH, SttMapping.toSttError(SttMapping.ERROR_AUDIO))
         assertEquals(SttError.NO_SPEECH, SttMapping.toSttError(9999))
+        // 12 · 13은 SttError에 맞는 값이 없어 NETWORK로 둔다 (NO_SPEECH로 바꾸면 더 틀린 안내가 됨)
+        assertEquals(SttError.NETWORK, SttMapping.toSttError(SttMapping.ERROR_LANGUAGE_NOT_SUPPORTED))
+        assertEquals(SttError.NETWORK, SttMapping.toSttError(SttMapping.ERROR_LANGUAGE_UNAVAILABLE))
+    }
+
+    @Test fun `온디바이스에서 한국어 모델이 없으면 재시도를 쓰지 않고 일반 인식기로 바꾼다`() {
+        assertEquals(SttNext.FALL_BACK_TO_STANDARD, SttMapping.next(SttMapping.ERROR_LANGUAGE_UNAVAILABLE, onDevice = true, retried = false))
+        assertEquals(SttNext.FALL_BACK_TO_STANDARD, SttMapping.next(SttMapping.ERROR_LANGUAGE_NOT_SUPPORTED, onDevice = true, retried = false))
+        assertEquals(SttNext.FALL_BACK_TO_STANDARD, SttMapping.next(SttMapping.ERROR_LANGUAGE_UNAVAILABLE, onDevice = true, retried = true))
+    }
+
+    @Test fun `일반 인식기와 다른 오류는 기존 재시도 규칙을 따른다`() {
+        assertEquals(SttNext.RETRY, SttMapping.next(SttMapping.ERROR_LANGUAGE_UNAVAILABLE, onDevice = false, retried = false))
+        assertEquals(SttNext.FINISH, SttMapping.next(SttMapping.ERROR_LANGUAGE_UNAVAILABLE, onDevice = false, retried = true))
+        assertEquals(SttNext.RETRY, SttMapping.next(SttMapping.ERROR_NETWORK, onDevice = true, retried = false))
+        assertEquals(SttNext.FINISH, SttMapping.next(SttMapping.ERROR_NETWORK, onDevice = true, retried = true))
+        assertEquals(SttNext.FINISH, SttMapping.next(SttMapping.ERROR_INSUFFICIENT_PERMISSIONS, onDevice = true, retried = false))
     }
 
     @Test fun `재시도는 1회만 하고 권한 문제는 하지 않는다`() {
