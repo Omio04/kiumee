@@ -29,6 +29,28 @@ class ScreenTrackerTest {
         assertEquals("s2", confirmed.snapshot.screenId)
     }
 
+    @Test fun ocrTyposBetweenFramesStillConfirmTheSameScreen() {
+        // 휴대폰으로 작은 글자를 찍으면 프레임마다 조금씩 다르게 읽힌다. 정확히 같은 것만 세면 3/7 = 0.43이라 확정이 안 됐다.
+        val tracker = ScreenTracker()
+        assertNull(tracker.update(screen("아메리카노", "카페라떼", "바닐라라떼", "담기", "취소")))
+        val confirmed = tracker.update(screen("아에리카노", "카페라때", "바닐라라떼", "담기", "취소"))
+        assertEquals("s1", confirmed!!.snapshot.screenId)
+        // 같은 화면을 또 오타 섞어 읽어도 새 화면으로 착각하지 않는다
+        val again = tracker.update(screen("아메리카노", "카페라떼", "바닐라라때", "담기", "취소"))!!
+        assertFalse(again.changed)
+        assertEquals("s1", again.snapshot.screenId)
+    }
+
+    @Test fun similarTextToleratesOcrTyposButNotDifferentNumbers() {
+        assertTrue(Elements.similar("아메리카노", "아에리카노"))
+        assertTrue(Elements.similar("카페라떼", "카페라때"))
+        assertTrue(Elements.similar("아이스아메리카노", "아이스아메리카누"))
+        assertFalse(Elements.similar("메뉴항목1", "메뉴항목2"))          // 숫자가 다르면 다른 버튼
+        assertFalse(Elements.similar("결제하기", "취소하기"))            // 두 글자 다름
+        assertFalse(Elements.similar("hot", "ice"))
+        assertFalse(Elements.similar("담기", "닫기"))                    // 짧은 글자는 정확히 같아야
+    }
+
     @Test fun duplicateLabelsKeepSeparateIdsWhenPositionsShift() {
         val tracker = ScreenTracker()
         tracker.update(screen("추가", "추가", "취소"))

@@ -58,6 +58,23 @@ internal class ScreenTracker(
     private fun signature(lines: List<OcrLine>) = lines
         .filterNot { it.text.matches(volatileCounter) }
         .map { Elements.key(it.text) }.toSet()
-    private fun similarity(a: Set<String>, b: Set<String>): Double =
-        if (a.isEmpty() && b.isEmpty()) 1.0 else a.intersect(b).size.toDouble() / a.union(b).size
+    /**
+     * 두 화면의 글자 집합이 얼마나 같은가 (자카드: 짝지은 수 ÷ 합친 수).
+     * 정확히 같은 글자를 먼저 짝짓고, 남은 것끼리 OCR 오타 정도로 비슷한 글자([Elements.similar])를 하나씩 짝짓는다.
+     * 휴대폰으로 작은 글자를 찍으면 프레임마다 "아메리카노" · "아에리카노"처럼 조금씩 다르게 읽혀서,
+     * 정확히 같은 것만 세면 같은 화면인데도 0.6을 못 넘어 확정이 안 됐다 (2026-11-11 웹캠 확인).
+     * 오타가 없으면 예전 자카드와 값이 같다.
+     */
+    private fun similarity(a: Set<String>, b: Set<String>): Double {
+        if (a.isEmpty() && b.isEmpty()) return 1.0
+        val exact = a.intersect(b)
+        val restB = (b - exact).toMutableList()
+        var fuzzy = 0
+        for (key in a - exact) {
+            val i = restB.indexOfFirst { Elements.similar(key, it) }
+            if (i >= 0) { restB.removeAt(i); fuzzy++ }
+        }
+        val matched = exact.size + fuzzy
+        return matched.toDouble() / (a.size + b.size - matched)
+    }
 }

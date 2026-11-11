@@ -63,7 +63,7 @@ class VisionScreenAnalyzer(
                     update == null -> ScanStatus.SCANNING
                     else -> ScanStatus.READY
                 }
-                log { logger.d("KL_PERF", "ocr ms=${clock.nowMs() - start} published=${update != null}") }
+                log { logger.d("KL_PERF", "ocr ms=${clock.nowMs() - start} lines=${lines.size} published=${update != null}") }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {

@@ -48,6 +48,38 @@ internal object Elements {
     fun kind(text: String) = builder.kind(text)
     fun distance(first: NormRect, second: NormRect): Float =
         hypot(first.centerX - second.centerX, first.centerY - second.centerY)
+
+    /**
+     * OCR 오타를 넘어 같은 글자로 볼 만큼 비슷한가 (둘 다 [key] 결과).
+     * - 같으면 같다. 3글자 이상끼리는 1글자 틀림까지, 8글자 이상이면 2글자까지 같다고 본다 ("아메리카노" ≈ "아에리카노")
+     * - 숫자가 다르면 다른 글자다 ("1잔" ≠ "2잔", "메뉴항목1" ≠ "메뉴항목2"): 숫자는 서로 다른 버튼 · 값을 뜻한다
+     */
+    fun similar(a: String, b: String): Boolean {
+        if (a == b) return true
+        if (a.length < 3 || b.length < 3) return false
+        if (a.filter { it.isDigit() } != b.filter { it.isDigit() }) return false
+        val allowed = if (maxOf(a.length, b.length) >= 8) 2 else 1
+        return editDistance(a, b, allowed) <= allowed
+    }
+
+    /** 편집 거리 (limit을 넘으면 limit + 1에서 멈춤). */
+    private fun editDistance(a: String, b: String, limit: Int): Int {
+        if (kotlin.math.abs(a.length - b.length) > limit) return limit + 1
+        var prev = IntArray(b.length + 1) { it }
+        var cur = IntArray(b.length + 1)
+        for (i in 1..a.length) {
+            cur[0] = i
+            var rowMin = cur[0]
+            for (j in 1..b.length) {
+                val cost = if (a[i - 1] == b[j - 1]) 0 else 1
+                cur[j] = minOf(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost)
+                rowMin = minOf(rowMin, cur[j])
+            }
+            if (rowMin > limit) return limit + 1
+            val t = prev; prev = cur; cur = t
+        }
+        return prev[b.length]
+    }
 }
 
 internal class ElementIds(private val builder: ElementBuilder = ElementBuilder()) {
