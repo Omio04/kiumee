@@ -150,12 +150,31 @@ class SessionStateMachine(
     private fun onSpeechFailed(state: SessionState, error: SttError): Transition {
         if (state.phase != Phase.LISTENING) return stay(state)
         if (state.listeningToAdd) return resume(state)                     // 보태려던 말만 실패: 하던 안내는 계속
+        if (error != SttError.PERMISSION && inProgress(state)) return askAgainLater(state)
         return if (error == SttError.NO_SPEECH) toIdleSaying(state, texts.silence()) else toError(state, texts.speechError(error))
     }
 
-    /** 아무 말도 못 들었다. 안내 중에 보태려던 거였으면 하던 안내로 돌아가고, 처음 말하기였으면 세션을 끝낸다. */
-    private fun heardNothing(state: SessionState): Transition =
-        if (state.listeningToAdd) resume(state) else toIdleSaying(state, texts.silence())
+    /** 아무 말도 못 들었다. 보태려던 말이면 하던 안내로, 질문에 대한 대답이면 잠시 뒤 다시 묻고, 처음 말하기면 세션을 끝낸다. */
+    private fun heardNothing(state: SessionState): Transition = when {
+        state.listeningToAdd -> resume(state)
+        inProgress(state) -> askAgainLater(state)
+        else -> toIdleSaying(state, texts.silence())
+    }
+
+    /** 목표나 이력이 있다 = 주문을 진행하던 중. 이때 음성 하나 실패로 세션을 끝내면 처음부터 다시 말해야 한다 */
+    private fun inProgress(state: SessionState) = state.goal != null || state.history.isNotEmpty()
+
+    /**
+     * 진행 중인 세션에서 질문에 대한 대답을 못 들었다 (2026-11-12 시험: 인식 오류 11번 하나로 세션이 끝났다).
+     * 세션을 끝내지 않고 "못 들었어요"를 읽고, 기다리다 최신 화면으로 다시 묻는다 → 같은 질문이 다시 나온다.
+     * 그 사이 "말하기"를 눌러 바로 대답할 수도 있다.
+     */
+    private fun askAgainLater(state: SessionState): Transition {
+        val screenId = state.snapshot?.screenId ?: state.requestedSnapshot?.screenId ?: return toIdleSaying(state, texts.silence())
+        val t = state.ticket + 1
+        val g = Guidance(screenId, spokenText = texts.notHeard(), retryOnTimeout = true)
+        return Transition(state.copy(phase = Phase.GUIDING, ticket = t, guide = g), listOf(StopListening, CancelPending, Speak(g.spokenText, t)))
+    }
 
     /** 하던 안내로 돌아간다: 최신 화면으로 서버에 다시 묻는다 (목표 · 이력은 그대로라 같은 단계가 다시 나온다). */
     private fun resume(state: SessionState): Transition =

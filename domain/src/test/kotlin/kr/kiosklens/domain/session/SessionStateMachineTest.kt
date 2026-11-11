@@ -373,6 +373,28 @@ class SessionStateMachineTest {
         assertEquals(Phase.IDLE, first.phase)
     }
 
+    @Test fun `질문에 대답하다 인식이 실패해도 세션을 끝내지 않고 기다렸다가 다시 묻는다`() {
+        val d = planningOnMenu().apply {
+            send { GuideReceived(it, GuideResponse(goal, GuideAction.AskUser("따뜻한 걸로 드릴까요, 차가운 걸로 드릴까요?"))) }
+            send { SpeechFinished(it) }                                    // 질문을 다 읽음 → 듣기
+        }
+        assertEquals(Phase.LISTENING, d.phase)
+        val tr = d.send { SpeechFailed(it, SttError.NETWORK) }             // 2026-11-12 시험: 인식 오류 11번 → 세션이 끝났다
+        assertEquals(Phase.GUIDING, d.phase)
+        assertEquals("sess-1", d.state.sessionId)
+        assertEquals(Speak("말씀을 잘 못 들었어요. 대답하시려면 '말하기'를 누르고 말씀해 주세요.", d.ticket), tr.effects.last())
+        d.send { SpeechFinished(it) }
+        d.send { TimedOut(it) }
+        assertEquals(Phase.PLANNING, d.phase)                               // 최신 화면으로 다시 묻기 → 같은 질문이 다시 나온다
+
+        val silent = planningOnMenu().apply {                               // 말이 없을 때(무음 8초)도 같다
+            send { GuideReceived(it, GuideResponse(goal, GuideAction.AskUser("포장하실 건가요?"))) }
+            send { SpeechFinished(it) }
+            send { TimedOut(it) }
+        }
+        assertEquals(Phase.GUIDING, silent.phase)
+    }
+
     @Test fun `서버가 답하기 전에 또 말하면 앞의 말과 이어 붙인다`() {
         val d = planningOnMenu()                                           // 첫 말을 서버에 묻는 중
         d.send(StartPressed("x"))
