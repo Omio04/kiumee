@@ -29,18 +29,18 @@ class VoiceMappingTest {
         assertEquals(SttError.NETWORK, SttMapping.toSttError(SttMapping.ERROR_LANGUAGE_UNAVAILABLE))
     }
 
-    @Test fun `온디바이스에서 한국어 모델이 없으면 재시도를 쓰지 않고 일반 인식기로 바꾼다`() {
-        assertEquals(SttNext.FALL_BACK_TO_STANDARD, SttMapping.next(SttMapping.ERROR_LANGUAGE_UNAVAILABLE, onDevice = true, retried = false))
-        assertEquals(SttNext.FALL_BACK_TO_STANDARD, SttMapping.next(SttMapping.ERROR_LANGUAGE_NOT_SUPPORTED, onDevice = true, retried = false))
-        assertEquals(SttNext.FALL_BACK_TO_STANDARD, SttMapping.next(SttMapping.ERROR_LANGUAGE_UNAVAILABLE, onDevice = true, retried = true))
+    @Test fun `오프라인으로 듣다가 한국어 모델이 없으면 재시도를 쓰지 않고 온라인 일반 인식기로 바꾼다 (온디바이스든 일반 인식기 오프라인이든)`() {
+        assertEquals(SttNext.FALL_BACK_TO_STANDARD, SttMapping.next(SttMapping.ERROR_LANGUAGE_UNAVAILABLE, offline = true, retried = false))
+        assertEquals(SttNext.FALL_BACK_TO_STANDARD, SttMapping.next(SttMapping.ERROR_LANGUAGE_NOT_SUPPORTED, offline = true, retried = false))
+        assertEquals(SttNext.FALL_BACK_TO_STANDARD, SttMapping.next(SttMapping.ERROR_LANGUAGE_UNAVAILABLE, offline = true, retried = true))
     }
 
-    @Test fun `일반 인식기와 다른 오류는 기존 재시도 규칙을 따른다`() {
-        assertEquals(SttNext.RETRY, SttMapping.next(SttMapping.ERROR_LANGUAGE_UNAVAILABLE, onDevice = false, retried = false))
-        assertEquals(SttNext.FINISH, SttMapping.next(SttMapping.ERROR_LANGUAGE_UNAVAILABLE, onDevice = false, retried = true))
-        assertEquals(SttNext.RETRY, SttMapping.next(SttMapping.ERROR_NETWORK, onDevice = true, retried = false))
-        assertEquals(SttNext.FINISH, SttMapping.next(SttMapping.ERROR_NETWORK, onDevice = true, retried = true))
-        assertEquals(SttNext.FINISH, SttMapping.next(SttMapping.ERROR_INSUFFICIENT_PERMISSIONS, onDevice = true, retried = false))
+    @Test fun `온라인 일반 인식기와 다른 오류는 기존 재시도 규칙을 따른다`() {
+        assertEquals(SttNext.RETRY, SttMapping.next(SttMapping.ERROR_LANGUAGE_UNAVAILABLE, offline = false, retried = false))
+        assertEquals(SttNext.FINISH, SttMapping.next(SttMapping.ERROR_LANGUAGE_UNAVAILABLE, offline = false, retried = true))
+        assertEquals(SttNext.RETRY, SttMapping.next(SttMapping.ERROR_NETWORK, offline = true, retried = false))
+        assertEquals(SttNext.FINISH, SttMapping.next(SttMapping.ERROR_NETWORK, offline = true, retried = true))
+        assertEquals(SttNext.FINISH, SttMapping.next(SttMapping.ERROR_INSUFFICIENT_PERMISSIONS, offline = true, retried = false))
     }
 
     @Test fun `재시도는 1회만 하고 권한 문제는 하지 않는다`() {

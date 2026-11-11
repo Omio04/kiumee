@@ -46,12 +46,13 @@ object SttMapping {
 
     /**
      * 인식 오류 뒤에 할 일 (결정 #3: 온디바이스 우선, 한국어 모델이 없으면 일반 인식기).
-     * - 온디바이스 인식기에서 12 · 13 → 일반 인식기로 바꿔 다시 듣는다. 듣기 전에 바로 나는 오류라
+     * - [offline] = 이번 시도가 오프라인이었는가 (온디바이스 인식기, 또는 일반 인식기 + `EXTRA_PREFER_OFFLINE`).
+     * - 오프라인 시도에서 12 · 13 → 일반 인식기 + 온라인으로 바꿔 다시 듣는다. 듣기 전에 바로 나는 오류라
      *   어르신의 말을 잃지 않으므로 1회 자동 재시도는 쓰지 않고 남겨 둔다.
      * - 그 밖에는 [shouldRetry] 규칙대로.
      */
-    fun next(code: Int, onDevice: Boolean, retried: Boolean): SttNext = when {
-        onDevice && isLanguageUnavailable(code) -> SttNext.FALL_BACK_TO_STANDARD
+    fun next(code: Int, offline: Boolean, retried: Boolean): SttNext = when {
+        offline && isLanguageUnavailable(code) -> SttNext.FALL_BACK_TO_STANDARD
         shouldRetry(toSttError(code), retried) -> SttNext.RETRY
         else -> SttNext.FINISH
     }
