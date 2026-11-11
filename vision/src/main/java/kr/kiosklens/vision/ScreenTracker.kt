@@ -55,9 +55,17 @@ internal class ScreenTracker(
         )
     }
 
-    private fun signature(lines: List<OcrLine>) = lines
-        .filterNot { it.text.matches(volatileCounter) }
-        .map { Elements.key(it.text) }.toSet()
+    /**
+     * 화면을 구분하는 글자 집합. 남은 시간("57초")과, 숫자가 3개 이상인 글자(가격 · 금액 · 시각)는 뺀다:
+     * 휴대폰 카메라로 찍으면 "W9,999"를 프레임마다 "W9,909" · "WS,999"처럼 제각각 읽어서 같은 화면의 유사도를
+     * 크게 떨어뜨리고, 화면 구분에는 메뉴 이름 · 버튼 글자로 충분하다 (2026-11-11 웹캠 측정: 프레임당 36개를 읽어도
+     * 확정 10%). 숫자뿐인 화면이라 다 빠지면 원래대로 전부 쓴다. 인식 결과(스냅샷)에서는 빼지 않는다.
+     */
+    private fun signature(lines: List<OcrLine>): Set<String> {
+        val keys = lines.filterNot { it.text.matches(volatileCounter) }.map { Elements.key(it.text) }
+        val words = keys.filterNot { key -> key.count { it.isDigit() } >= 3 }
+        return (words.ifEmpty { keys }).toSet()
+    }
     /**
      * 두 화면의 글자 집합이 얼마나 같은가 (자카드: 짝지은 수 ÷ 합친 수).
      * 정확히 같은 글자를 먼저 짝짓고, 남은 것끼리 OCR 오타 정도로 비슷한 글자([Elements.similar])를 하나씩 짝짓는다.

@@ -41,6 +41,15 @@ class ScreenTrackerTest {
         assertEquals("s1", again.snapshot.screenId)
     }
 
+    @Test fun pricesReadDifferentlyEveryFrameDoNotBlockConfirmation() {
+        // 같은 메뉴 화면인데 가격을 프레임마다 다르게 읽는다 ("W 9,999" → "W 9,909" · "WS,999" · "W 8,999")
+        val tracker = ScreenTracker()
+        assertNull(tracker.update(screen("아메리카노", "카페라떼", "담기", "W 9,999", "W 4,500", "W 5,000")))
+        val confirmed = tracker.update(screen("아메리카노", "카페라떼", "담기", "W 9,909", "WS,500", "W 8,000"))
+        assertEquals("s1", confirmed!!.snapshot.screenId)
+        assertEquals(6, confirmed.snapshot.elements.size)              // 가격은 비교에서만 빼고 인식 결과에는 그대로 둔다
+    }
+
     @Test fun similarTextToleratesOcrTyposButNotDifferentNumbers() {
         assertTrue(Elements.similar("아메리카노", "아에리카노"))
         assertTrue(Elements.similar("카페라떼", "카페라때"))
