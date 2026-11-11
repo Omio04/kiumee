@@ -236,6 +236,24 @@ class SessionStateMachineTest {
         assertTrue("위치가 같으면 다시 보내지 않음", tr.effects.isEmpty())
     }
 
+    @Test fun `목표가 가려지면 주변이 움직인 만큼 하이라이트를 옮기고 단서가 없으면 숨겼다가 다시 보이면 그린다`() {
+        val d = waitingOnMenu()
+        val start = d.state.guide!!.rect!!
+        // 손가락이 아메리카노를 가리고 휴대폰이 위로 움직임 (다른 요소는 0.125 위로)
+        val up = menu.copy(frameId = 11, elements = menu.elements.filter { it.id != "e4" }
+            .map { it.copy(rect = NormRect(it.rect.left, it.rect.top - 0.125f, it.rect.right, it.rect.bottom - 0.125f)) })
+        var tr = d.send(SnapshotReceived(up))
+        val moved = (tr.effects.single() as Highlight).target
+        assertEquals("e4", moved.elementId)
+        assertEquals(start.top - 0.125f, moved.rect.top, 1e-4f)
+        // 단서가 없음 (요소 1개뿐) → 틀린 자리를 가리키지 않게 숨김
+        tr = d.send(SnapshotReceived(up.copy(frameId = 12, elements = up.elements.take(1))))
+        assertEquals(listOf(ClearHighlight), tr.effects)
+        // 다시 보이면 다시 그림
+        tr = d.send(SnapshotReceived(menu.copy(frameId = 13)))
+        assertEquals(listOf(Highlight(HighlightTarget("e4", menu.findElement("e4")!!.rect))), tr.effects)
+    }
+
     @Test fun `다른 화면의 스냅샷이 오면 화면 전환으로 보고 바로 다시 묻는다`() {
         val d = waitingOnMenu()
         val tr = d.send(SnapshotReceived(options))

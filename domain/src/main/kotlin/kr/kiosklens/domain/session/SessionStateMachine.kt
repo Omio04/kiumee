@@ -8,6 +8,7 @@ import kr.kiosklens.core.model.HistoryItem
 import kr.kiosklens.core.model.ScreenSnapshot
 import kr.kiosklens.core.model.SttError
 import kr.kiosklens.domain.policy.GuideTextComposer
+import kr.kiosklens.domain.policy.HighlightArea
 import kr.kiosklens.domain.policy.TimeoutPolicy
 import kr.kiosklens.domain.session.SessionEffect.CancelPending
 import kr.kiosklens.domain.session.SessionEffect.ClearHighlight
@@ -76,7 +77,7 @@ class SessionStateMachine(
                 if (s.screenId != state.requestedSnapshot?.screenId) requestOrScan(updated, listOf(CancelPending)) else stay(updated)
             Phase.GUIDING, Phase.WAIT_CHANGE -> {
                 val g = state.guide ?: return stay(updated)
-                if (s.screenId != g.screenId) screenChanged(updated) else follow(updated, g, s)
+                if (s.screenId != g.screenId) screenChanged(updated) else follow(updated, g, state.snapshot, s)
             }
             else -> stay(updated)
         }
@@ -98,12 +99,20 @@ class SessionStateMachine(
     private fun screenChanged(state: SessionState): Transition =
         requestOrScan(state.copy(guide = null), listOf(StopSpeaking, ClearHighlight, CancelPending))
 
-    /** 같은 화면의 새 스냅샷: 하이라이트가 버튼을 따라가게 위치를 갱신한다 (위치가 바뀌었을 때만). */
-    private fun follow(state: SessionState, g: Guidance, s: ScreenSnapshot): Transition {
+    /**
+     * 같은 화면의 새 스냅샷: 하이라이트가 버튼을 따라가게 위치를 갱신한다 (위치가 바뀌었을 때만).
+     * 목표가 안 읽히면(손가락에 가려짐 등) 주변 요소가 움직인 만큼 옮기고, 그것도 모르면 숨긴다 —
+     * 마지막 화면 좌표에 그대로 두면 휴대폰이 움직였을 때 옆 버튼을 가리킨다 (2026-11-11 시험: 아메리카노 안내에 에스프레소 테두리).
+     */
+    private fun follow(state: SessionState, g: Guidance, prev: ScreenSnapshot?, s: ScreenSnapshot): Transition {
         val id = g.targetId ?: return stay(state)
-        val element = s.findElement(id) ?: return stay(state)
-        if (element.rect == g.rect) return stay(state)
-        return Transition(state.copy(guide = g.copy(rect = element.rect)), listOf(Highlight(HighlightTarget(id, element.rect))))
+        val element = s.findElement(id)
+        val rect = if (element != null) HighlightArea.of(element, s.elements) else HighlightArea.shift(g.rect, prev, s, id)
+        if (rect == null) {
+            return if (g.rect == null) stay(state) else Transition(state.copy(guide = g.copy(rect = null)), listOf(ClearHighlight))
+        }
+        if (rect == g.rect) return stay(state)
+        return Transition(state.copy(guide = g.copy(rect = rect)), listOf(Highlight(HighlightTarget(id, rect))))
     }
 
     // ---------------- 음성 ----------------
@@ -147,8 +156,10 @@ class SessionStateMachine(
             is GuideAction.Tap -> {
                 val element = asked.findElement(action.targetId)
                     ?: return speakAndWait(base, asked.screenId, texts.notFound(), retry = true)   // 계약 위반 방어
-                // 응답을 기다리는 사이 같은 화면의 새 스냅샷이 왔으면 최신 위치를 쓴다
-                val rect = base.snapshot?.takeIf { it.screenId == asked.screenId }?.findElement(element.id)?.rect ?: element.rect
+                // 응답을 기다리는 사이 같은 화면의 새 스냅샷이 왔으면 최신 위치를 쓴다. 메뉴 칸이면 칸 전체를 감싼다
+                val latest = base.snapshot?.takeIf { it.screenId == asked.screenId }
+                val now = latest?.findElement(element.id)
+                val rect = if (latest != null && now != null) HighlightArea.of(now, latest.elements) else HighlightArea.of(element, asked.elements)
                 val spoken = texts.tap(rect, action.guideText)
                 val t = base.ticket + 1
                 Transition(
