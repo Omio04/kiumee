@@ -53,7 +53,7 @@ internal class ScreenTracker(
         previous = lines
         val screenId = "s$screenNumber"
         return ScreenUpdate(
-            ScreenSnapshot(screenId, frameId, timestampMs, ids.assign(screenId, voted), stableFrames),
+            ScreenSnapshot(screenId, frameId, timestampMs, CartRegion.demoteDuplicates(ids.assign(screenId, voted)), stableFrames),
             isNew && screenNumber > 1,
         )
     }
