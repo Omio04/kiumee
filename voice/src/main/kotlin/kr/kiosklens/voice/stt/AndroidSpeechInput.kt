@@ -26,6 +26,8 @@ import kr.kiosklens.voice.EchoGuard
  * - 실패(권한 제외)하면 1회 자동으로 다시 듣는다.
  * - [EchoGuard]가 안내 소리 직후 300ms는 기다리게 한다.
  * - 기기 안(온디바이스) 인식이 되면 그것을 쓴다(Android 12+). 안 되면 일반 인식 + 오프라인 선호.
+ * - 온디바이스 인식기가 한국어 모델 없음(오류 12 · 13)을 내면 재시도 횟수를 쓰지 않고 일반 인식기로 바꾼다.
+ *   이후 이 인스턴스는 일반 인식기만 쓴다 (결정 #3 · U7).
  * - SpeechRecognizer는 **메인 스레드**에서만 만들고 쓴다.
  * - 로그에는 인식된 글자를 남기지 않는다.
  */
@@ -37,9 +39,12 @@ class AndroidSpeechInput(
 ) : SpeechInput {
     private val main = Handler(Looper.getMainLooper())
     @Volatile private var current: SpeechRecognizer? = null
+    /** 온디바이스 인식기가 한국어 모델 없음(12 · 13)을 낸 적이 있으면, 이후로는 처음부터 일반 인식기를 쓴다. */
+    @Volatile private var onDeviceUnusable = false
 
     override fun start(): Flow<SttEvent> = callbackFlow {
         if (!SpeechRecognizer.isRecognitionAvailable(context)) {
+            logger.w(TAG, "recognition service unavailable")
             trySend(SttEvent.Error(SttError.NETWORK)); close(); return@callbackFlow
         }
         // 안내 소리의 끝울림이 사라질 때까지 (최대 300ms 씩 몇 번만) 기다린다
@@ -49,6 +54,7 @@ class AndroidSpeechInput(
         var finished = false
         var retried = false
         var recognizer: SpeechRecognizer? = null
+        var usingOnDevice = false
 
         fun finish(event: SttEvent) {
             if (finished) return
@@ -59,7 +65,8 @@ class AndroidSpeechInput(
 
         fun begin() {                                                        // 항상 메인 스레드에서 호출
             recognizer?.let { runCatching { it.cancel(); it.destroy() } }
-            val r = createRecognizer()
+            usingOnDevice = canUseOnDevice()
+            val r = createRecognizer(usingOnDevice)
             recognizer = r; current = r
             r.setRecognitionListener(object : RecognitionListener {
                 override fun onReadyForSpeech(params: Bundle?) {}
@@ -79,11 +86,20 @@ class AndroidSpeechInput(
                 }
                 override fun onError(error: Int) {
                     val e = SttMapping.toSttError(error)
-                    logger.w(TAG, "stt error=$error mapped=$e retried=$retried")
-                    if (!finished && SttMapping.shouldRetry(e, retried)) {
-                        retried = true
-                        main.postDelayed({ if (!finished) begin() }, 250)
-                    } else finish(SttEvent.Error(e))
+                    logger.w(TAG, "stt error=$error mapped=$e onDevice=$usingOnDevice retried=$retried")
+                    if (finished) return
+                    when (SttMapping.next(error, usingOnDevice, retried)) {
+                        SttNext.FALL_BACK_TO_STANDARD -> {
+                            onDeviceUnusable = true
+                            logger.w(TAG, "ko-KR on-device model missing (error=$error), falling back to standard recognizer")
+                            main.postDelayed({ if (!finished) begin() }, 250)
+                        }
+                        SttNext.RETRY -> {
+                            retried = true
+                            main.postDelayed({ if (!finished) begin() }, 250)
+                        }
+                        SttNext.FINISH -> finish(SttEvent.Error(e))
+                    }
                 }
             })
             r.startListening(intent())
@@ -103,9 +119,12 @@ class AndroidSpeechInput(
         main.post { current?.let { runCatching { it.cancel(); it.destroy() } }; current = null }
     }
 
-    private fun createRecognizer(): SpeechRecognizer =
-        if (Build.VERSION.SDK_INT >= 31 && SpeechRecognizer.isOnDeviceRecognitionAvailable(context))
-            SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+    /** 온디바이스 인식기를 쓸 수 있는가: Android 12+ · 서비스 있음 · 한국어 모델 없음을 겪은 적 없음. */
+    private fun canUseOnDevice(): Boolean =
+        !onDeviceUnusable && Build.VERSION.SDK_INT >= 31 && SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
+
+    private fun createRecognizer(onDevice: Boolean): SpeechRecognizer =
+        if (onDevice && Build.VERSION.SDK_INT >= 31) SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
         else SpeechRecognizer.createSpeechRecognizer(context)
 
     private fun intent() = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
