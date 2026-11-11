@@ -1,10 +1,14 @@
 package kr.kiosklens.app.camera
 
 import android.content.Context
+import android.util.Size
 import androidx.camera.core.AspectRatio
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
+import androidx.camera.core.resolutionselector.AspectRatioStrategy
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
@@ -17,6 +21,8 @@ import kr.kiosklens.core.port.Logger
 /**
  * 후면 카메라 미리보기 + 분석 프레임을 [FrameSink]로 보낸다.
  * - 미리보기와 분석은 같은 종횡비(4:3)를 써서 하이라이트 좌표가 어긋나지 않게 한다.
+ * - 분석 해상도는 [ANALYSIS_SIZE](1280×960)를 목표로 한다. 기본값 640×480에서는 키오스크 메뉴 이름처럼
+ *   작은 글자를 거의 못 읽었다 (2026-11-11 웹캠 확인). 지원하지 않으면 가장 가까운 낮은 해상도로 내려간다.
  * - 분석은 "최신 한 장만 유지" 전략: 처리가 느리면 CameraX 가 알아서 건너뛴다.
  * - 분석 프레임 크기(회전 보정 후)는 [onAnalysisSize] 로 알려 준다(오버레이 좌표 변환용).
  */
@@ -37,8 +43,12 @@ class CameraController(
             try {
                 val p = future.get(); provider = p
                 val preview = Preview.Builder().setTargetAspectRatio(AspectRatio.RATIO_4_3).build().also { it.setSurfaceProvider(view.surfaceProvider) }
+                val analysisResolution = ResolutionSelector.Builder()
+                    .setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY)
+                    .setResolutionStrategy(ResolutionStrategy(ANALYSIS_SIZE, ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER))
+                    .build()
                 val analysis = ImageAnalysis.Builder()
-                    .setTargetAspectRatio(AspectRatio.RATIO_4_3)
+                    .setResolutionSelector(analysisResolution)
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                     .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888)
                     .build()
@@ -48,7 +58,10 @@ class CameraController(
                         val w = if (rot == 90 || rot == 270) proxy.height else proxy.width
                         val h = if (rot == 90 || rot == 270) proxy.width else proxy.height
                         val key = "${w}x$h"
-                        if (key != reportedSize) { reportedSize = key; onAnalysisSize(w, h) }
+                        if (key != reportedSize) {
+                            reportedSize = key; onAnalysisSize(w, h)
+                            logger.d("CameraController", "analysis size $key (rotation $rot)")
+                        }
                         sink.submit(ImageProxyFrame(proxy, ids.incrementAndGet(), System.currentTimeMillis()))   // 닫는 책임은 sink
                     } catch (t: Throwable) {
                         proxy.close()
@@ -65,5 +78,10 @@ class CameraController(
     fun stop() {
         provider?.unbindAll()
         executor.shutdown()
+    }
+
+    companion object {
+        /** 분석 프레임 목표 크기 (센서 방향 기준 가로×세로, 4:3). */
+        val ANALYSIS_SIZE = Size(1280, 960)
     }
 }

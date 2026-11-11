@@ -120,8 +120,8 @@
 | `action.type` | 들어 있는 필드 | 앱이 할 일 |
 |---|---|---|
 | `TAP` | `targetId`, `guideText` | `targetId` 요소를 하이라이트 + "{위치} 깜빡이는 {guideText}를 누르세요" → WAIT_CHANGE |
-| `SCROLL` | `direction` (UP·DOWN·LEFT·RIGHT), `guideText` | 밀어서 찾게 안내 → WAIT_CHANGE. **서버는 아직 안 보냄. 앱은 처리할 수 있어야 함** |
-| `WAIT` | `guideText` | 그대로 읽고 기다림. **서버는 아직 안 보냄. 앱은 처리할 수 있어야 함** |
+| `SCROLL` | `direction` (UP·DOWN·LEFT·RIGHT), `guideText` | "화면을 {방향} 밀어서 {guideText} 찾아 주세요" → WAIT_CHANGE. `guideText`는 **찾는 대상 이름** (짧은 말, 문장 아님) |
+| `WAIT` | `guideText` | `guideText`(문장)를 그대로 읽고 기다림 |
 | `ASK_USER` | `question` | 그대로 읽고 → LISTENING. 대답은 다음 요청의 `utterance` |
 | `DONE` | `guideText` | 그대로 읽고 → IDLE (세션 끝) |
 | `UNKNOWN` | `reason` | 그대로 읽어도 되는 쉬운 문장 (60자 이내). → SCANNING |
@@ -129,6 +129,7 @@
 - 해당 type에 없는 필드는 **아예 빠진다** (null로 오지 않음).
 - 문장 필드(`guideText` · `question` · `reason`)에는 **위치 표현이 없다**. 위치 문구는 앱(`PositionPhraser`)이 만든다.
 - TAP의 `guideText`는 항상 **화면의 실제 버튼 글자**다 (서버가 교정).
+- SCROLL의 `guideText`는 **찾는 대상 이름**이다 (예: "딸기 스무디"). 서버는 문장이 오면 "원하시는 메뉴"로 바꾼다 — 앱 문장 안에 문장이 또 들어가지 않게 (2026-11-10).
 - `source`는 진단용이다 (llm · fastpath · rule · fake · fallback). 앱은 무시한다. **모르는 필드는 무시하도록 파싱할 것.**
 
 전체 예시: `testdata/contract/response_*.json` (type마다 하나씩)
@@ -227,7 +228,7 @@ DTO는 `:agent/remote`에 두고 `:core-model`과 1:1로 변환한다. **`testda
 | `HistoryItem.action` | `String` | `ActionType` enum | 오타 방지. JSON 값은 같음 |
 | 응답 `source` | 없음 | 선택 필드 (진단용) | 서버 통계 · 평가용. 앱은 무시 |
 | 오류 본문 | `{"error": "CODE", "message": …}` | `{"error": {"code", "message", "requestId"}}` | 이미 구현된 서버 형식 유지 + 추적용 requestId |
-| SCROLL · WAIT | LLM이 고름 | 계약에는 유지, **서버 생성은 보류** | 5일 범위. 앱은 처리 가능해야 함 |
+| SCROLL · WAIT | LLM이 고름 | **서버가 보냄** (2026-11-10부터, P4 · 구조화 출력과 함께) | 처음엔 보류했지만 앱이 이미 처리할 수 있어서 켬 |
 | `:core-model` 의존 | 외부 라이브러리 금지 | `kotlinx-coroutines-core`만 예외 | 포트가 `Flow`를 씀 |
 | JSON 직렬화 | (4.4) kotlinx.serialization | `:agent`에서만 | `:core-model`을 순수하게 유지 |
 | 길이 제한 | 없음 | 상수로 명시 (3.6) | 서버가 400으로 거절하는 기준을 앱과 공유 |

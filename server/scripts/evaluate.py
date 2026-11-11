@@ -50,7 +50,7 @@ async def run(args):
     s = Settings(app_key="x", llm_provider=args.llm, fastpath=not args.no_fastpath,
                  anthropic_api_key=__import__("os").environ.get("ANTHROPIC_API_KEY", ""),
                  gemini_api_key=__import__("os").environ.get("GEMINI_API_KEY", ""),
-                 llm_model=__import__("os").environ.get("LLM_MODEL", "gemini-2.5-flash-lite" if args.llm == "gemini" else "claude-haiku-5-5"))
+                 llm_model=__import__("os").environ.get("LLM_MODEL", "gemini-3.5-flash-lite" if args.llm == "gemini" else "claude-haiku-5-5"))
     if args.llm == "fake":
         agent = FakeGuideAgent()
     elif args.llm == "heuristic":

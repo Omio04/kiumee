@@ -1,0 +1,19 @@
+# Render 무료/스타터 배포용 (Docker). 비밀 값은 대시보드에서 직접 입력 (sync: false).
+services:
+  - type: web
+    name: kiosk-lens-agent
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /healthz
+    autoDeploy: false
+    envVars:
+      - key: APP_KEY
+        sync: false
+      - key: LLM_PROVIDER
+        value: gemini            # anthropic | gemini | fake
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: TOTAL_BUDGET_S
+        value: "5.0"

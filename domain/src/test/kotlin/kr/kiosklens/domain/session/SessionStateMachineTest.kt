@@ -1,6 +1,7 @@
 package kr.kiosklens.domain.session
 
 import kr.kiosklens.core.model.ActionType
+import kr.kiosklens.core.model.ElementKind
 import kr.kiosklens.core.model.GuideAction
 import kr.kiosklens.core.model.GuideRequest
 import kr.kiosklens.core.model.GuideResponse
@@ -236,6 +237,24 @@ class SessionStateMachineTest {
         assertTrue("위치가 같으면 다시 보내지 않음", tr.effects.isEmpty())
     }
 
+    @Test fun `목표가 가려지면 주변이 움직인 만큼 하이라이트를 옮기고 단서가 없으면 숨겼다가 다시 보이면 그린다`() {
+        val d = waitingOnMenu()
+        val start = d.state.guide!!.rect!!
+        // 손가락이 아메리카노를 가리고 휴대폰이 위로 움직임 (다른 요소는 0.125 위로)
+        val up = menu.copy(frameId = 11, elements = menu.elements.filter { it.id != "e4" }
+            .map { it.copy(rect = NormRect(it.rect.left, it.rect.top - 0.125f, it.rect.right, it.rect.bottom - 0.125f)) })
+        var tr = d.send(SnapshotReceived(up))
+        val moved = (tr.effects.single() as Highlight).target
+        assertEquals("e4", moved.elementId)
+        assertEquals(start.top - 0.125f, moved.rect.top, 1e-4f)
+        // 단서가 없음 (요소 1개뿐) → 틀린 자리를 가리키지 않게 숨김
+        tr = d.send(SnapshotReceived(up.copy(frameId = 12, elements = up.elements.take(1))))
+        assertEquals(listOf(ClearHighlight), tr.effects)
+        // 다시 보이면 다시 그림
+        tr = d.send(SnapshotReceived(menu.copy(frameId = 13)))
+        assertEquals(listOf(Highlight(HighlightTarget("e4", menu.findElement("e4")!!.rect))), tr.effects)
+    }
+
     @Test fun `다른 화면의 스냅샷이 오면 화면 전환으로 보고 바로 다시 묻는다`() {
         val d = waitingOnMenu()
         val tr = d.send(SnapshotReceived(options))
@@ -262,15 +281,33 @@ class SessionStateMachineTest {
 
     // ---------------------------------------------------------------- ⑩ 오류
 
-    @Test fun `서버 요청이 실패하면 오류 안내 뒤 IDLE`() {
+    @Test fun `서버 요청이 실패하면 잠시만요 뒤 같은 내용으로 다시 묻고, 세 번 연달아 실패하면 오류 안내 뒤 IDLE`() {
         val d = planningOnMenu()
-        var tr = d.send { GuideFailed(it) }
+        var tr = d.send { GuideFailed(it) }                               // 무료 LLM이 늦거나 혼잡함 (2026-11-12)
+        assertEquals(Phase.GUIDING, d.phase)
+        assertEquals(listOf(Speak("답이 조금 늦어지고 있어요. 잠시만 기다려 주세요.", d.ticket)), tr.effects)
+        tr = d.send { SpeechFinished(it) }
+        assertEquals(listOf(StartTimer(3_000, d.ticket)), tr.effects)     // 15초가 아니라 3초 뒤
+        tr = d.send { TimedOut(it) }
+        assertEquals(Phase.PLANNING, d.phase)
+        assertEquals("들은 말을 그대로 다시 보낸다", goal, (tr.effects.last() as RequestGuide).request.utterance)
+
+        d.send { GuideFailed(it) }; d.send { SpeechFinished(it) }; d.send { TimedOut(it) }   // 두 번째 실패 → 또 다시 묻기
+        assertEquals(Phase.PLANNING, d.phase)
+        tr = d.send { GuideFailed(it) }                                   // 세 번째 연달아 실패 → 끝
         assertEquals(Phase.ERROR, d.phase)
         assertEquals(Speak("연결이 잠시 불안정해요. 다시 말하기 버튼을 눌러 주세요.", d.ticket), tr.effects.last())
-
         tr = d.send { SpeechFinished(it) }
         assertEquals(Phase.IDLE, d.phase)
         assertEquals(listOf(ClearHighlight), tr.effects)
+    }
+
+    @Test fun `답을 받으면 실패 횟수는 처음부터 다시 센다`() {
+        val d = planningOnMenu()
+        d.send { GuideFailed(it) }; d.send { SpeechFinished(it) }; d.send { TimedOut(it) }
+        d.send { GuideFailed(it) }; d.send { SpeechFinished(it) }; d.send { TimedOut(it) }
+        d.send { GuideReceived(it, GuideResponse(goal, GuideAction.Tap("e4", "아메리카노"))) }
+        assertEquals(0, d.state.guideFailures)
     }
 
     @Test fun `음성 인식 실패 - 말이 없으면 IDLE, 권한 문제면 ERROR`() {
@@ -299,11 +336,104 @@ class SessionStateMachineTest {
 
     // ---------------------------------------------------------------- 그 밖
 
-    @Test fun `IDLE이 아닐 때 말하기 버튼은 무시한다 (진행 중 말하기는 2일차에 결정)`() {
+    // ---------------------------------------------------------------- ⑫ 안내 중 말하기 (2026-11-11 시험: 처음 한 번만 말할 수 있었다)
+
+    @Test fun `안내 중 말하기는 읽던 안내를 끊고 듣는다 - 같은 세션, 목표와 이력은 그대로`() {
         val d = waitingOnMenu()
         val before = d.state
         val tr = d.send(StartPressed("sess-2"))
-        assertEquals(before, d.state)
-        assertTrue(tr.effects.isEmpty())
+        assertEquals(Phase.LISTENING, d.phase)
+        assertEquals(listOf(StopSpeaking, CancelPending, ClearHighlight, StartListening(d.ticket), StartTimer(8_000, d.ticket)), tr.effects)
+        assertEquals("같은 세션", "sess-1", d.state.sessionId)
+        assertEquals(before.goal, d.state.goal)
+        assertEquals(before.history, d.state.history)
+
+        val sent = d.send { SpeechRecognized(it, "따뜻한 걸로요") }        // 들은 말은 utterance로 → 서버가 목표에 붙인다
+        assertEquals(Phase.PLANNING, d.phase)
+        val req = (sent.effects.last() as RequestGuide).request
+        assertEquals("따뜻한 걸로요", req.utterance)
+        assertEquals(goal, req.goal)
+        assertEquals(before.history, req.history)
+    }
+
+    @Test fun `안내 중 말하기에서 못 들으면 세션을 끝내지 않고 하던 안내로 돌아간다`() {
+        val silent = waitingOnMenu().apply { send(StartPressed("x")) }
+        val tr = silent.send { TimedOut(it) }                              // 8초 동안 말이 없음
+        assertEquals(Phase.PLANNING, silent.phase)                         // 최신 화면으로 다시 묻기 (IDLE 아님)
+        assertEquals("sess-1", silent.state.sessionId)
+        assertEquals(StopListening, tr.effects.first())
+
+        val failed = waitingOnMenu().apply { send(StartPressed("x")) }
+        failed.send { SpeechFailed(it, SttError.NETWORK) }
+        assertEquals(Phase.PLANNING, failed.phase)
+
+        // 처음 말하기는 예전처럼: 말이 없으면 세션을 끝낸다
+        val first = Driver().apply { send(StartPressed("s")) }
+        first.send { TimedOut(it) }
+        assertEquals(Phase.IDLE, first.phase)
+    }
+
+    @Test fun `질문에 대답하다 인식이 실패해도 세션을 끝내지 않고 기다렸다가 다시 묻는다`() {
+        val d = planningOnMenu().apply {
+            send { GuideReceived(it, GuideResponse(goal, GuideAction.AskUser("따뜻한 걸로 드릴까요, 차가운 걸로 드릴까요?"))) }
+            send { SpeechFinished(it) }                                    // 질문을 다 읽음 → 듣기
+        }
+        assertEquals(Phase.LISTENING, d.phase)
+        val tr = d.send { SpeechFailed(it, SttError.NETWORK) }             // 2026-11-12 시험: 인식 오류 11번 → 세션이 끝났다
+        assertEquals(Phase.GUIDING, d.phase)
+        assertEquals("sess-1", d.state.sessionId)
+        assertEquals(Speak("말씀을 잘 못 들었어요. 대답하시려면 '말하기'를 누르고 말씀해 주세요.", d.ticket), tr.effects.last())
+        d.send { SpeechFinished(it) }
+        d.send { TimedOut(it) }
+        assertEquals(Phase.PLANNING, d.phase)                               // 최신 화면으로 다시 묻기 → 같은 질문이 다시 나온다
+
+        val silent = planningOnMenu().apply {                               // 말이 없을 때(무음 8초)도 같다
+            send { GuideReceived(it, GuideResponse(goal, GuideAction.AskUser("포장하실 건가요?"))) }
+            send { SpeechFinished(it) }
+            send { TimedOut(it) }
+        }
+        assertEquals(Phase.GUIDING, silent.phase)
+    }
+
+    @Test fun `서버가 답하기 전에 또 말하면 앞의 말과 이어 붙인다`() {
+        val d = planningOnMenu()                                           // 첫 말을 서버에 묻는 중
+        d.send(StartPressed("x"))
+        val tr = d.send { SpeechRecognized(it, "아이스로요") }
+        assertEquals("$goal, 아이스로요", (tr.effects.last() as RequestGuide).request.utterance)
+    }
+
+    @Test fun `듣는 중 말하기는 무시하고, 마무리 안내 중 말하기는 새 세션을 연다`() {
+        val listening = Driver().apply { send(StartPressed("s")) }
+        val before = listening.state
+        assertTrue(listening.send(StartPressed("s2")).effects.isEmpty())
+        assertEquals(before, listening.state)
+
+        val done = planningOnMenu().apply { send { GuideReceived(it, GuideResponse(goal, GuideAction.Done("다 됐어요"))) } }
+        assertEquals(Phase.DONE, done.phase)
+        done.send(StartPressed("sess-2"))
+        assertEquals(Phase.LISTENING, done.phase)
+        assertEquals("sess-2", done.state.sessionId)
+        assertNull(done.state.goal)
+    }
+
+    // ---------------------------------------------------------------- ⑬ 놓친 화면 전환
+
+    @Test fun `화면 번호가 그대로여도 안내한 버튼이 사라지고 새 글자가 여럿이면 다시 묻는다`() {
+        // 메뉴 위에 옵션 창이 떠서 뒤 글자가 그대로 읽히는 바람에 화면 번호가 안 바뀐 경우 (2026-11-11 시험: 4분 동안 같은 안내)
+        val popup = menu.copy(frameId = 11, elements = menu.elements.filter { it.id != "e4" } + listOf(
+            Screens.el("p1", "옵션을 선택해 주세요", 0.2f, 0.3f, 0.8f, 0.35f, ElementKind.TEXT),
+            Screens.el("p2", "취소", 0.2f, 0.7f, 0.45f, 0.75f),
+            Screens.el("p3", "주문담기", 0.55f, 0.7f, 0.8f, 0.75f),
+        ))
+        val d = waitingOnMenu().apply { send(SnapshotReceived(popup)) }
+        assertEquals(Phase.WAIT_CHANGE, d.phase)
+        d.send { TimedOut(it) }
+        assertEquals(Phase.PLANNING, d.phase)
+
+        // 손가락이 버튼을 가린 것뿐이면(처음 보는 글자 없음) 다시 읽기만 한다
+        val covered = menu.copy(frameId = 12, elements = menu.elements.filter { it.id != "e4" })
+        val f = waitingOnMenu().apply { send(SnapshotReceived(covered)) }
+        f.send { TimedOut(it) }
+        assertEquals(Phase.GUIDING, f.phase)
     }
 }

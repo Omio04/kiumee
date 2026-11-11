@@ -25,7 +25,7 @@ object UiTexts {
     }
 
     /** "말하기" 버튼을 누를 수 있는 단계 (진행 중에는 무시된다) */
-    fun canStart(phase: Phase) = phase == Phase.IDLE
+    fun canStart(phase: Phase) = phase != Phase.LISTENING   // 안내 중에도 눌러 말을 보탤 수 있다 (듣는 중만 막음)
 
     /** "그만하기" 버튼은 진행 중에만 보인다 */
     fun canStop(phase: Phase) = phase != Phase.IDLE

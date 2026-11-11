@@ -21,8 +21,14 @@ class Settings:
     anthropic_api_key: str = field(default="", repr=False)
     gemini_api_key: str = field(default="", repr=False)
     llm_model: str = "claude-haiku-5-5"       # p95 2초 예산에 맞춘 빠른 모델 (바꿀 때는 평가 스크립트로 비교)
-    llm_timeout_s: float = 4.0                # 설계: LlmClient 타임아웃 4초
+    llm_timeout_s: float = 5.0                # LlmClient 타임아웃. 무료 Gemini는 가끔 4초를 넘어 4 → 5초 (앱 6초 안)
+    total_budget_s: float = 5.5               # 요청 하나의 서버 처리 예산. 앱 타임아웃(6초) 안에 답이 도착하도록 LLM 재요청을 제한
+    min_retry_s: float = 1.2                  # 남은 예산이 이보다 적으면 형식 오류가 나도 재요청하지 않음
+    hedge_after_s: float = 2.0                # LLM이 이만큼 답이 없으면 같은 요청을 하나 더 보내 먼저 온 답을 쓴다 (0이면 끔)
+    debug_prompts: bool = False               # 개발용: 요청 화면 · 프롬프트 · LLM 원답 · 결정을 서버 기록에 남김 (배포 금지)
     candidate_k: int = 8                      # 설계: 후보 K=8
+    cache_size: int = 256                     # 같은 요청 재처리 방지 (0이면 끔)
+    cache_ttl_s: float = 30.0
     fastpath: bool = True                     # 확실한 경우 LLM을 건너뜀(로컬 규칙)
     fast_min_score: float = 0.85
     fast_margin: float = 0.20
@@ -37,9 +43,15 @@ class Settings:
             llm_provider=e("LLM_PROVIDER", "anthropic").strip().lower(),
             anthropic_api_key=e("ANTHROPIC_API_KEY", ""),
             gemini_api_key=e("GEMINI_API_KEY", ""),
-            llm_model=e("LLM_MODEL", "gemini-2.5-flash-lite" if e("LLM_PROVIDER", "anthropic").strip().lower() == "gemini" else "claude-haiku-5-5"),
-            llm_timeout_s=float(e("LLM_TIMEOUT_S", "4.0")),
+            llm_model=e("LLM_MODEL", "gemini-3.5-flash-lite" if e("LLM_PROVIDER", "anthropic").strip().lower() == "gemini" else "claude-haiku-5-5"),
+            llm_timeout_s=float(e("LLM_TIMEOUT_S", "5.0")),
+            total_budget_s=float(e("TOTAL_BUDGET_S", "5.5")),
+            min_retry_s=float(e("MIN_RETRY_S", "1.2")),
+            hedge_after_s=float(e("HEDGE_AFTER_S", "2.0")),
+            debug_prompts=_env_bool("DEBUG_PROMPTS", False),
             candidate_k=int(e("CANDIDATE_K", "8")),
+            cache_size=int(e("CACHE_SIZE", "256")),
+            cache_ttl_s=float(e("CACHE_TTL_S", "30")),
             fastpath=_env_bool("FASTPATH", True),
             fast_min_score=float(e("FASTPATH_MIN_SCORE", "0.85")),
             fast_margin=float(e("FASTPATH_MARGIN", "0.20")),

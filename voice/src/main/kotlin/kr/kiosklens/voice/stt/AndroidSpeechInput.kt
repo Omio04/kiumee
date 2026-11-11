@@ -25,7 +25,10 @@ import kr.kiosklens.voice.EchoGuard
  * - 계약: `Final` 또는 `Error` **하나**를 내고 플로우 종료 / 수집을 취소하면 마이크 해제 / 실패는 예외가 아니라 `Error`.
  * - 실패(권한 제외)하면 1회 자동으로 다시 듣는다.
  * - [EchoGuard]가 안내 소리 직후 300ms는 기다리게 한다.
- * - 기기 안(온디바이스) 인식이 되면 그것을 쓴다(Android 12+). 안 되면 일반 인식 + 오프라인 선호.
+ * - 처음에는 **오프라인**으로 듣는다: 기기 안(온디바이스) 인식이 되면 그것(Android 12+), 안 되면 일반 인식 + 오프라인만.
+ * - 오프라인 시도가 한국어 모델 없음(오류 12 · 13)을 내면 재시도 횟수를 쓰지 않고 **일반 인식기 + 온라인**으로 바꾼다.
+ *   이후 이 인스턴스는 처음부터 온라인 일반 인식기를 쓴다 (결정 #3 · U7: 폴백 때는 음성이 Google 서버로 갈 수 있음).
+ *   `EXTRA_PREFER_OFFLINE`은 "오프라인 엔진만"이라는 뜻이라, 폴백에서 끄지 않으면 같은 오류가 또 난다.
  * - SpeechRecognizer는 **메인 스레드**에서만 만들고 쓴다.
  * - 로그에는 인식된 글자를 남기지 않는다.
  */
@@ -37,9 +40,12 @@ class AndroidSpeechInput(
 ) : SpeechInput {
     private val main = Handler(Looper.getMainLooper())
     @Volatile private var current: SpeechRecognizer? = null
+    /** 오프라인 인식이 한국어 모델 없음(12 · 13)을 낸 적이 있으면, 이후로는 처음부터 온라인 일반 인식기를 쓴다. */
+    @Volatile private var offlineUnavailable = false
 
     override fun start(): Flow<SttEvent> = callbackFlow {
         if (!SpeechRecognizer.isRecognitionAvailable(context)) {
+            logger.w(TAG, "recognition service unavailable")
             trySend(SttEvent.Error(SttError.NETWORK)); close(); return@callbackFlow
         }
         // 안내 소리의 끝울림이 사라질 때까지 (최대 300ms 씩 몇 번만) 기다린다
@@ -49,6 +55,8 @@ class AndroidSpeechInput(
         var finished = false
         var retried = false
         var recognizer: SpeechRecognizer? = null
+        var usingOffline = true
+        var usingOnDevice = false
 
         fun finish(event: SttEvent) {
             if (finished) return
@@ -59,7 +67,9 @@ class AndroidSpeechInput(
 
         fun begin() {                                                        // 항상 메인 스레드에서 호출
             recognizer?.let { runCatching { it.cancel(); it.destroy() } }
-            val r = createRecognizer()
+            usingOffline = !offlineUnavailable
+            usingOnDevice = usingOffline && canUseOnDevice()
+            val r = createRecognizer(usingOnDevice)
             recognizer = r; current = r
             r.setRecognitionListener(object : RecognitionListener {
                 override fun onReadyForSpeech(params: Bundle?) {}
@@ -79,14 +89,23 @@ class AndroidSpeechInput(
                 }
                 override fun onError(error: Int) {
                     val e = SttMapping.toSttError(error)
-                    logger.w(TAG, "stt error=$error mapped=$e retried=$retried")
-                    if (!finished && SttMapping.shouldRetry(e, retried)) {
-                        retried = true
-                        main.postDelayed({ if (!finished) begin() }, 250)
-                    } else finish(SttEvent.Error(e))
+                    logger.w(TAG, "stt error=$error mapped=$e onDevice=$usingOnDevice offline=$usingOffline retried=$retried")
+                    if (finished) return
+                    when (SttMapping.next(error, usingOffline, retried)) {
+                        SttNext.FALL_BACK_TO_STANDARD -> {
+                            offlineUnavailable = true
+                            logger.w(TAG, "ko-KR offline model missing (error=$error, onDevice=$usingOnDevice), falling back to online standard recognizer")
+                            main.postDelayed({ if (!finished) begin() }, 250)
+                        }
+                        SttNext.RETRY -> {
+                            retried = true
+                            main.postDelayed({ if (!finished) begin() }, 250)
+                        }
+                        SttNext.FINISH -> finish(SttEvent.Error(e))
+                    }
                 }
             })
-            r.startListening(intent())
+            r.startListening(intent(preferOffline = usingOffline))
         }
 
         main.post { if (!finished) runCatching { begin() }.onFailure { logger.e(TAG, "stt start failed", it); finish(SttEvent.Error(SttError.BUSY)) } }
@@ -103,18 +122,22 @@ class AndroidSpeechInput(
         main.post { current?.let { runCatching { it.cancel(); it.destroy() } }; current = null }
     }
 
-    private fun createRecognizer(): SpeechRecognizer =
-        if (Build.VERSION.SDK_INT >= 31 && SpeechRecognizer.isOnDeviceRecognitionAvailable(context))
-            SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+    /** 온디바이스 인식기를 쓸 수 있는가: Android 12+ · 서비스 있음. */
+    private fun canUseOnDevice(): Boolean =
+        Build.VERSION.SDK_INT >= 31 && SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
+
+    private fun createRecognizer(onDevice: Boolean): SpeechRecognizer =
+        if (onDevice && Build.VERSION.SDK_INT >= 31) SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
         else SpeechRecognizer.createSpeechRecognizer(context)
 
-    private fun intent() = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+    /** [preferOffline]: true면 오프라인 엔진만 쓴다 (Android 문서). 폴백(온라인)일 때만 false. */
+    private fun intent(preferOffline: Boolean) = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
         putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
         putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ko-KR")
         putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "ko-KR")
         putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
         putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
-        putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+        putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, preferOffline)
         putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, context.packageName)
         putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, silenceMs)
         putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, silenceMs)
