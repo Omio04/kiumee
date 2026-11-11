@@ -1,7 +1,7 @@
 """PromptBuilder: 짧을수록 빠릅니다. 후보 K개 + 최근 이력 + 화면 문구 몇 개만 넣습니다."""
 from __future__ import annotations
 
-from typing import List, Sequence
+from typing import List, Optional, Sequence
 
 from .models import ActionType, HistoryItem, ScreenElement
 
@@ -30,8 +30,12 @@ JSON 한 줄만 출력하세요 (설명 금지):
 RETRY_NOTE = "\n\n(앞 응답은 형식이 틀렸습니다. 위 JSON 한 줄만, 설명 없이 다시 출력하세요.)"
 
 
+PRESSED_PREFIX = "방금 누른 버튼: "
+
+
 def build_user(goal: str, history: Sequence[HistoryItem], candidates: Sequence[ScreenElement],
-               context_texts: Sequence[str]) -> str:
+               context_texts: Sequence[str], pressed: Optional[str] = None) -> str:
+    """pressed: 직전 '누르기' 안내 뒤 화면이 바뀌었으면 그 버튼 글자 (어르신이 이미 눌렀음 → 다음 단계를 고를 것)."""
     lines: List[str] = [f"목표(어르신 말): {goal.strip() or '(없음)'}"]
     hist = list(history)[-5:]
     if hist:
@@ -39,6 +43,8 @@ def build_user(goal: str, history: Sequence[HistoryItem], candidates: Sequence[S
         for h in hist:
             text = (h.targetText or "")[:80]
             lines.append(f"- {_ACTION_KO[h.action]}: {text}" if text else f"- {_ACTION_KO[h.action]}")
+    if pressed:
+        lines.append(f"{PRESSED_PREFIX}{pressed[:40]} (그 뒤 화면이 바뀜 → 같은 글자를 다시 고르지 말고 흐름상 다음 단계)")
     if context_texts:
         lines.append("화면 문구: " + " | ".join(t[:30] for t in context_texts[:6]))
     lines.append("[후보]")

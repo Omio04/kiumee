@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from typing import Dict, List, Protocol
+from typing import Dict, List, Optional, Protocol
 
 from . import privacy
 from .cache import ResponseCache, request_key
@@ -27,7 +27,7 @@ from .models import (MAX_GOAL, ActionType, ElementKind, GuideAction, GuideReques
                      ScreenElement)
 from .parser import ActionParser, ParseError
 from .prompt import RETRY_NOTE, SYSTEM, build_user
-from .ranker import JamoNgramRanker
+from .ranker import JamoNgramRanker, match_score
 from .settings import Settings
 from .validator import MSG_ASK, MSG_DONE, MSG_UNKNOWN, ActionValidator
 
@@ -58,6 +58,18 @@ def _goal_of(req: GuideRequest) -> str:
     """
     parts = [p.strip() for p in (req.goal, req.utterance) if p and p.strip()]
     return ", ".join(parts)[-MAX_GOAL:]
+
+
+def _pressed_text(req: GuideRequest) -> Optional[str]:
+    """직전 안내가 '누르기'였고 그 뒤 화면이 바뀌었으면(= 어르신이 눌렀음) 그 버튼 글자.
+
+    새 화면에도 같은 글자(담은 목록 · 옵션 창 제목 등)가 있으면 빠른 길이 또 고르는 바람에
+    "아메리카노를 누르세요"가 되풀이됐다 (2026-11-11 시험). 흐름상 다음 단계는 LLM이 이력을 보고 판단한다.
+    """
+    last = req.history[-1] if req.history else None
+    if last and last.action == ActionType.TAP and last.targetText and last.screenId != req.snapshot.screenId:
+        return last.targetText
+    return None
 
 
 def _is_done_screen(elements: List[ScreenElement]) -> bool:
@@ -104,11 +116,13 @@ class LlmGuideAgent:
             return self._finish(GuideResponse(goal=goal, action=GuideAction.unknown(MSG_UNKNOWN), source="fallback"),
                                 meta, t0)
 
-        # 4) 빠른 길
+        # 4) 빠른 길 — 방금 누른 버튼과 같은 글자면 쓰지 않는다 (화면이 바뀌었으니 다음 단계는 LLM이 이력으로 판단)
+        pressed = _pressed_text(req)
         if self.s.fastpath and goal:
             top = ranked[0]
             second = ranked[1].match if len(ranked) > 1 else 0.0
-            if top.match >= self.s.fast_min_score and top.match - second >= self.s.fast_margin:
+            repeat = pressed is not None and match_score(top.element.text, pressed) >= self.s.fast_min_score
+            if not repeat and top.match >= self.s.fast_min_score and top.match - second >= self.s.fast_margin:
                 meta["source"] = "fastpath"
                 return self._finish(GuideResponse(goal=goal, action=GuideAction.tap(top.element.id, top.element.text),
                                                   source="fastpath"), meta, t0)
@@ -117,7 +131,7 @@ class LlmGuideAgent:
         candidates = [r.element for r in ranked]
         by_id = {c.id: c for c in candidates}
         context = [e.text for e in els if e.kind == ElementKind.TEXT][:6]
-        user = build_user(goal, req.history, candidates, context)
+        user = build_user(goal, req.history, candidates, context, pressed=pressed)
 
         action = None
         deadline = t0 + self.s.total_budget_s
