@@ -25,19 +25,22 @@ internal class ScreenTracker(
             return null
         }
         val keys = signature(lines)
-        val isNew = screenNumber == 0 || similarity(reference, keys) < 0.6
+        // 히스테리시스: 지금 화면은 STAY만 넘으면 유지하고, 새 화면은 연속 두 프레임이 CONFIRM을 넘어야 확정한다.
+        // 흐린 프레임 하나에 "새 화면 후보"가 되어 두 프레임씩 확정이 끊기던 문제 (2026-11-11 웹캠 측정)
+        val isNew = screenNumber == 0 || similarity(reference, keys) < STAY
         if (isNew) {
             val candidate = pending
             pending = keys
             previous = emptyList()
             stableFrames = 0
-            if (candidate == null || similarity(candidate, keys) < 0.6) return null
+            if (candidate == null || similarity(candidate, keys) < CONFIRM) return null
             screenNumber++
             reference = keys
             ids.reset()
             stableFrames = 2
         } else {
             stableFrames = if (pending != null) 1 else (stableFrames + 1).coerceAtMost(Int.MAX_VALUE - 1)
+            if (keys.size > reference.size) reference = keys        // 같은 화면을 더 많이 읽은 프레임을 새 기준으로
         }
         pending = null
         if (stableFrames < 2) {
@@ -73,6 +76,13 @@ internal class ScreenTracker(
      * 정확히 같은 것만 세면 같은 화면인데도 0.6을 못 넘어 확정이 안 됐다 (2026-11-11 웹캠 확인).
      * 오타가 없으면 예전 자카드와 값이 같다.
      */
+    private companion object {
+        /** 새 화면 확정: 연속 두 프레임이 이만큼 같아야 한다 (예전 기준 그대로). */
+        const val CONFIRM = 0.6
+        /** 지금 화면 유지: 기준과 이만큼만 같아도 같은 화면. 진짜 화면 전환(같은 틀에 메뉴만 바뀜)은 보통 0.3대 */
+        const val STAY = 0.45
+    }
+
     private fun similarity(a: Set<String>, b: Set<String>): Double {
         if (a.isEmpty() && b.isEmpty()) return 1.0
         val exact = a.intersect(b)

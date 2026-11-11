@@ -41,6 +41,21 @@ class ScreenTrackerTest {
         assertEquals("s1", again.snapshot.screenId)
     }
 
+    @Test fun oneBlurryFrameDoesNotBreakTheCurrentScreen() {
+        val tracker = ScreenTracker()
+        val menu = screen("아메리카노", "카페라떼", "바닐라라떼", "에스프레소", "담기", "취소")
+        tracker.update(menu); assertEquals("s1", tracker.update(menu)!!.snapshot.screenId)
+        // 흐려서 절반만 제대로 읽힌 프레임 (유사도 0.5): 예전에는 새 화면 후보가 되어 확정이 끊겼다
+        val blurry = screen("아메리카노", "카페라떼", "바닐라라떼", "담기", "쥐소", "에프레")
+        val kept = tracker.update(blurry)!!
+        assertFalse(kept.changed)
+        assertEquals("s1", kept.snapshot.screenId)
+        // 진짜 다른 화면은 여전히 두 번 보이면 바뀐다
+        val pay = screen("신용카드", "삼성페이", "카카오페이", "쿠폰 사용", "이전")
+        assertNull(tracker.update(pay))
+        assertTrue(tracker.update(pay)!!.changed)
+    }
+
     @Test fun pricesReadDifferentlyEveryFrameDoNotBlockConfirmation() {
         // 같은 메뉴 화면인데 가격을 프레임마다 다르게 읽는다 ("W 9,999" → "W 9,909" · "WS,999" · "W 8,999")
         val tracker = ScreenTracker()
