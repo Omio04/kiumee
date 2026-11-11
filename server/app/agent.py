@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Protocol
@@ -31,6 +32,8 @@ from .prompt import RETRY_NOTE, SYSTEM, build_user
 from .ranker import JamoNgramRanker, answer_button, is_flow_button, same_item
 from .settings import Settings
 from .validator import MSG_ASK, MSG_DONE, MSG_UNKNOWN, ActionValidator
+
+log = logging.getLogger("kl")
 
 # 결제가 "진행 중"이라는 뜻의 화면 문구. 이 계획의 범위는 결제 수단 선택까지라서, 보이면 안내를 마칩니다.
 _DONE_PATTERNS = [normalize(p) for p in (
@@ -119,6 +122,10 @@ class LlmGuideAgent:
         meta["dropped"] = dropped
         els = req.snapshot.elements
         goal = _goal_of(req)
+        if self.s.debug_prompts:                       # 개발용 진단 (개인정보 걸러낸 뒤의 내용 · 로컬 기록에만)
+            log.info("KL_DEBUG 요청 screen=%s goal=%r utter=%r 이력=%s 화면=%s", req.snapshot.screenId, goal, req.utterance,
+                     [(h.action.value, h.targetText, h.screenId) for h in req.history],
+                     [e.text for e in sorted(els, key=lambda e: (round(e.rect.top, 2), e.rect.left))][:30])
 
         key = request_key(goal, req)
         cached = self.cache.get(key)
@@ -156,7 +163,9 @@ class LlmGuideAgent:
         # 5) LLM
         candidates = [r.element for r in ranked]
         by_id = {c.id: c for c in candidates}
-        context = [e.text for e in els if e.kind == ElementKind.TEXT][:6]
+        # 화면 전체 글자를 위→아래로: 바뀐 화면이 원하는 메뉴의 옵션 창인지 · 다른 메뉴인지 · 다른 분류인지 LLM이 판단한다
+        # (예전엔 일반 글자 6개만 보여서 판단할 근거가 없었다, 2026-11-12 시험)
+        context = [e.text for e in sorted(els, key=lambda e: (round(e.rect.top, 2), e.rect.left))][:30]
         user = build_user(goal, req.history, candidates, context, pressed=pressed, chosen=chosen)
 
         action = None
@@ -168,6 +177,8 @@ class LlmGuideAgent:
             timeout = max(0.5, min(self.s.llm_timeout_s, remaining))
             raw = await self._complete(user if attempt == 0 else user + RETRY_NOTE, timeout, list(by_id), meta)
             meta["llm_calls"] = int(meta["llm_calls"]) + 1
+            if self.s.debug_prompts:
+                log.info("KL_DEBUG LLM 원답=%s", raw)
             try:
                 action = self.parser.parse(raw)
                 break
@@ -218,9 +229,12 @@ class LlmGuideAgent:
                 if not t.done():
                     t.cancel()
 
-    @staticmethod
-    def _finish(resp: GuideResponse, meta: Dict[str, object], t0: float) -> GuideResult:
+    def _finish(self, resp: GuideResponse, meta: Dict[str, object], t0: float) -> GuideResult:
         meta["total_ms"] = round((time.perf_counter() - t0) * 1000, 1)
+        if self.s.debug_prompts:
+            a = resp.action
+            log.info("KL_DEBUG → %s %r (source=%s, %sms)", a.type.value, a.guideText or a.question or a.reason,
+                     meta.get("source"), meta["total_ms"])
         return GuideResult(resp, meta)
 
 

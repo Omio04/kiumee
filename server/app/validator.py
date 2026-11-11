@@ -48,7 +48,9 @@ class ActionValidator:
                 return GuideResponse(goal=goal, action=GuideAction.unknown(MSG_UNKNOWN), source="fallback")
             return GuideResponse(goal=goal, action=GuideAction.tap(el.id, el.text), source=source)
         if a.action == LlmKind.ASK_USER:
-            return GuideResponse(goal=goal, action=GuideAction.ask_user(_clean_message(a.message, MSG_ASK)), source=source)
+            # 질문이 message가 아니라 guideText 칸에 들어오는 일이 있다 (Gemini, 2026-11-12) → 질문 문장이면 그걸 쓴다
+            q = a.message or (a.guideText if (a.guideText or "").strip().endswith(("?", "요", "까")) else None)
+            return GuideResponse(goal=goal, action=GuideAction.ask_user(_clean_message(q, MSG_ASK)), source=source)
         if a.action == LlmKind.DONE:
             return GuideResponse(goal=goal, action=GuideAction.done(_clean_message(a.message, MSG_DONE)), source=source)
         if a.action == LlmKind.SCROLL:

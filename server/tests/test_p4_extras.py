@@ -149,7 +149,11 @@ async def test_gemini_sends_response_schema_with_upper_case_types():
     assert await c.complete("s", "u", 4) == '{"action":"DONE"}'
     schema = seen["b"]["generationConfig"]["responseSchema"]
     assert schema["type"] == "OBJECT" and schema["properties"]["action"]["type"] == "STRING"
-    assert "GUIDE" in schema["properties"]["action"]["enum"] and schema["required"] == ["action"]
+    assert "GUIDE" in schema["properties"]["action"]["enum"]
+    # 모든 칸을 반드시 쓰게 (쓸 일 없으면 null): ASK_USER인데 질문 칸을 건너뛰던 문제 (2026-11-12)
+    assert set(schema["required"]) == set(schema["properties"])
+    assert all(p.get("nullable") for k, p in schema["properties"].items() if k != "action")
+    assert schema["propertyOrdering"][:2] == ["action", "message"]
     # Gemini 3 계열은 temperature를 낮추면 출력이 망가진다 (0일 때 번호 칸에 문장이 섞임, 2026-11-12) → 보내지 않는다
     assert "temperature" not in seen["b"]["generationConfig"]
     assert "enum" not in schema["properties"]["targetId"]                     # 후보를 안 주면 묶지 않는다

@@ -30,7 +30,8 @@ ACTION_SCHEMA = {
         "action": {"type": "string", "enum": _ACTIONS},
         "targetId": {"type": "string", "description": "GUIDE일 때 [후보]의 id"},
         "guideText": {"type": "string", "description": "GUIDE일 때 버튼 글자, SCROLL일 때 찾는 메뉴 이름 (문장 아님)"},
-        "message": {"type": "string", "description": "ASK_USER · DONE · UNKNOWN · WAIT일 때 쉬운 존댓말 한 문장"},
+        "message": {"type": "string", "description": "ASK_USER면 어르신께 할 질문(필수, 예: 따뜻한 걸로 드릴까요, 차가운 걸로 드릴까요?). "
+                                                     "DONE · UNKNOWN · WAIT면 쉬운 존댓말 한 문장"},
         "direction": {"type": "string", "enum": _DIRECTIONS, "description": "SCROLL일 때만"},
     },
     "required": ["action"],
@@ -138,13 +139,26 @@ class AnthropicLlmClient:
         await self._http.aclose()
 
 
+_GEMINI_ORDER = ["action", "message", "targetId", "guideText", "direction"]
+
+
 def _gemini_schema(target_ids: Optional[Sequence[str]] = None) -> dict:
-    """Gemini responseSchema는 OpenAPI 부분집합이라 대문자 type을 씁니다 (description · enum은 그대로 허용)."""
+    """Gemini responseSchema는 OpenAPI 부분집합이라 대문자 type을 씁니다 (description · enum은 그대로 허용).
+
+    모든 칸을 required + nullable로 둔다: 선택 칸이면 모델이 자주 건너뛴다 — ASK_USER인데 질문(message)을 안 써서
+    기본 질문 "무엇을 드시고 싶으세요?"로 바뀌었다 (2026-11-12 시험). 쓸 일 없는 칸은 null로 채운다.
+    순서도 action 다음에 message가 오게 해서 질문을 먼저 쓰게 한다."""
     def conv(n):
         if isinstance(n, dict):
             return {k: (v.upper() if k == "type" and isinstance(v, str) else conv(v)) for k, v in n.items()}
         return n
-    return conv(action_schema(target_ids))
+    s = conv(action_schema(target_ids))
+    for name, prop in s["properties"].items():
+        if name != "action":
+            prop["nullable"] = True
+    s["required"] = list(s["properties"])
+    s["propertyOrdering"] = [k for k in _GEMINI_ORDER if k in s["properties"]]
+    return s
 
 
 class GeminiLlmClient:

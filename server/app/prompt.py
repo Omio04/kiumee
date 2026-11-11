@@ -19,7 +19,10 @@ SYSTEM = """키오스크 안내 도우미의 판단기입니다. 화면 버튼 �
 규칙:
 - targetId는 반드시 [후보] 목록에 있는 id여야 합니다. 맞는 버튼이 없으면 action은 UNKNOWN.
 - 흐름: 메뉴 → 옵션 → 장바구니 → 결제 수단 선택. 결제 수단을 이미 눌렀거나 결제 진행 문구가 보이면 DONE. 결제 수단을 고르는 화면 자체는 DONE이 아니다(아직 고를 게 남음).
-- [이미 고른 메뉴]는 다시 고르지 말고(어르신이 더 달라고 했을 때만) 흐름상 다음 단계를 고르세요: 옵션 → 담기·확인 → 결제하기 → 결제 수단.
+- [방금 안내한 버튼] 뒤 화면이 바뀌었으면 먼저 [화면 글자]로 지금 무슨 화면인지 확인하세요 (눌렀다고 단정하지 말 것):
+  ① 원하는 메뉴의 옵션·상세 창(제목에 그 메뉴 이름) → 다음 단계 ② 다른 메뉴의 옵션·상세 창 → 잘못 눌린 것이니 취소·닫기·이전 버튼
+  ③ 메뉴 목록만 바뀜(다른 분류) → 원하는 메뉴가 보이면 그 메뉴, 없으면 그 메뉴가 있을 분류 탭(예: 커피) ④ 장바구니·선택 목록에 원하는 메뉴가 담김 → 결제 단계로
+- [앞서 안내한 메뉴]가 장바구니·선택 목록에 이미 있으면 다시 고르지 말고(어르신이 더 달라고 했을 때만) 흐름상 다음 단계를 고르세요: 옵션 → 담기·확인 → 결제하기 → 결제 수단.
 - 어르신 말에 없는 선택은 마음대로 고르지 말고 ASK_USER로 물으세요: 따뜻한/차가운(HOT/ICE), 크기, 샷·시럽 같은 추가 옵션이 보이면 "따뜻한 걸로 드릴까요, 차가운 걸로 드릴까요?", "샷이나 시럽을 추가하실래요?"처럼. 매장/포장, 결제 수단도 같다. 이력에 같은 질문이 있으면 다시 묻지 말고 대답대로 하고, "아니요·괜찮아요"면 추가 없이 담기·확인으로 넘어갑니다.
 - 원하는 버튼이 후보에 없지만 목록·메뉴가 더 있을 것 같으면 SCROLL(direction: UP|DOWN|LEFT|RIGHT, 보통 DOWN). 화면이 로딩 중이거나 바뀌는 중이면 WAIT.
 - 어르신이 무엇을 원하는지 모르겠으면 ASK_USER와 40자 이내의 짧은 질문.
@@ -32,8 +35,9 @@ JSON 한 줄만 출력하세요 (설명 금지):
 RETRY_NOTE = "\n\n(앞 응답은 형식이 틀렸습니다. 위 JSON 한 줄만, 설명 없이 다시 출력하세요.)"
 
 
-PRESSED_PREFIX = "방금 누른 버튼: "
-CHOSEN_PREFIX = "이미 고른 메뉴: "
+PRESSED_PREFIX = "방금 안내한 버튼: "
+CHOSEN_PREFIX = "앞서 안내한 메뉴: "
+SCREEN_PREFIX = "화면 글자(위→아래): "
 
 
 def build_user(goal: str, history: Sequence[HistoryItem], candidates: Sequence[ScreenElement],
@@ -49,11 +53,11 @@ def build_user(goal: str, history: Sequence[HistoryItem], candidates: Sequence[S
             text = (h.targetText or "")[:80]
             lines.append(f"- {_ACTION_KO[h.action]}: {text}" if text else f"- {_ACTION_KO[h.action]}")
     if pressed:
-        lines.append(f"{PRESSED_PREFIX}{pressed[:40]} (눌러서 화면이 바뀜 → 흐름상 다음 단계)")
+        lines.append(f"{PRESSED_PREFIX}{pressed[:40]} (그 뒤 화면이 바뀜 → [화면 글자]로 정말 그 버튼이 눌렸는지 확인)")
     if chosen:
-        lines.append(f"{CHOSEN_PREFIX}{', '.join(c[:30] for c in list(chosen)[:5])} (다시 고르지 말 것)")
-    if context_texts:
-        lines.append("화면 문구: " + " | ".join(t[:30] for t in context_texts[:6]))
+        lines.append(f"{CHOSEN_PREFIX}{', '.join(c[:30] for c in list(chosen)[:5])} (장바구니·선택 목록에 있으면 다시 고르지 말 것)")
+    if context_texts:                              # 화면 전체를 읽는 순서로: 무슨 화면인지(옵션 창 · 다른 분류 · 장바구니) 판단용
+        lines.append(SCREEN_PREFIX + " | ".join(t[:20] for t in context_texts[:30]))
     lines.append("[후보]")
     for c in candidates:
         lines.append(f"{c.id}|{c.text}")

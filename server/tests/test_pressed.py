@@ -3,7 +3,7 @@
 from app.agent import LlmGuideAgent, _chosen_items, _pressed_text
 from app.llm import HeuristicFakeLlmClient, ScriptedFakeLlmClient
 from app.models import GuideRequest
-from app.prompt import CHOSEN_PREFIX, PRESSED_PREFIX, build_user
+from app.prompt import CHOSEN_PREFIX, PRESSED_PREFIX, SCREEN_PREFIX, build_user
 from app.ranker import is_flow_button
 from app.settings import Settings
 from .conftest import make_req
@@ -88,6 +88,17 @@ async def test_short_answer_never_takes_the_fastpath(snaps):
     r = await LlmGuideAgent(llm, Settings(app_key="k")).next(req)
     assert r.meta["source"] != "fastpath" and len(llm.calls) == 1
     assert "샷이나 시럽을 추가하실래요?" in llm.calls[0]["user"]                # 무엇에 대한 대답인지 LLM이 본다
+
+
+async def test_llm_sees_the_whole_screen_in_reading_order(snaps):
+    """바뀐 화면이 원하는 메뉴의 옵션 창인지 · 다른 메뉴인지 · 다른 분류인지 판단하려면 화면 전체 글자가 필요하다
+    (예전엔 일반 글자 6개만 보여 줬다, 2026-11-12 시험)."""
+    llm = ScriptedFakeLlmClient(['{"action":"UNKNOWN"}'])
+    req = GuideRequest.model_validate(make_req(snaps, "s03_options", goal="아메리카노 주세요", history=TAPPED))
+    await LlmGuideAgent(llm, Settings(app_key="k")).next(req)
+    line = next(x for x in llm.calls[0]["user"].splitlines() if x.startswith(SCREEN_PREFIX))
+    assert line.index("아메리카노 옵션 선택") < line.index("HOT") < line.index("담기")    # 제목부터 위→아래
+    assert "정말 그 버튼이 눌렸는지 확인" in llm.calls[0]["user"]                        # 눌렀다고 단정하지 않는다
 
 
 async def test_llm_gets_candidate_ids_to_restrict_its_answer(snaps):
