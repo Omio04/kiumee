@@ -41,6 +41,10 @@ import kr.kiosklens.app.ui.MicButtonView
 import kr.kiosklens.app.ui.MicRipple
 import kr.kiosklens.app.ui.OrbState
 import kr.kiosklens.app.ui.RecognitionStatus
+import kr.kiosklens.app.ui.ViewfinderLook
+import kr.kiosklens.app.ui.ViewfinderView
+import kr.kiosklens.app.ui.VignetteView
+import kr.kiosklens.app.ui.MiniMascotView
 import kr.kiosklens.app.ui.UiTexts
 import kr.kiosklens.core.model.ScreenSnapshot
 import kr.kiosklens.domain.session.Phase
@@ -71,7 +75,11 @@ class MainActivity : AppCompatActivity() {
     private var graph: Graph? = null
     private var camera: CameraController? = null
 
-    // 확인용 (디버그 빌드만): 카메라가 인식한 글자 · 버튼을 미리보기 위에 그리고, 위쪽 줄에 인식 상태를 보여 준다
+    private lateinit var viewfinder: ViewfinderView
+
+    // 개발자 확인용: 카메라가 인식한 글자 · 버튼을 미리보기 위에 그리고, 위쪽 줄에 인식 상태를 보여 준다.
+    // 평소 화면을 어지럽혀서 (2026-11-12) local.properties 에 kl.showRecognition=true 를 넣은 디버그 빌드에서만 켠다
+    private val devOverlay = BuildConfig.DEBUG && BuildConfig.SHOW_RECOGNITION
     private var recognition: RecognitionView? = null
     private var debugLine: TextView? = null
     private var showRecognition = true
@@ -170,14 +178,13 @@ class MainActivity : AppCompatActivity() {
         loading.postDelayed({ finishLoading() }, MAX_LOADING_MS)
         if (BuildConfig.SERVER_URL.isBlank()) { note.text = getString(R.string.need_server); note.visibility = View.VISIBLE }
         if (BuildConfig.DEBUG) ensureLocalNetworkPermission()
-        if (BuildConfig.DEBUG) {
-            ui.launch { g.snapshots.collect { s -> lastSnapshot = s; recognition?.show(s); renderDebug() } }
-            ui.launch { g.scanStatus.collect { st ->
-                lastScan = st
-                if (st != ScanStatus.READY) recognition?.clear()                    // 카메라를 돌리면 옛 테두리를 바로 지운다
-                renderDebug()
-            } }
-        }
+        if (devOverlay) ui.launch { g.snapshots.collect { s -> lastSnapshot = s; recognition?.show(s); renderDebug() } }
+        ui.launch { g.scanStatus.collect { st ->                                   // 키오스크 글자를 읽었는지 → 조준 모서리
+            lastScan = st
+            if (st != ScanStatus.READY) recognition?.clear()                        // 카메라를 돌리면 옛 테두리를 바로 지운다
+            renderDebug()
+            render()
+        } }
         g.runner.start()
         ui.launch { g.runner.state.collect { render() } }
         ui.launch { g.voiceLevel.collect { micButton.level = it } }                // 목소리 크기 → 파동 크기
@@ -187,7 +194,9 @@ class MainActivity : AppCompatActivity() {
     private fun render() {
         val g = graph ?: return
         val phase = g.runner.state.value.phase
-        micButton.state = OrbState.of(phase)                                       // 자막 대신 구슬의 색 · 움직임으로 상태를
+        val orb = OrbState.of(phase)
+        micButton.state = orb                                                      // 자막 대신 구슬의 색 · 움직임으로 상태를
+        viewfinder.look = ViewfinderLook.of(lastScan == ScanStatus.READY, orb)   // 키오스크를 찾았는지는 조준 모서리로
         val description = UiTexts.micDescription(phase)                          // 자막 대신 TalkBack이 읽는 설명
         if (micButton.contentDescription != description) micButton.contentDescription = description
     }
@@ -211,11 +220,17 @@ class MainActivity : AppCompatActivity() {
         val match = ViewGroup.LayoutParams.MATCH_PARENT
 
         preview = PreviewView(this).apply { scaleType = PreviewView.ScaleType.FILL_CENTER }.also { root.addView(it, FrameLayout.LayoutParams(match, match)) }
-        // 화면 아래 은은한 그림자 띠: 어떤 카메라 화면 위에서도 구슬이 또렷하게. 노란 안내 테두리보다 아래라 테두리는 어두워지지 않는다
+        // 가장자리는 은은하게 어둡게, 위아래는 그림자 띠: 가운데 키오스크에 시선이 모이고 시계 · 구슬이 또렷하게.
+        // 모두 노란 안내 테두리보다 아래라 테두리는 어두워지지 않는다
+        root.addView(VignetteView(this), FrameLayout.LayoutParams(match, match))
         View(this).apply {
             background = GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP, intArrayOf(Color.argb(115, 0, 0, 0), Color.TRANSPARENT))
         }.also { root.addView(it, FrameLayout.LayoutParams(match, dp(280), Gravity.BOTTOM)) }
-        if (BuildConfig.DEBUG) recognition = RecognitionView(this).also { root.addView(it, FrameLayout.LayoutParams(match, match)) }   // 노란 테두리보다 아래
+        View(this).apply {
+            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(Color.argb(110, 0, 0, 0), Color.TRANSPARENT))
+        }.also { root.addView(it, FrameLayout.LayoutParams(match, dp(150), Gravity.TOP)) }
+        viewfinder = ViewfinderView(this).also { root.addView(it, FrameLayout.LayoutParams(match, match)) }   // 키오스크를 담을 자리
+        if (devOverlay) recognition = RecognitionView(this).also { root.addView(it, FrameLayout.LayoutParams(match, match)) }   // 노란 테두리보다 아래
         overlay = ViewOverlay(this).also { root.addView(it, FrameLayout.LayoutParams(match, match)) }
 
         // 문제가 있을 때만 보이는 안내 (서버 주소 · 로컬 네트워크). 평소 화면에는 글자가 없다. 권한 안내는 로딩 화면이 맡는다
@@ -248,7 +263,25 @@ class MainActivity : AppCompatActivity() {
             insets
         }
         root.addView(bottom, FrameLayout.LayoutParams(match, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM))
-        if (BuildConfig.DEBUG) {
+
+        // 왼쪽 위 작은 키우미 표시 (앱 표시일 뿐 안내 글자가 아니다)
+        val brand = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+            addView(MiniMascotView(this@MainActivity), LinearLayout.LayoutParams(dp(34), dp(34)))
+            addView(TextView(this@MainActivity).apply {
+                text = getString(R.string.app_name); setTextColor(Color.WHITE); setTextSize(TypedValue.COMPLEX_UNIT_SP, 19f)
+                typeface = Typeface.DEFAULT_BOLD; setShadowLayer(dp(4).toFloat(), 0f, dp(1).toFloat(), Color.argb(120, 0, 0, 0))
+            }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { marginStart = dp(10) })
+        }
+        ViewCompat.setOnApplyWindowInsetsListener(brand) { v, insets ->                  // 상태 표시줄 바로 아래
+            v.setPadding(dp(20), insets.getInsets(WindowInsetsCompat.Type.systemBars()).top + dp(12), dp(20), 0)
+            insets
+        }
+        root.addView(brand, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP or Gravity.START))
+
+        // 개발자 확인용 (local.properties kl.showRecognition=true 인 디버그 빌드만): 인식 상태 줄 · 글자 네모
+        if (devOverlay) {
             debugLine = TextView(this).apply {
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f); setTextColor(Color.WHITE); setBackgroundColor(Color.argb(170, 0, 0, 0))
                 setPadding(dp(12), dp(36), dp(12), dp(8))                                       // 위 상태 표시줄 아래로
@@ -269,7 +302,7 @@ class MainActivity : AppCompatActivity() {
         const val REQ_LOCAL = 101
         /** 마이크 버튼(원) 지름. 어르신이 누르기 쉽게 크게 (핵심 버튼 72dp 이상) */
         const val MIC_DP = 96
-        /** 로딩 화면 최소 시간: 노란 테두리 그리기(0.25초 뒤 0.9초)를 끝까지 보여 준다 */
+        /** 로딩 화면 최소 시간: 캐릭터 아래 글자가 떠오르는 것까지 보여 준다 */
         const val MIN_LOADING_MS = 1500L
         /** 이만큼 지나도 카메라가 안 켜지면 "조금만 기다려 주세요" */
         const val SLOW_LOADING_MS = 4000L

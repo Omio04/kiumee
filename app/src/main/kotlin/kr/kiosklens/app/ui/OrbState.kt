@@ -35,6 +35,26 @@ enum class OrbState {
     }
 }
 
+/** 카메라 화면 조준 모서리의 모습 ([ViewfinderView]) */
+enum class ViewfinderLook {
+    /** 키오스크 화면을 찾는 중: 하얀 모서리가 숨 쉰다 */
+    SEARCHING,
+    /** 키오스크 글자를 읽음: 맑은 하늘색으로 바뀌며 살짝 조여든다 */
+    FOUND,
+    /** 노란 안내 테두리가 있는 동안: 옅게 (테두리가 돋보이게) */
+    QUIET,
+    /** 화면을 놓침 · 오류: 주황빛 */
+    PROBLEM;
+
+    companion object {
+        fun of(scanReady: Boolean, orb: OrbState): ViewfinderLook = when (orb) {
+            OrbState.PROBLEM -> PROBLEM
+            OrbState.SPEAKING, OrbState.DONE -> if (scanReady) QUIET else SEARCHING
+            else -> if (scanReady) FOUND else SEARCHING
+        }
+    }
+}
+
 /** 구슬의 움직임 계산 (그리는 쪽과 떼어 기기 없이 테스트). 모두 경과 시간(ms)만으로 정해진다. */
 object OrbMotion {
     /** 숨 쉬기 한 번 */

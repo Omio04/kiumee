@@ -2,6 +2,7 @@ package kr.kiosklens.app
 
 import kr.kiosklens.app.ui.OrbMotion
 import kr.kiosklens.app.ui.OrbState
+import kr.kiosklens.app.ui.ViewfinderLook
 import kr.kiosklens.domain.session.Phase
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -54,5 +55,14 @@ class OrbStateTest {
         for (t in 0L..1500L step 20) { val v = OrbMotion.trace(t); assertTrue(v >= last); last = v }
         // 처음엔 빠르고 끝에서 천천히 (짚어서 멈추는 느낌): 앞 절반에 이미 80% 넘게 그린다
         assertTrue(OrbMotion.trace(OrbMotion.TRACE_DELAY_MS + OrbMotion.TRACE_MS / 2) > 0.8f)
+    }
+
+    @Test fun `조준 모서리는 키오스크를 찾았는지와 안내 상태를 보여 준다`() {
+        assertEquals(ViewfinderLook.SEARCHING, ViewfinderLook.of(false, OrbState.IDLE))
+        assertEquals("글자를 읽으면 찾았다는 신호", ViewfinderLook.FOUND, ViewfinderLook.of(true, OrbState.IDLE))
+        assertEquals(ViewfinderLook.FOUND, ViewfinderLook.of(true, OrbState.LISTENING))
+        assertEquals("노란 안내 테두리가 있는 동안엔 옅게", ViewfinderLook.QUIET, ViewfinderLook.of(true, OrbState.SPEAKING))
+        assertEquals(ViewfinderLook.PROBLEM, ViewfinderLook.of(true, OrbState.PROBLEM))
+        assertEquals(ViewfinderLook.PROBLEM, ViewfinderLook.of(false, OrbState.PROBLEM))
     }
 }
