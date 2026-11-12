@@ -1,10 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">키오스크 렌즈</string>
-    <string name="start">말하기</string>
-    <string name="stop">그만하기</string>
+    <string name="app_name">키우미</string>
     <string name="open_settings">설정 열기</string>
     <string name="need_permission">카메라와 마이크를 쓸 수 있게 허용해 주세요.</string>
     <string name="need_server">서버 주소가 설정되지 않았어요. README의 \'서버 연결\'을 따라 설정해 주세요.</string>
     <string name="need_local_network">서버에 연결하려면 \'로컬 네트워크\' 권한이 필요해요. 설정 → 앱 → 키오스크 렌즈 → 권한에서 허용해 주세요.</string>
+    <string name="loading_tagline">키오스크, 같이 해요</string>
+    <string name="loading_camera">카메라를 켜는 중이에요</string>
+    <string name="loading_slow">조금만 기다려 주세요</string>
+    <string name="loading_need_permission">카메라와 마이크를\n쓸 수 있게 허용해 주세요</string>
 </resources>

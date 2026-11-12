@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 테마 아이콘(Android 13+)용 한 색 키우미: 선으로 그린 화면 · 눈 · 웃는 입 · 받침 (시스템이 색을 입힌다) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:strokeColor="#FF000000" android:strokeWidth="3.4" android:pathData="M43,30 H65 A10,10 0 0 1 75,40 V56 A10,10 0 0 1 65,66 H43 A10,10 0 0 1 33,56 V40 A10,10 0 0 1 43,30 Z" />
+    <path android:fillColor="#FF000000" android:pathData="M50,66 H58 V72 H50 Z" />
+    <path android:fillColor="#FF000000" android:pathData="M44.25,71.5 H63.75 A2.25,2.25 0 0 1 63.75,76 H44.25 A2.25,2.25 0 0 1 44.25,71.5 Z" />
+    <path android:fillColor="#FF000000" android:pathData="M43.5,44.5 a3,3 0 1 0 6,0 a3,3 0 1 0 -6,0 Z" />
+    <path android:fillColor="#FF000000" android:pathData="M58.5,44.5 a3,3 0 1 0 6,0 a3,3 0 1 0 -6,0 Z" />
+    <path android:strokeColor="#FF000000" android:strokeWidth="3" android:strokeLineCap="round" android:pathData="M47.5,51.5 Q54,57.5 60.5,51.5" />
+</vector>

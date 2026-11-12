@@ -32,5 +32,14 @@ class UiTextsTest {
     @Test fun `문구에 비난이나 전문용어가 없다`() {
         val banned = listOf("실패", "오류", "에러", "잘못", "OCR", "서버", "STT", "TTS")
         for (p in Phase.values()) { val t = UiTexts.status(p, null); assertTrue("$p: $t", banned.none { t.contains(it) }) }
+        for (p in Phase.values()) { val t = UiTexts.micDescription(p); assertTrue("$p: $t", banned.none { t.contains(it) }) }
+    }
+
+    @Test fun `자막을 없앤 대신 마이크 버튼 설명에 상태와 쓰는 법을 담는다`() {
+        assertTrue(UiTexts.micDescription(Phase.IDLE).contains("누르고"))
+        assertTrue(UiTexts.micDescription(Phase.LISTENING).contains("듣고 있어요"))
+        val guiding = UiTexts.micDescription(Phase.GUIDING)
+        assertTrue(guiding.startsWith("노란 테두리를 눌러 주세요") && guiding.contains("길게 누르세요"))   // 길게 누르기 = 처음부터
+        for (p in Phase.values()) assertFalse("$p", UiTexts.micDescription(p).contains("\n"))
     }
 }

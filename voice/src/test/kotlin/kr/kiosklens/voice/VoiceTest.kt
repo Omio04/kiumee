@@ -15,6 +15,13 @@ import org.junit.Test
  * 포트 계약(Final/Error 하나 · 끝까지 읽고 복귀 · 취소 즉시 중단)은 기기에서 확인한다 (voice/README.md).
  */
 class VoiceMappingTest {
+    @Test fun `소리 크기는 0~1로 (마이크 버튼 파동용)`() {
+        assertEquals(0f, SttMapping.level(-10f), 0f)                       // 조용함
+        assertEquals(1f, SttMapping.level(20f), 0f)                        // 아주 큼
+        assertTrue(SttMapping.level(2f) in 0.2f..0.5f)                     // 보통 말소리
+        assertTrue(SttMapping.level(8f) > SttMapping.level(2f))
+    }
+
     @Test fun `오류 번호 매핑`() {
         assertEquals(SttError.NO_SPEECH, SttMapping.toSttError(SttMapping.ERROR_NO_MATCH))
         assertEquals(SttError.NO_SPEECH, SttMapping.toSttError(SttMapping.ERROR_SPEECH_TIMEOUT))

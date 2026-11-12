@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 키우미: 웃는 얼굴의 작은 키오스크 (하얀 화면 · 받침, 깊은 바다색 눈과 입, 안내 노랑 볼). 안전 영역(지름 66) 안 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:fillColor="#FFFFFFFF" android:pathData="M43,30 H65 A10,10 0 0 1 75,40 V56 A10,10 0 0 1 65,66 H43 A10,10 0 0 1 33,56 V40 A10,10 0 0 1 43,30 Z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M50,64 H58 V72 H50 Z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M44.25,71.5 H63.75 A2.25,2.25 0 0 1 63.75,76 H44.25 A2.25,2.25 0 0 1 44.25,71.5 Z" />
+    <path android:fillColor="#FFFFD600" android:pathData="M38.1,51.5 a3.4,2.3 0 1 0 6.8,0 a3.4,2.3 0 1 0 -6.8,0 Z" />
+    <path android:fillColor="#FFFFD600" android:pathData="M63.1,51.5 a3.4,2.3 0 1 0 6.8,0 a3.4,2.3 0 1 0 -6.8,0 Z" />
+    <path android:fillColor="#FF14344D" android:pathData="M43.5,44.5 a3,3 0 1 0 6,0 a3,3 0 1 0 -6,0 Z" />
+    <path android:fillColor="#FF14344D" android:pathData="M58.5,44.5 a3,3 0 1 0 6,0 a3,3 0 1 0 -6,0 Z" />
+    <path android:strokeColor="#FF14344D" android:strokeWidth="3" android:strokeLineCap="round" android:pathData="M47.5,51.5 Q54,57.5 60.5,51.5" />
+</vector>

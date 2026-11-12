@@ -1,5 +1,6 @@
 package kr.kiosklens.overlay
 
+import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Canvas
 import android.os.SystemClock
@@ -98,7 +99,9 @@ class ViewOverlay(context: Context) : View(context), HighlightSurface, MotionSin
         lastDraw = now
         val rect = synchronized(lock) { smoother.step(dt); smoother.current } ?: run { lastDraw = 0L; return }
         if (m != null) {
-            painter.draw(canvas, m.map(rect, width.toFloat(), height.toFloat()), PulseCurve.level(now - shownSince))
+            val since = now - shownSince
+            val traced = if (ValueAnimator.areAnimatorsEnabled()) PulseCurve.trace(since) else 1f   // 처음 나타날 때 그려지며 짚기
+            painter.draw(canvas, m.map(rect, width.toFloat(), height.toFloat()), PulseCurve.level(since), 1f, traced)
         }
         postInvalidateOnAnimation()                                  // 보이는 동안 계속 깜빡임
     }
