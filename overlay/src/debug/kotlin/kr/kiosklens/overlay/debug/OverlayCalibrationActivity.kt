@@ -28,9 +28,12 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import java.util.concurrent.Executors
+import kr.kiosklens.core.model.FrameMotion
 import kr.kiosklens.core.model.HighlightTarget
 import kr.kiosklens.core.model.NormRect
+import kr.kiosklens.overlay.RenderStats
 import kr.kiosklens.overlay.ViewOverlay
+import kr.kiosklens.overlay.tracking.CameraMotionTracker
 import kr.kiosklens.overlay.transform.CoordinateMapper
 import kr.kiosklens.overlay.transform.FillCenterMapper
 import kr.kiosklens.overlay.transform.FitCenterMapper
@@ -45,6 +48,9 @@ import kr.kiosklens.overlay.transform.FitCenterMapper
  * - 아래쪽 회색 띠: 앱의 "말하기" 버튼판 자리(높이를 앱과 비슷하게 가정). 위쪽 글자 · 버튼 영역도 가려진 곳으로 친다
  * - 가운데 테두리가 화면 밖이나 가려진 곳에 걸리면 "안 보임"으로 바뀐다 (ViewOverlay.onTargetVisibilityChanged)
  * - 버튼: 채우기(FILL)/맞추기(FIT) 전환 · 같은 값 · 숨김/보임 · 흔들기 · 가운데 테두리를 왼쪽 끝/맨 아래/가운데로
+ * - 따라가기: 켜면 카메라 움직임(CameraMotionTracker)을 테두리에 넣어, 휴대폰을 흔들어도 테두리가 처음 겹쳐 있던 물건에 붙어 다닌다.
+ *   카메라를 손으로 가리거나 아주 빨리 흔들어 1초 넘게 움직임을 믿을 수 없으면 테두리가 흐려진다 (추적 실패)
+ * - 위쪽 넷째 줄: 그리기 속도(fps · 가장 느린 간격, 합격 기준 30fps 이상) · 움직임 · 추적 상태
  *
  * 카메라 설정은 앱의 CameraController와 같다 (미리보기 · 분석 모두 4:3).
  * 실행: adb shell am start -n kr.kiosklens.app/kr.kiosklens.overlay.debug.OverlayCalibrationActivity
@@ -66,10 +72,19 @@ class OverlayCalibrationActivity : AppCompatActivity() {
     private var centerRect = CENTER_HOME
     private var centerVisible = true
     private var lastGhostMs = 0L
+    private val motionTracker = CameraMotionTracker()                    // 분석 스레드에서만 쓴다
+    private var frameNo = 0L                                             // 분석 스레드에서만 쓴다
+    @Volatile private var follow = false
+    @Volatile private var lastMotion: FrameMotion? = null
+    private lateinit var followBtn: Button
+    private val ticker = object : Runnable {                             // 그리기 속도 · 움직임은 계속 바뀌니 0.5초마다 다시 표시
+        override fun run() { updateInfo(); info.postDelayed(this, 500) }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(buildUi())
+        info.postDelayed(ticker, 500)
         if (checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) startCamera()
         else requestPermissions(arrayOf(Manifest.permission.CAMERA), REQ)
     }
@@ -81,6 +96,7 @@ class OverlayCalibrationActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        info.removeCallbacks(ticker)
         executor.shutdown()
         super.onDestroy()
     }
@@ -105,6 +121,12 @@ class OverlayCalibrationActivity : AppCompatActivity() {
                     if (w != frameW || h != frameH || rot != rotation) {
                         frameW = w; frameH = h; rotation = rot
                         runOnUiThread { applyMapper() }
+                    }
+                    // 흔들림: 밝기 평면만 읽어 직전 프레임과 비교 (앱에서는 FrameSink에 넘기기 전에 같은 일을 한다)
+                    val y = proxy.planes[0]
+                    motionTracker.onLumaFrame(++frameNo, y.buffer, y.rowStride, y.pixelStride, proxy.width, proxy.height, rot)?.let { m ->
+                        lastMotion = m
+                        if (follow) boxes.forEach { it.onFrameMotion(m) }
                     }
                     val now = SystemClock.uptimeMillis()
                     if (now - lastGhostMs > 400) {                       // 겹쳐 그릴 사진은 0.4초마다 한 장이면 충분
@@ -160,9 +182,37 @@ class OverlayCalibrationActivity : AppCompatActivity() {
             else -> "안 보임 → \"휴대폰을 조금 뒤로 빼 주세요\" 안내 대상"
         }
         info.text = String.format(
-            "방식 %s · 분석 %d×%d (회전 %d°) · 화면 %d×%d\n보이는 범위 x %.2f~%.2f · y %.2f~%.2f\n가운데 테두리: %s",
+            "방식 %s · 분석 %d×%d (회전 %d°) · 화면 %d×%d\n보이는 범위 x %.2f~%.2f · y %.2f~%.2f\n가운데 테두리: %s\n%s",
             if (fill) "채우기(FILL)" else "맞추기(FIT)", frameW, frameH, rotation, vw.toInt(), vh.toInt(), x0, x1, y0, y1, center,
+            trackingLine(),
         )
+    }
+
+    /** 넷째 줄: 그리기 속도 · 움직임 · 추적 상태 */
+    private fun trackingLine(): String {
+        val s = boxes[CENTER].renderStats
+        val draw = if (s.frames < RenderStats.MIN_FRAMES) "그리기 재는 중"
+        else String.format("그리기 %.0ffps(가장 느린 %dms)%s", s.fps, s.worstMs, if (s.meetsTarget == true) "" else " 기준 미달")
+        val m = lastMotion
+        val move = if (m == null) "움직임 -" else String.format("움직임 %+.3f,%+.3f 신뢰 %.2f", m.dx, m.dy, m.confidence)
+        val track = when {
+            !follow -> "따라가기 끔"
+            boxes[CENTER].isTrackingLost -> "추적 실패 → 흐리게"
+            else -> "따라가는 중"
+        }
+        return "$draw · $move · $track"
+    }
+
+    private fun toggleFollow() {
+        follow = !follow
+        followBtn.text = if (follow) "따라가기 켬" else "따라가기 끔"
+        if (!follow) {                                                  // 끄면 테두리를 원래 고정 위치로 되돌린다
+            boxes.forEachIndexed { i, b ->
+                b.setTarget(null)
+                b.setTarget(if (i == CENTER) (if (centerShown) HighlightTarget(CENTER_ID, centerRect) else null) else CORNERS[i])
+            }
+        }
+        updateInfo()
     }
 
     private fun moveCenter(rect: NormRect) {
@@ -213,6 +263,8 @@ class OverlayCalibrationActivity : AppCompatActivity() {
             addView(small("왼쪽 끝으로") { moveCenter(NormRect(0.02f, 0.30f, 0.15f, 0.40f)) })
             addView(small("맨 아래로") { moveCenter(NormRect(0.62f, 0.85f, 0.78f, 0.95f)) })
             addView(small("가운데로") { moveCenter(CENTER_HOME) })
+            followBtn = small("따라가기 끔") { toggleFollow() }
+            addView(followBtn)
         }
         topBar = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.argb(170, 0, 0, 0))
@@ -227,7 +279,10 @@ class OverlayCalibrationActivity : AppCompatActivity() {
         }
         root.addView(panel, FrameLayout.LayoutParams(match, dp(PANEL_DP), Gravity.BOTTOM))
 
-        // 위 글자 · 버튼 영역과 아래 버튼판에 걸린 테두리는 "안 보임"으로 친다
+        // 위 글자 · 버튼 영역과 아래 버튼판에 걸린 테두리는 "안 보임"으로 친다 (글자 줄 수가 바뀌면 높이도 바뀌니 그때마다)
+        topBar.addOnLayoutChangeListener { _, _, top, _, bottom, _, oldTop, _, oldBottom ->
+            if (bottom - top != oldBottom - oldTop) boxes.forEach { it.setObstructedInsets(0, topBar.height, 0, panel.height) }
+        }
         root.post { boxes.forEach { it.setObstructedInsets(0, topBar.height, 0, panel.height) } }
         return root
     }
