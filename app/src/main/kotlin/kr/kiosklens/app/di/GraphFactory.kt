@@ -39,6 +39,7 @@ object GraphFactory {
             override val frameSink: FrameSink = vision
             override val snapshots = vision.snapshots
             override val scanStatus = vision.status
+            override val voiceLevel = speechIn.level
             override fun setCaptionListener(listener: (String) -> Unit) { caption = listener }
             override fun close() { runner.close(); tts.shutdown(); vision.close() }
         }

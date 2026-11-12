@@ -24,6 +24,15 @@ object UiTexts {
         return if (c.isNotEmpty() && phase != Phase.IDLE && phase != Phase.LISTENING && phase != Phase.PLANNING) c else base
     }
 
+    /**
+     * 마이크 버튼 설명 (TalkBack이 읽음). 2026-11-12 화면 개편으로 자막을 없앤 대신, 지금 상태와 버튼 쓰는 법을 여기에 담는다.
+     */
+    fun micDescription(phase: Phase): String = when (phase) {
+        Phase.IDLE -> "말하기 버튼. 누르고 원하는 것을 말씀해 주세요"
+        Phase.LISTENING -> "듣고 있어요. 천천히 말씀해 주세요"
+        else -> "${status(phase, null).replace("\n", " ")}. 더 말씀하시려면 누르고, 처음부터 하려면 길게 누르세요"
+    }
+
     /** "말하기" 버튼을 누를 수 있는 단계 (진행 중에는 무시된다) */
     fun canStart(phase: Phase) = phase != Phase.LISTENING   // 안내 중에도 눌러 말을 보탤 수 있다 (듣는 중만 막음)
 

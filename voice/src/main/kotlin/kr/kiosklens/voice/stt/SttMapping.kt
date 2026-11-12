@@ -7,6 +7,12 @@ enum class SttNext { FALL_BACK_TO_STANDARD, RETRY, FINISH }
 
 /** android.speech.SpeechRecognizer 의 오류 번호를 [SttError]로. (번호는 Android 문서의 ERROR_* 값) */
 object SttMapping {
+    /**
+     * 음성 인식기의 소리 크기(`onRmsChanged`, 대략 -2 ~ 10 dB)를 0~1로. 마이크 버튼 둘레 파동의 크기에 쓴다.
+     * 조용하면 0 근처, 보통 말소리는 0.3~0.8.
+     */
+    fun level(rmsdB: Float): Float = ((rmsdB + 2f) / 12f).coerceIn(0f, 1f)
+
     const val ERROR_NETWORK_TIMEOUT = 1
     const val ERROR_NETWORK = 2
     const val ERROR_AUDIO = 3

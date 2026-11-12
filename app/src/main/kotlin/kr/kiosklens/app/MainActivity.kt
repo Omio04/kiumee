@@ -11,6 +11,7 @@ import android.os.Bundle
 import android.provider.Settings
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
@@ -20,6 +21,8 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.view.PreviewView
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -30,6 +33,8 @@ import kr.kiosklens.app.di.AndroidLogger
 import kr.kiosklens.app.di.Graph
 import kr.kiosklens.app.di.GraphFactory
 import kr.kiosklens.app.net.LocalNetwork
+import kr.kiosklens.app.ui.MicButtonView
+import kr.kiosklens.app.ui.MicRipple
 import kr.kiosklens.app.ui.RecognitionStatus
 import kr.kiosklens.app.ui.UiTexts
 import kr.kiosklens.core.model.ScreenSnapshot
@@ -39,9 +44,11 @@ import kr.kiosklens.overlay.ViewOverlay
 import kr.kiosklens.vision.ScanStatus
 
 /**
- * 화면 하나짜리 앱: 카메라 미리보기 + 노란 테두리 + 큰 상태 문구 + "말하기" / "그만하기" 버튼.
- * 로직은 없다. 조립은 [GraphFactory](실구현만), 흐름은 :domain 의 SessionRunner.
- * 본문 글자 20sp 이상, 핵심 버튼 72dp 이상 (설계서 10장).
+ * 화면 하나짜리 앱: 카메라 미리보기 + 노란 테두리 + 아래 가운데 동그란 마이크 버튼 하나.
+ * 2026-11-12 화면 개편: "말하기" · "그만하기" 버튼과 상태 문구(자막)를 없애고 마이크 버튼 하나로.
+ * - 누르기 = 말하기 (안내 중이면 말 보태기) · 길게 누르기 = 처음부터 · 듣는 동안 둘레에 파동
+ * - 상태 문구는 화면에 안 쓰고 버튼 설명(TalkBack)으로만 읽는다. 권한 · 서버 안내는 문제가 있을 때만 보인다
+ * 로직은 없다. 조립은 [GraphFactory](실구현만), 흐름은 :domain 의 SessionRunner. 핵심 버튼 72dp 이상 (설계서 10장).
  */
 class MainActivity : AppCompatActivity() {
     private val work = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -49,16 +56,13 @@ class MainActivity : AppCompatActivity() {
     private val logger = AndroidLogger()
 
     private lateinit var overlay: ViewOverlay
-    private lateinit var status: TextView
     private lateinit var note: TextView
-    private lateinit var startBtn: Button
-    private lateinit var stopBtn: Button
+    private lateinit var micButton: MicButtonView
     private lateinit var settingsBtn: Button
     private lateinit var preview: PreviewView
 
     private var graph: Graph? = null
     private var camera: CameraController? = null
-    private var caption: String? = null
 
     // 확인용 (디버그 빌드만): 카메라가 인식한 글자 · 버튼을 미리보기 위에 그리고, 위쪽 줄에 인식 상태를 보여 준다
     private var recognition: RecognitionView? = null
@@ -104,9 +108,9 @@ class MainActivity : AppCompatActivity() {
         if (requestCode != REQ) return
         if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) init()
         else {
-            status.text = getString(R.string.need_permission)
+            note.text = getString(R.string.need_permission); note.visibility = View.VISIBLE
             settingsBtn.visibility = View.VISIBLE
-            startBtn.isEnabled = false
+            micButton.isEnabled = false; micButton.alpha = 0.4f
         }
     }
 
@@ -115,9 +119,10 @@ class MainActivity : AppCompatActivity() {
     private fun init() {
         if (graph != null) return
         settingsBtn.visibility = View.GONE
+        note.visibility = View.GONE
+        micButton.isEnabled = true; micButton.alpha = 1f
         val g = GraphFactory.create(this, work, overlay)
         graph = g
-        g.setCaptionListener { text -> runOnUiThread { caption = text; render() } }
 
         camera = CameraController(this, g.frameSink, logger) { w, h ->
             runOnUiThread { overlay.setAnalysisSize(w, h); recognition?.setAnalysisSize(w, h) }
@@ -133,19 +138,17 @@ class MainActivity : AppCompatActivity() {
             } }
         }
         g.runner.start()
-        ui.launch { g.runner.state.collect { s ->
-            if (s.phase == Phase.LISTENING) caption = null
-            render()
-        } }
+        ui.launch { g.runner.state.collect { render() } }
+        ui.launch { g.voiceLevel.collect { micButton.level = it } }                // 목소리 크기 → 파동 크기
         render()
     }
 
     private fun render() {
         val g = graph ?: return
         val phase = g.runner.state.value.phase
-        status.text = UiTexts.status(phase, caption)
-        startBtn.isEnabled = UiTexts.canStart(phase)
-        stopBtn.visibility = if (UiTexts.canStop(phase)) View.VISIBLE else View.INVISIBLE
+        micButton.listening = phase == Phase.LISTENING
+        val description = UiTexts.micDescription(phase)                          // 자막 대신 TalkBack이 읽는 설명
+        if (micButton.contentDescription != description) micButton.contentDescription = description
     }
 
     private fun renderDebug() {
@@ -170,37 +173,37 @@ class MainActivity : AppCompatActivity() {
         if (BuildConfig.DEBUG) recognition = RecognitionView(this).also { root.addView(it, FrameLayout.LayoutParams(match, match)) }   // 노란 테두리보다 아래
         overlay = ViewOverlay(this).also { root.addView(it, FrameLayout.LayoutParams(match, match)) }
 
-        status = TextView(this).apply {
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 26f); setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD
-            gravity = Gravity.CENTER; setPadding(dp(16), dp(16), dp(16), dp(8))
-            accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE                  // TalkBack 이 상태 변화를 읽어 준다
-            text = ""
-        }
+        // 문제가 있을 때만 보이는 안내 (권한 · 서버 주소 · 로컬 네트워크). 평소 화면에는 글자가 없다
         note = TextView(this).apply {
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f); setTextColor(Color.rgb(255, 214, 0)); gravity = Gravity.CENTER
-            setPadding(dp(16), 0, dp(16), dp(8)); visibility = View.GONE
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f); setTextColor(Color.WHITE); gravity = Gravity.CENTER
+            typeface = Typeface.DEFAULT_BOLD; setBackgroundColor(Color.argb(200, 0, 0, 0))
+            setPadding(dp(16), dp(12), dp(16), dp(12)); visibility = View.GONE
         }
         settingsBtn = bigButton(getString(R.string.open_settings), Color.WHITE, Color.BLACK, 72).apply {
             visibility = View.GONE
             setOnClickListener { startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))) }
         }
-        startBtn = bigButton(getString(R.string.start), Color.rgb(255, 214, 0), Color.BLACK, 88).apply {
-            contentDescription = "말하기. 누르고 원하는 것을 말씀하세요"
-            setOnClickListener { graph?.runner?.pressStart() }
+        micButton = MicButtonView(this).apply {
+            accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE                  // 설명이 바뀌면 TalkBack이 읽어 준다
+            contentDescription = UiTexts.micDescription(Phase.IDLE)
+            setOnClickListener { graph?.runner?.pressStart() }                             // 말하기 (안내 중이면 말 보태기)
+            setOnLongClickListener {                                                       // 처음부터 (예전 "그만하기")
+                performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                graph?.runner?.pressStop(); true
+            }
         }
-        stopBtn = bigButton(getString(R.string.stop), Color.rgb(60, 60, 60), Color.WHITE, 88).apply {
-            visibility = View.INVISIBLE; setOnClickListener { graph?.runner?.pressStop() }
+        val micSize = (dp(MIC_DP) * MicRipple.MAX_SCALE).toInt()                          // 파동이 퍼질 자리까지
+        val bottom = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL
+            addView(note, LinearLayout.LayoutParams(match, ViewGroup.LayoutParams.WRAP_CONTENT))
+            addView(settingsBtn, LinearLayout.LayoutParams(match, ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(dp(16), dp(8), dp(16), 0) })
+            addView(micButton, LinearLayout.LayoutParams(micSize, micSize))
         }
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL; setPadding(dp(12), dp(4), dp(12), dp(16))
-            addView(stopBtn, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = dp(8) })
-            addView(startBtn, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 2f))
+        ViewCompat.setOnApplyWindowInsetsListener(bottom) { v, insets ->                 // 시스템 내비게이션 바에 가리지 않게
+            v.setPadding(0, 0, 0, insets.getInsets(WindowInsetsCompat.Type.systemBars()).bottom)
+            insets
         }
-        val panel = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.argb(230, 0, 0, 0))
-            addView(status); addView(note); addView(settingsBtn); addView(row)
-        }
-        root.addView(panel, FrameLayout.LayoutParams(match, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM))
+        root.addView(bottom, FrameLayout.LayoutParams(match, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM))
         if (BuildConfig.DEBUG) {
             debugLine = TextView(this).apply {
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f); setTextColor(Color.WHITE); setBackgroundColor(Color.argb(170, 0, 0, 0))
@@ -221,5 +224,10 @@ class MainActivity : AppCompatActivity() {
         setBackgroundColor(bg); minHeight = dp(heightDp); minimumHeight = dp(heightDp); isAllCaps = false
     }
 
-    private companion object { const val REQ = 100; const val REQ_LOCAL = 101 }
+    private companion object {
+        const val REQ = 100
+        const val REQ_LOCAL = 101
+        /** 마이크 버튼(원) 지름. 어르신이 누르기 쉽게 크게 (핵심 버튼 72dp 이상) */
+        const val MIC_DP = 96
+    }
 }

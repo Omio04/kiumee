@@ -16,6 +16,8 @@ interface Graph {
     val snapshots: Flow<ScreenSnapshot>
     /** 확인용(디버그 빌드): 인식 상태 (찾는 중 · 다시 비추기 · 인식됨) */
     val scanStatus: StateFlow<ScanStatus>
+    /** 듣는 동안의 목소리 크기 0~1 (마이크 버튼 둘레 파동). 듣지 않을 때는 0 */
+    val voiceLevel: StateFlow<Float>
     /** 마지막으로 읽어 준 안내 문장을 화면에 보여 주기 위한 알림 */
     fun setCaptionListener(listener: (String) -> Unit)
     fun close()

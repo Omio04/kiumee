@@ -12,6 +12,9 @@ import android.speech.SpeechRecognizer
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kr.kiosklens.core.model.SttError
 import kr.kiosklens.core.model.SttEvent
@@ -43,6 +46,10 @@ class AndroidSpeechInput(
     /** 오프라인 인식이 한국어 모델 없음(12 · 13)을 낸 적이 있으면, 이후로는 처음부터 온라인 일반 인식기를 쓴다. */
     @Volatile private var offlineUnavailable = false
 
+    private val _level = MutableStateFlow(0f)
+    /** 듣는 동안의 목소리 크기 0~1 (마이크 버튼 둘레 파동용). 듣지 않을 때는 0. 포트(`SpeechInput`) 밖의 화면용 정보 */
+    val level: StateFlow<Float> = _level.asStateFlow()
+
     override fun start(): Flow<SttEvent> = callbackFlow {
         if (!SpeechRecognizer.isRecognitionAvailable(context)) {
             logger.w(TAG, "recognition service unavailable")
@@ -61,6 +68,7 @@ class AndroidSpeechInput(
         fun finish(event: SttEvent) {
             if (finished) return
             finished = true
+            _level.value = 0f
             trySend(event)
             close()
         }
@@ -74,7 +82,7 @@ class AndroidSpeechInput(
             r.setRecognitionListener(object : RecognitionListener {
                 override fun onReadyForSpeech(params: Bundle?) {}
                 override fun onBeginningOfSpeech() {}
-                override fun onRmsChanged(rmsdB: Float) {}
+                override fun onRmsChanged(rmsdB: Float) { if (!finished) _level.value = SttMapping.level(rmsdB) }
                 override fun onBufferReceived(buffer: ByteArray?) {}
                 override fun onEndOfSpeech() {}
                 override fun onEvent(eventType: Int, params: Bundle?) {}
@@ -111,6 +119,7 @@ class AndroidSpeechInput(
         main.post { if (!finished) runCatching { begin() }.onFailure { logger.e(TAG, "stt start failed", it); finish(SttEvent.Error(SttError.BUSY)) } }
 
         awaitClose {
+            _level.value = 0f
             main.post {                                                      // 수집이 취소되면 마이크를 놓는다
                 recognizer?.let { runCatching { it.cancel(); it.destroy() } }
                 if (current === recognizer) current = null
@@ -119,6 +128,7 @@ class AndroidSpeechInput(
     }
 
     override fun stop() {
+        _level.value = 0f
         main.post { current?.let { runCatching { it.cancel(); it.destroy() } }; current = null }
     }
 
