@@ -16,6 +16,9 @@ class BoxSmoother(private val alpha: Float = 0.3f, private val snapDistance: Flo
 
     val current: NormRect? get() = cur?.let { NormRect(it[0], it[1], it[2], it[3]) }
 
+    /** 따라가는 목표 위치. 흔들림([nudge])만큼 옮겨진 값이라 "지금 버튼이 있을 자리"에 가장 가깝다. */
+    val target: NormRect? get() = tgt?.let { NormRect(it[0], it[1], it[2], it[3]) }
+
     fun setTarget(r: NormRect?) {
         if (r == null) { cur = null; tgt = null; return }
         val t = floatArrayOf(r.left, r.top, r.right, r.bottom)

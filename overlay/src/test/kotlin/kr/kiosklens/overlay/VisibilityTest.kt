@@ -71,7 +71,44 @@ class VisibilityTest {
     @Test fun `하이라이트가 없어지면 기록을 지운다`() {
         val t = VisibilityTracker()
         assertEquals(false, t.update("e4", false))
-        assertNull(t.update(null, true))
+        assertEquals("안 보임을 알렸으니 풀어 준다", true, t.update(null, true))
+        assertNull("이미 풀었으니 또 알리지 않음", t.update(null, true))
         assertEquals(false, t.update("e4", false))      // 같은 버튼이라도 다시 가리키기 시작하면 새로 판단
+    }
+
+    // ---- 2026-11-11 P1 지적: 안 보임을 알린 뒤 다른 버튼으로 바뀌면 "다시 보임"을 알리지 않던 문제 ----
+
+    @Test fun `안 보이던 버튼이 보이는 다른 버튼으로 바뀌면 다시 보임을 알린다`() {
+        val t = VisibilityTracker()
+        assertEquals(false, t.update("e4", false))      // 아메리카노가 화면 밖
+        assertEquals(true, t.update("e9", true))        // 옵션 창의 "확인"으로 바뀌었고 보임
+        assertNull(t.update("e9", true))
+    }
+
+    @Test fun `보이는 버튼끼리 바뀌면 알리지 않는다`() {
+        val t = VisibilityTracker()
+        assertNull(t.update("e4", true))
+        assertNull(t.update("e9", true))
+    }
+
+    @Test fun `안 보임이 없었으면 하이라이트가 없어져도 알리지 않는다`() {
+        val t = VisibilityTracker()
+        assertNull(t.update("e4", true))
+        assertNull(t.update(null, true))
+    }
+
+    @Test fun `받은 값을 차례로 따라가면 늘 지금 상태와 같다`() {
+        // (버튼 id, 지금 보이는가). null id는 하이라이트 없음 = 안 보이는 하이라이트도 없음
+        val steps = listOf(
+            "e4" to true, "e4" to false, "e9" to true, "e9" to false, "e9" to false,
+            null to true, "e4" to false, "e9" to false, "e9" to true, "e4" to true, null to true,
+        )
+        val t = VisibilityTracker()
+        var lastNotified = true                          // 받는 쪽의 처음 상태: 안 보이는 하이라이트 없음
+        for ((id, visible) in steps) {
+            t.update(id, visible)?.let { lastNotified = it }
+            val expected = id == null || visible
+            assertEquals("$id · $visible 뒤", expected, lastNotified)
+        }
     }
 }
