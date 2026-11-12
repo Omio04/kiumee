@@ -8,8 +8,23 @@ import org.junit.Assert.*
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 import kotlin.math.abs
+import java.util.zip.GZIPInputStream
 
 class CloseIconDetectorTest {
+    @Test fun detectsCloseInExecutedKioskPixelsUsingObservedOcrTitleBox() {
+        val raw=GZIPInputStream(File("testdata/kiosk/loyalty-720.luma.gz").inputStream()).use { it.readBytes() }
+        val bytes=ByteBuffer.wrap(raw).order(ByteOrder.LITTLE_ENDIAN)
+        val imageWidth=bytes.int;val imageHeight=bytes.int
+        val image=object:LumaImage {
+            override val width=imageWidth
+            override val height=imageHeight
+            override fun at(x:Int,y:Int)=raw[8+y*width+x].toInt() and 255
+        }
+        val close=CloseIconDetector().detect(image,NormRect(.47568f,.25678f,.52343f,.2726f))
+        assertNotNull("Real browser pixels must verify the visible X",close)
+        assertTrue(close!!.rect.centerX in .58f.. .59f)
+        assertTrue(close.rect.centerY in .26f.. .28f)
+    }
     private fun synthetic(symbol: String) = object : LumaImage {
         override val width = 400
         override val height = 600
@@ -21,6 +36,7 @@ class CloseIconDetectorTest {
                 "x" -> abs(abs(dx) - abs(dy)) <= 3 && abs(dx) <= 14
                 "+" -> (abs(dx) <= 3 || abs(dy) <= 3) && abs(dx) + abs(dy) < 20
                 "glare" -> dx * dx + dy * dy < 14 * 14
+                "small-glare" -> dx * dx + dy * dy < 9 * 9
                 else -> false
             }
             return if (bright) 220 else 30
@@ -38,7 +54,7 @@ class CloseIconDetectorTest {
     }
 
     @Test fun rejectsPlusCircleAndGlare() {
-        listOf("+", "glare", "circle").forEach {
+        listOf("+", "glare", "small-glare", "circle").forEach {
             assertNull(it, CloseIconDetector().detect(synthetic(it), title))
         }
     }

@@ -23,14 +23,16 @@ class CloseIconDetector {
         var best: NormRect? = null
         var bestScore = 45f
         for (disk in darkDisks(image, startX, endX, startY, endY, h)) {
-            val x = disk.centerX * image.width
-            val y = disk.centerY * image.height
+            // The box uses an exclusive right/bottom edge; samples refer to pixel centres.
+            val pixelOffset = max(1, (h / 20).toInt()) / 2f
+            val x = disk.centerX * image.width - pixelOffset
+            val y = disk.centerY * image.height - pixelOffset
             for (scale in listOf(0.90f, 1.00f, 1.10f)) {
                 val radius = (disk.width * image.width + disk.height * image.height) / 4 * scale
                 if (x - radius * 1.3f < 0 || x + radius * 1.3f >= image.width ||
                     y - radius * 1.3f < 0 || y + radius * 1.3f >= image.height) continue
-                for (tilt in listOf(-15, 0, 15)) {
-                    val score = score(image, x, y, radius, tilt)
+                for (tilt in listOf(-15, 0, 15)) for (armScale in listOf(1f, 0.65f, 0.5f)) {
+                    val score = score(image, x, y, radius, tilt, armScale)
                     if (score > bestScore) {
                         bestScore = score
                         best = disk
@@ -95,7 +97,7 @@ class CloseIconDetector {
         return disks
     }
 
-    private fun score(image: LumaImage, x: Float, y: Float, r: Float, tilt: Int): Float {
+    private fun score(image: LumaImage, x: Float, y: Float, r: Float, tilt: Int, armScale: Float): Float {
         fun sample(angle: Double, distance: Float): Float {
             val px = (x + cos(angle) * r * distance).roundToInt()
             val py = (y + sin(angle) * r * distance).roundToInt()
@@ -105,16 +107,18 @@ class CloseIconDetector {
         val darkSamples = (0..3).map { sample(rotation + it * PI / 2, 0.55f) }
         val dark = darkSamples.average().toFloat()
         if (darkSamples.any { it > 145f }) return 0f
+        // A short X needs dark gaps close to its centre too; otherwise a small bright glare could match.
+        if (armScale < 1f && (0..3).any { sample(rotation + it * PI / 2, 0.35f * armScale / 0.65f) > 145f }) return 0f
         if (image.at(x.roundToInt(), y.roundToInt()) - dark < 35f) return 0f
         val arms = (0..3).map { arm ->
             val angle = rotation + PI / 4 + arm * PI / 2
-            listOf(0.25f, 0.40f, 0.55f, 0.70f).map { sample(angle, it) }.average().toFloat()
+            listOf(0.25f, 0.40f, 0.55f, 0.70f).map { sample(angle, it * armScale) }.average().toFloat()
         }
         // Every arm must have positive contrast: plus signs, rings and glare must not pass.
         if (arms.any { it - dark < 30f }) return 0f
         val outerArms = (0..3).map { arm ->
             val angle = rotation + PI / 4 + arm * PI / 2
-            (sample(angle, 0.55f) + sample(angle, 0.70f)) / 2
+            sample(angle, 0.70f * armScale)
         }
         if (outerArms.any { it - dark < 25f }) return 0f
         val outside = (0..3).map { sample(rotation + it * PI / 2, 1.25f) }.average().toFloat()

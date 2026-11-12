@@ -1,0 +1,642 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>연습용 키오스크</title>
+<!--
+  키오스크 렌즈 테스트용 가짜 키오스크 (메가커피 화면 구성 참고, 9:16).
+  참고: 피피팀 '키오스크 화면 수집 - 메가커피' 클론 디자인. 글자 · 배치만 따라 만들었고 이미지는 직접 그린 단순 그림이다.
+  :vision이 알아보는 문구(옵션상품을 모두 선택 · 주문담기 · 주문 세부 내역 · 일회용품 필요여부 · 결제수단 선택 · 스탬프 적립 · ×)는 그대로 쓴다.
+  키보드: F 전체 화면 · R 처음으로 · T 남은시간 켜기/끄기.  주소 뒤 ?timer=off 면 남은시간이 줄지 않는다.
+-->
+<style>
+:root{
+  --yellow:#FFD600; --yellow-dk:#F2A900; --brown:#3A1A00; --orange:#FFA000; --price:#F08A1C;
+  --red:#E3261B; --ink:#1F1F1F; --muted:#8A8A8A; --line:#E6E6E6; --soft:#F5F5F5; --cream:#FFF5D9;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#000;overflow:hidden}
+body{font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;color:var(--ink);
+  -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+button{font:inherit;color:inherit;border:none;background:none;cursor:pointer}
+#kiosk{position:absolute;left:50%;top:50%;width:1080px;height:1920px;background:var(--soft);overflow:hidden;transform-origin:50% 50%}
+
+/* 머리 */
+.hdr{position:absolute;left:0;top:0;width:100%;height:160px;background:var(--yellow);border-bottom:4px solid var(--yellow-dk)}
+.hdr-top{height:88px;display:flex;align-items:center;justify-content:space-between;padding:0 24px}
+.pill{background:var(--brown);color:#F6E7C1;font-size:25px;padding:9px 16px;border-radius:8px;line-height:1}
+.store{font-size:33px;font-weight:800;color:var(--brown)}
+.tabs{display:flex;height:68px}
+.tab{flex:1;font-size:28px;font-weight:800;color:#2A1300;position:relative}
+.tab.on::after{content:"";position:absolute;left:10%;right:10%;bottom:0;height:6px;background:var(--brown)}
+.sect{position:absolute;top:164px;left:0;width:100%;height:56px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800}
+
+/* 메뉴 칸 */
+.scroll{overflow-y:auto;overscroll-behavior:contain}
+.scroll::-webkit-scrollbar{width:8px}
+.scroll::-webkit-scrollbar-thumb{background:#C9C9C9;border-radius:4px}
+.grid{position:absolute;top:220px;left:0;width:100%;height:958px;padding:22px 34px;display:grid;
+  grid-template-columns:repeat(4,1fr);gap:18px;align-content:start}
+.card{background:#fff;border-radius:10px;height:216px;display:flex;flex-direction:column;align-items:center;
+  padding:12px 8px 10px;box-shadow:0 1px 3px rgba(0,0,0,.07)}
+.card .art{width:104px;height:104px;flex:none}
+.card .nm{font-size:25px;line-height:1.18;text-align:center;flex:1;display:flex;align-items:center;overflow-wrap:anywhere}
+.card .pr{font-size:25px;color:var(--price);line-height:1.2}
+
+/* 장바구니 */
+.cart{position:absolute;top:1178px;left:0;width:100%;height:742px;background:#fff;display:flex;border-top:1px solid var(--line)}
+.cart-l{width:720px;position:relative}
+.cart-r{width:360px;position:relative;background:var(--soft)}
+.cart-tag{position:absolute;left:22px;top:20px;background:#111;color:#fff;font-size:27px;padding:8px 14px;border-radius:6px;line-height:1}
+.cart-cols{position:absolute;left:0;top:84px;width:100%;height:62px;display:grid;grid-template-columns:330px 230px 160px;
+  align-items:center;font-size:27px;text-align:center;border-bottom:2px solid var(--line)}
+.cart-rows{position:absolute;left:0;top:146px;width:100%;bottom:0}
+.crow{display:grid;grid-template-columns:330px 230px 160px;align-items:center;min-height:90px;border-bottom:1px solid #F0F0F0}
+.cn{padding-left:22px;font-size:27px;line-height:1.25;overflow:hidden}
+.cn small{display:block;font-size:20px;color:var(--muted)}
+.cq{display:flex;align-items:center;justify-content:center;gap:16px}
+.qn{font-size:30px;color:var(--price);min-width:62px;text-align:center}
+.cp{font-size:27px;color:var(--price);text-align:center}
+.rb{width:44px;height:44px;flex:none}
+.timer-lbl{position:absolute;left:18px;top:16px;font-size:26px}
+.timer{position:absolute;left:18px;top:52px;font-size:56px;color:var(--orange);line-height:1}
+.timer small{font-size:26px;color:var(--ink);margin-left:6px}
+.clear{position:absolute;right:16px;top:14px;width:104px;height:104px;border-radius:50%;background:var(--orange);
+  color:#fff;font-size:26px;font-weight:800;line-height:1.15}
+.picked{position:absolute;left:18px;right:18px;top:140px;display:flex;justify-content:space-between;font-size:27px;font-weight:800}
+.picked b{color:var(--orange)}
+.paybtn{position:absolute;left:18px;right:18px;top:196px;bottom:18px;background:var(--brown);color:#fff;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px}
+.paybtn .amt{font-size:38px;font-weight:800;color:var(--yellow)}
+.paybtn .go{font-size:36px;font-weight:800}
+
+/* 팝업 공통 */
+#layer{position:absolute;inset:0;pointer-events:none}
+#layer > *{pointer-events:auto}
+.dim{position:absolute;inset:0;background:rgba(0,0,0,.55)}
+.pop{position:absolute;background:#fff;box-shadow:0 12px 40px rgba(0,0,0,.35);display:flex;flex-direction:column;overflow:hidden}
+.pt{background:var(--yellow);min-height:78px;display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:0 18px 0 24px;font-size:29px;font-weight:800;color:#1E0E00;flex:none}
+.x{width:52px;height:52px;border-radius:50%;background:var(--brown);display:flex;align-items:center;justify-content:center;flex:none}
+.x svg{width:26px;height:26px}
+.btn{display:flex;align-items:center;justify-content:center;text-align:center;font-weight:800;line-height:1.25}
+.b-brown{background:var(--brown);color:#fff}
+.b-orange{background:var(--orange);color:#fff}
+.b-yellow{background:var(--yellow);color:#2A1300}
+.b-black{background:#111;color:#fff}
+.b-gray{background:#BDBDBD;color:#fff}
+
+/* 옵션 */
+.op-head{display:flex;gap:26px;padding:26px 30px;flex:none}
+.op-head .art{width:140px;height:140px;flex:none}
+.op-info{flex:1}
+.op-line{display:flex;align-items:center;gap:16px}
+.op-name{font-size:36px;flex:1}
+.op-price{font-size:36px;color:var(--price)}
+.op-desc{font-size:22px;color:#666;line-height:1.45;margin-top:10px}
+.op-bar{background:var(--yellow);height:74px;display:flex;align-items:center;gap:16px;padding:0 20px 0 24px;flex:none}
+.op-bar b{font-size:29px}
+.op-sum{flex:1;height:44px;background:#fff;border-radius:22px;font-size:22px;display:flex;align-items:center;padding:0 20px;overflow:hidden;white-space:nowrap}
+.op-body{flex:1;background:#F7F7F7;padding:10px 34px 24px}
+.og-title{font-size:25px;font-weight:800;margin:22px 0 12px}
+.og-row{display:flex;gap:14px}
+.og-tag{width:44px;background:var(--yellow);color:var(--red);font-size:21px;font-weight:800;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;line-height:1.15;border-radius:4px}
+.og-tag.red{background:var(--red);color:#fff}
+.tile{width:204px;background:#fff;border:3px solid #fff;border-radius:6px;display:flex;flex-direction:column;align-items:center;padding:6px 6px 8px}
+.tile .ph{width:100%;height:104px;background:var(--cream);position:relative}
+.tile.on{border-color:var(--orange)}
+.tile.on .ph::after{content:"✓";position:absolute;right:8px;top:4px;font-size:34px;font-weight:800;color:var(--orange)}
+.tile .tn{font-size:21px;color:var(--price);margin-top:8px;text-align:center}
+.tile .tp{font-size:27px;color:var(--price)}
+.none{font-size:26px;color:var(--muted);text-align:center;margin-top:120px}
+.op-foot{height:170px;display:flex;align-items:center;justify-content:center;gap:16px;flex:none;background:#fff}
+.op-foot .btn{width:290px;height:112px;font-size:32px}
+
+/* 주문 확인 */
+.rv-list{flex:1;overflow-y:auto}
+.rv-row{display:grid;grid-template-columns:50px 1fr 120px 180px;align-items:center;min-height:100px;background:#F7F7F7;
+  padding:0 24px;font-size:28px;border-bottom:1px solid #EEE}
+.rv-row .i{color:var(--orange)}
+.rv-row small{display:block;font-size:20px;color:var(--muted)}
+.rv-row .r{text-align:right}
+.rv-note{color:var(--red);font-size:31px;padding:0 24px 18px}
+.rv-tot{margin:0 20px;border:2px solid #EEE;border-radius:8px;height:104px;display:flex;align-items:center;gap:20px;padding:0 28px;font-size:27px}
+.rv-tot b{color:var(--orange);font-weight:400}
+.rv-btns{display:flex;gap:18px;padding:22px 20px;height:236px;flex:none}
+.rv-btns .btn{font-size:29px;font-weight:600;height:100%}
+
+/* 일회용품 */
+.chk{display:flex;align-items:center;gap:18px;font-size:29px;padding:14px 34px}
+.box{width:38px;height:38px;border:2px solid #CFCFCF;border-radius:6px;display:flex;align-items:center;justify-content:center;
+  font-size:28px;font-weight:800;color:#fff}
+.chk.on .box{background:var(--orange);border-color:var(--orange)}
+.two{display:flex;gap:16px;justify-content:center;padding:26px 0 30px}
+.two .btn{width:236px;height:104px;font-size:28px}
+
+/* 결제수단 */
+.step{display:flex;align-items:center;gap:12px;font-size:27px;font-weight:600;padding:22px 24px 14px}
+.step i{font-style:normal;background:var(--orange);color:#fff;padding:5px 10px;border-radius:4px;font-size:25px}
+.pg{display:grid;gap:10px;padding:0 24px}
+.pg3{grid-template-columns:repeat(3,1fr)}
+.pg2{grid-template-columns:repeat(2,1fr)}
+.pg4{grid-template-columns:repeat(4,1fr);margin-top:10px}
+.pt1{height:104px;border:2px solid var(--line);display:flex;align-items:center;gap:14px;padding:0 14px;font-size:21px;text-align:left;line-height:1.25}
+.pt1.on{border-color:var(--orange);background:#FFF7E6}
+.ic{width:62px;height:62px;border:2px solid var(--line);border-radius:6px;flex:none;background:#fff}
+.pt2{height:196px;border:2px solid var(--line);display:flex;align-items:center;gap:22px;padding:0 24px;text-align:left}
+.pt2 .ic{width:96px;height:96px}
+.pt2 b{display:block;font-size:31px;font-weight:600}
+.pt2 small{font-size:19px;color:var(--muted)}
+.pt3{height:150px;border:2px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;font-size:21px;line-height:1.2}
+.pt3 .ic{width:62px;height:44px}
+.pt3 small{font-size:16px;color:var(--muted)}
+.pay-tot{margin:22px 24px 24px;border:2px solid var(--line);border-radius:8px;height:100px;display:flex;align-items:center;padding:0 26px;font-size:26px;gap:40px}
+.pay-tot .due{margin-left:auto;color:var(--red);font-size:28px}
+
+/* 스탬프 */
+.st-title{background:var(--yellow);padding:16px 70px 12px;text-align:center;position:relative;flex:none}
+.st-title b{font-size:31px}
+.st-title small{display:block;font-size:16px;color:#7A5A00;margin-top:4px}
+.st-title .x{position:absolute;right:16px;top:50%;transform:translateY(-50%)}
+.st-num{height:110px;display:flex;align-items:center;justify-content:center;font-size:48px;letter-spacing:1px;border-bottom:1px solid var(--line)}
+.keys{display:grid;grid-template-columns:repeat(3,1fr)}
+.key{height:112px;font-size:46px;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+.key:nth-child(3n){border-right:none}
+.st-err{height:34px;color:var(--red);font-size:21px;text-align:center;padding-top:6px}
+.st-go{margin:4px 26px 0;height:92px;font-size:31px}
+.st-fine{font-size:15px;color:var(--muted);text-align:center;line-height:1.5;padding:16px 20px 22px}
+
+/* 카드 */
+.cd-row{display:flex;justify-content:space-between;align-items:center;height:76px;padding:0 30px;font-size:29px}
+.cd-row:nth-child(odd){background:#F7F7F7}
+.cd-row .red{color:var(--red)}
+.cd-btns{display:flex;gap:16px;padding:26px 30px 12px}
+.cd-btns .btn{height:76px;font-size:29px}
+.cd-help{font-size:20px;color:var(--muted);text-align:center;line-height:1.6;padding:6px 20px 16px}
+.cd-pic{margin:0 30px 30px;background:#F7F7F7;flex:1;display:flex;align-items:center;justify-content:center}
+
+/* 영수증 · 완료 · 알림 */
+.rc-top{height:64px;background:var(--yellow);flex:none}
+.rc-body{text-align:center;font-size:27px;color:#555;line-height:1.7;padding:34px 20px 10px}
+.done{position:absolute;inset:0;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;text-align:center}
+.done .ok{width:170px;height:170px;border-radius:50%;background:var(--yellow);display:flex;align-items:center;justify-content:center}
+.done h1{font-size:56px}
+.done .no{font-size:34px;color:#555}
+.done .no b{display:block;font-size:130px;color:var(--orange);line-height:1.1}
+.done p{font-size:28px;color:#666}
+.al-msg{font-size:30px;line-height:1.55;text-align:center;padding:44px 30px 10px;white-space:pre-line}
+.toast{position:absolute;left:50%;bottom:90px;transform:translateX(-50%);background:rgba(0,0,0,.8);color:#fff;
+  font-size:26px;padding:14px 26px;border-radius:30px;pointer-events:none;transition:opacity .3s}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <!-- 컵 그림: 음료 색은 currentColor -->
+    <symbol id="ice" viewBox="0 0 100 100">
+      <path d="M24 22 Q50 4 76 22 Z" fill="#EFEAE4"/>
+      <rect x="18" y="20" width="64" height="8" rx="4" fill="#D8D0C6"/>
+      <path d="M22 28 L78 28 L72 91 Q71 96 66 96 L34 96 Q29 96 28 91 Z" fill="#EDE8E2"/>
+      <path d="M25 40 L75 40 L71 89 Q70 93 66 93 L34 93 Q30 93 29 89 Z" fill="currentColor"/>
+      <g fill="#fff" opacity=".28"><rect x="33" y="46" width="15" height="14" rx="3"/><rect x="53" y="50" width="15" height="14" rx="3"/>
+        <rect x="38" y="66" width="15" height="14" rx="3"/><rect x="56" y="70" width="12" height="12" rx="3"/></g>
+      <rect x="66" y="30" width="5" height="58" rx="2" fill="#fff" opacity=".35"/>
+    </symbol>
+    <symbol id="mug" viewBox="0 0 100 100">
+      <path d="M72 44 q18 0 18 15 t-18 15" fill="none" stroke="#E4DDD5" stroke-width="8"/>
+      <path d="M12 34 h62 v32 q0 24 -31 24 q-31 0 -31 -24 z" fill="#EFE9E2"/>
+      <ellipse cx="43" cy="34" rx="31" ry="8" fill="#DED5CB"/>
+      <ellipse cx="43" cy="35" rx="26" ry="5.5" fill="currentColor"/>
+    </symbol>
+    <symbol id="food" viewBox="0 0 100 100">
+      <ellipse cx="50" cy="80" rx="40" ry="9" fill="#E6E1DB"/>
+      <rect x="20" y="36" width="60" height="40" rx="12" fill="currentColor"/>
+      <g stroke="#fff" stroke-width="3" opacity=".45"><path d="M26 50 H74 M26 62 H74 M38 40 V72 M50 40 V72 M62 40 V72"/></g>
+    </symbol>
+    <symbol id="goods" viewBox="0 0 100 100">
+      <rect x="34" y="12" width="32" height="10" rx="4" fill="#5A5A5A"/>
+      <rect x="30" y="20" width="40" height="70" rx="10" fill="currentColor"/>
+      <rect x="36" y="44" width="28" height="16" rx="4" fill="#fff" opacity=".6"/>
+    </symbol>
+    <symbol id="minus" viewBox="0 0 44 44"><circle cx="22" cy="22" r="21" fill="#3A1A00"/><path d="M13 22 H31" stroke="#FFA000" stroke-width="4" stroke-linecap="round"/></symbol>
+    <symbol id="plus" viewBox="0 0 44 44"><circle cx="22" cy="22" r="21" fill="#3A1A00"/><path d="M13 22 H31 M22 13 V31" stroke="#FFA000" stroke-width="4" stroke-linecap="round"/></symbol>
+  </defs>
+</svg>
+
+<div id="kiosk">
+  <header class="hdr">
+    <div class="hdr-top">
+      <button class="pill" data-act="home">처음으로</button>
+      <div class="store">메가엠지씨커피</div>
+      <button class="pill" data-act="lang">LANGUAGE</button>
+    </div>
+    <nav class="tabs" id="tabs"></nav>
+  </header>
+  <div class="sect" id="sect"></div>
+  <div class="grid scroll" id="grid"></div>
+  <section class="cart">
+    <div class="cart-l">
+      <div class="cart-tag">장바구니 조회</div>
+      <div class="cart-cols"><span>메뉴</span><span>수량</span><span>가격</span></div>
+      <div class="cart-rows scroll" id="cartRows"></div>
+    </div>
+    <div class="cart-r">
+      <div class="timer-lbl">남은시간</div>
+      <div class="timer"><span id="tleft">120</span><small>초</small></div>
+      <button class="clear" data-act="clear">전체<br>삭제</button>
+      <div class="picked"><span>선택한 상품</span><span id="pcount"><b>0</b>개</span></div>
+      <button class="paybtn" data-act="pay"><span class="amt" id="ptotal">0 원</span><span class="go">결제하기</span></button>
+    </div>
+  </section>
+  <div id="layer"></div>
+</div>
+
+<script>
+'use strict';
+// ---------------------------------------------------------------- 메뉴 데이터
+const C = { ice:'#4A2414', latte:'#C79B72', hot:'#3B1B0D', lemon:'#F2CF47', grapefruit:'#F08A6C', grape:'#A8CF5A',
+  berry:'#F3A3B5', choco:'#6B3B25', peach:'#E8A15A', tea:'#B5763A', green:'#7FA35A', bread:'#D9A15B', cake:'#F1D9A8',
+  cookie:'#B9844E', tumbler:'#2F5D50', mug:'#E9E2D8', bean:'#5A3B28' };
+const DESC = {
+  coffee: '(24oz)[기본 2샷] 블렌드 원두로 추출한 에스프레소에 물을 더해 풍부한 바디감을 느낄 수 있는 스탠다드 커피.',
+  drink: '시원하고 달콤하게 즐기는 음료. 얼음 양과 당도는 옵션에서 고를 수 있습니다.',
+  food: '커피와 함께 즐기기 좋은 디저트.',
+  goods: '매장에서 바로 구매할 수 있는 상품.',
+};
+function I(name, price, art, color, kind) { return { name, price, art, color, kind }; }
+const ice = (n, p, c = C.ice) => I(n, p, 'ice', c, 'coffee');
+const hot = (n, p, c = C.hot) => I(n, p, 'mug', c, 'coffee');
+const drink = (n, p, c, art = 'ice') => I(n, p, art, c, 'drink');
+const MENUS = {
+  '신메뉴': { title: '겨울시즌', items: [
+    hot('군고구마 크림브륄레 슈페너', 3900, C.latte), ice('(ICE)메가리카노', 3300), ice('(ICE)아메리카노', 2000), ice('(ICE)헛개리카노', 2400),
+    ice('왕메가 헛개리카노', 3400), ice('할메가커피', 2100, C.latte), ice('할메가미숫커피', 2900, C.latte), ice('왕할메가커피', 3200, C.latte),
+    ice('(ICE)꿀아메리카노', 2700), ice('(ICE)바닐라아메리카노', 2700), ice('(ICE)헤이즐넛아메리카노', 2700), hot('(HOT)아메리카노', 2700),
+    hot('(HOT)헛개리카노', 2400), hot('(HOT)꿀아메리카노', 2700), hot('(HOT)바닐라아메리카노', 2700), hot('(HOT)헤이즐넛아메리카노', 2700),
+  ] },
+  '추천메뉴': { title: '추천메뉴', items: [
+    ice('(ICE)아메리카노', 2000), ice('(ICE)카페라떼', 2900, C.latte), ice('(ICE)바닐라라떼', 3400, C.latte), drink('딸기라떼', 3700, C.berry),
+    drink('레몬에이드', 3500, C.lemon), ice('(ICE)메가리카노', 3300), hot('(HOT)카페라떼', 2900, C.latte), I('크로플', 3000, 'food', C.bread, 'food'),
+  ] },
+  '커피': { title: '커피', items: [
+    ice('(ICE)아메리카노', 2000), hot('(HOT)아메리카노', 2700), ice('(ICE)카페라떼', 2900, C.latte), hot('(HOT)카페라떼', 2900, C.latte),
+    ice('(ICE)바닐라라떼', 3400, C.latte), hot('(HOT)바닐라라떼', 3400, C.latte), ice('(ICE)카라멜마끼아또', 3700, C.latte), hot('(HOT)카라멜마끼아또', 3700, C.latte),
+    ice('(ICE)카페모카', 3900, C.choco), hot('(HOT)카페모카', 3900, C.choco), ice('(ICE)카푸치노', 2900, C.latte), hot('(HOT)카푸치노', 2900, C.latte),
+    hot('에스프레소', 1500), ice('(ICE)콜드브루', 3500), ice('(ICE)연유라떼', 3900, C.latte), ice('(ICE)메가리카노', 3300),
+    ice('(ICE)꿀아메리카노', 2700), ice('(ICE)헤이즐넛아메리카노', 2700), ice('(ICE)헛개리카노', 2400), hot('(HOT)헛개리카노', 2400),
+  ] },
+  '디카페인': { title: '디카페인', items: [
+    ice('(ICE)디카페인 아메리카노', 2500), hot('(HOT)디카페인 아메리카노', 2500), ice('(ICE)디카페인 카페라떼', 3400, C.latte),
+    hot('(HOT)디카페인 카페라떼', 3400, C.latte), ice('(ICE)디카페인 바닐라라떼', 3900, C.latte), ice('(ICE)디카페인 꿀아메리카노', 3200),
+  ] },
+  '음료': { title: '음료', items: [
+    drink('레몬에이드', 3500, C.lemon), drink('자몽에이드', 3500, C.grapefruit), drink('청포도에이드', 3500, C.grape), drink('딸기라떼', 3700, C.berry),
+    drink('(ICE)초코라떼', 3500, C.choco), drink('(HOT)초코라떼', 3500, C.choco, 'mug'), drink('딸기스무디', 3900, C.berry), drink('플레인퐁크러쉬', 3900, '#EDE3D2'),
+  ] },
+  '티': { title: '티', items: [
+    drink('(ICE)복숭아아이스티', 3000, C.peach), drink('(HOT)캐모마일', 2500, C.tea, 'mug'), drink('(HOT)페퍼민트', 2500, C.green, 'mug'),
+    drink('(ICE)유자차', 3300, C.lemon), drink('(HOT)유자차', 3300, C.lemon, 'mug'), drink('(HOT)녹차', 2500, C.green, 'mug'),
+  ] },
+  '푸드': { title: '푸드', items: [
+    I('크로플', 3000, 'food', C.bread, 'food'), I('허니 브레드', 4500, 'food', C.bread, 'food'), I('마카롱', 2000, 'food', C.berry, 'food'),
+    I('초코칩 쿠키', 2500, 'food', C.cookie, 'food'), I('햄치즈 샌드위치', 4800, 'food', C.cake, 'food'), I('치즈케이크', 4500, 'food', C.cake, 'food'),
+  ] },
+  '상품': { title: '상품', items: [
+    I('텀블러', 15000, 'goods', C.tumbler, 'goods'), I('머그컵', 12000, 'goods', C.mug, 'goods'),
+    I('원두 500g', 15000, 'goods', C.bean, 'goods'), I('스틱커피 10개입', 5000, 'goods', C.choco, 'goods'),
+  ] },
+};
+const TABS = Object.keys(MENUS);
+const ITEMS = {};
+TABS.forEach((t, ti) => MENUS[t].items.forEach((it, i) => { it.id = ti + '-' + i; ITEMS[it.id] = it; }));
+
+const OPT = {
+  tumbler: { title: '텀블러 선택', opts: [['tb', '텀블러(개인컵) 사용', 0]] },
+  shot: { title: '샷 선택', single: true, opts: [['weak', '연하게', 0], ['s1', '샷 추가', 600], ['s2', '2샷 추가', 1200]] },
+  stevia: { title: '저당 스테비아 슈가 추가', opts: [['stv', '저당 스테비아 추가', 600]] },
+  sweet: { title: '당도 선택', opts: [['milk', '연유 추가', 700], ['stv2', '저당 스테비아 추가', 600]] },
+  top: { title: '토핑 선택', opts: [['whip', '휘핑추가', 500]] },
+  tip: { title: '추천 옵션', tag: '꿀팁', red: true, opts: [['tip1', '아메리카노 꿀팁옵션', 700]] },
+};
+const GROUPS = { coffee: ['tumbler', 'shot', 'stevia', 'sweet', 'top', 'tip'], drink: ['tumbler', 'sweet', 'top'], food: [], goods: [] };
+const DISPOSABLES = ['빨대/스틱 필요', '캐리어/봉투 필요', '직접 가져 갈게요'];
+const DISCOUNTS = ['KT VIP 초이스\n통합 월1회', 'T 멤버십', 'CJ ONE\n포인트', '기아멤버스', 'SKT\n우주패스', '쿠폰\nAPP 연동 쿠폰'];
+const PAYS_BIG = [['카드결제', '삼성페이/애플페이'], ['앱카드', 'QR/바코드']];
+const PAYS = [['카카오페이'], ['페이코'], ['네이버페이'], ['제로페이'], ['BC페이북'], ['하나PAY'], ['KB PAY'], ['알리페이/위챗페이'],
+  ['모바일상품권', '교환권/금액권'], ['선불카드'], ['CJ기프트카드'], ['현대M포인트', '20% 사용']];
+
+// ---------------------------------------------------------------- 상태
+const params = new URLSearchParams(location.search);
+const TIME = 120;
+const S = { tab: '신메뉴', cart: [], stack: [], timer: TIME, timerOn: params.get('timer') !== 'off', orderNo: 100, sub: null, pay: null };
+function freshPay() { return { discount: new Set(), method: null, dine: null, disp: new Set(), phone: '010', err: '', approving: false, count: 0 }; }
+S.pay = freshPay();
+
+const $ = (s) => document.querySelector(s);
+const won = (n) => n.toLocaleString('ko-KR');
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const art = (it) => `<svg class="art" style="color:${it.color}" aria-hidden="true"><use href="#${it.art}"/></svg>`;
+const X = (act) => `<button class="x" data-act="${act}" aria-label="닫기"><svg viewBox="0 0 24 24"><path d="M6 6L18 18M18 6L6 18" stroke="#fff" stroke-width="3.4" stroke-linecap="round"/></svg></button>`;
+const icon = (id) => `<svg class="rb" aria-hidden="true"><use href="#${id}"/></svg>`;
+const total = () => S.cart.reduce((a, l) => a + l.unit * l.qty, 0);
+const count = () => S.cart.reduce((a, l) => a + l.qty, 0);
+const cur = () => S.stack[S.stack.length - 1];
+
+// ---------------------------------------------------------------- 그리기: 바탕 화면
+function renderBase(resetScroll) {
+  $('#tabs').innerHTML = TABS.map((t) => `<button class="tab${t === S.tab ? ' on' : ''}" data-act="tab" data-tab="${t}">${t}</button>`).join('');
+  const m = MENUS[S.tab];
+  $('#sect').textContent = m.title;
+  $('#grid').innerHTML = m.items.map((it) =>
+    `<button class="card" data-act="item" data-id="${it.id}">${art(it)}<span class="nm">${esc(it.name)}</span><span class="pr">${won(it.price)}원</span></button>`).join('');
+  if (resetScroll) $('#grid').scrollTop = 0;
+  renderCart();
+}
+function renderCart() {
+  $('#cartRows').innerHTML = S.cart.map((l, i) => `<div class="crow">
+      <div class="cn">${esc(l.item.name)}${l.opts.length ? `<small>${esc(l.opts.map((o) => o[1]).join(', '))}</small>` : ''}</div>
+      <div class="cq"><button data-act="cdec" data-i="${i}" aria-label="빼기">${icon('minus')}</button><span class="qn">${l.qty}개</span><button data-act="cinc" data-i="${i}" aria-label="더하기">${icon('plus')}</button></div>
+      <div class="cp">${won(l.unit * l.qty)}원</div></div>`).join('');
+  $('#pcount').innerHTML = `<b>${count()}</b>개`;
+  $('#ptotal').textContent = `${won(total())} 원`;
+}
+
+// ---------------------------------------------------------------- 그리기: 팝업
+const POP = {
+  options(o) {
+    const it = o.item;
+    const groups = GROUPS[it.kind].map((g) => {
+      const G = OPT[g];
+      const tag = (G.tag || '선택옵션').split('').join('<br>');
+      return `<div class="og-title">${G.title}</div><div class="og-row"><div class="og-tag${G.red ? ' red' : ''}">${tag}</div>${
+        G.opts.map(([id, name, price]) => `<button class="tile${o.sel.has(g + ':' + id) ? ' on' : ''}" data-act="opt" data-g="${g}" data-o="${id}">
+          <span class="ph"></span><span class="tn">${name}</span><span class="tp">+${won(price)}원</span></button>`).join('')}</div>`;
+    }).join('');
+    return `<div class="pop" style="left:0;top:0;width:1080px;height:1920px">
+      <div class="pt"><span>선택하신 상품의 옵션상품을 모두 선택해주세요</span>${X('opt-close')}</div>
+      <div class="op-head">${art(it)}<div class="op-info">
+        <div class="op-line"><span class="op-name">${esc(it.name)}</span>
+          <button data-act="oq" data-d="-1" aria-label="빼기">${icon('minus')}</button><span class="qn">${o.qty}개</span>
+          <button data-act="oq" data-d="1" aria-label="더하기">${icon('plus')}</button>
+          <span class="op-price">${won(optUnit(o) * o.qty)}원</span></div>
+        <div class="op-desc">${DESC[it.kind]}</div></div></div>
+      <div class="op-bar"><b>선택된 옵션</b><span class="op-sum">${esc(optList(o).map((x) => x[1]).join(', '))}</span><button class="pill" data-act="opt-reset">초기화</button></div>
+      <div class="op-body scroll">${groups || '<div class="none">추가로 선택할 옵션이 없습니다</div>'}</div>
+      <div class="op-foot"><button class="btn b-brown" data-act="opt-close">취소</button><button class="btn b-orange" data-act="opt-add">주문담기</button></div>
+    </div>`;
+  },
+  review() {
+    const rows = S.cart.map((l, i) => `<div class="rv-row"><span class="i">${i + 1}</span>
+      <span>${esc(l.item.name)}${l.opts.length ? `<small>${esc(l.opts.map((o) => o[1]).join(', '))}</small>` : ''}</span>
+      <span>${l.qty}개</span><span class="r">${won(l.unit * l.qty)} 원</span></div>`).join('');
+    return `<div class="pop" style="left:62px;top:96px;width:956px;height:1760px">
+      <div class="pt"><span>주문 세부 내역을 다시 한번 확인하여주세요</span>${X('back')}</div>
+      <div class="rv-list scroll">${rows}</div>
+      <div class="rv-note">매장 이용 시 일회용컵 사용 불가</div>
+      <div class="rv-tot"><span>총 수량</span><span style="margin-left:auto"><b>${count()}</b> 개</span><span style="margin-left:60px">총 결제금액</span><span style="margin-left:auto"><b>${won(total())}</b> 원</span></div>
+      <div class="rv-btns"><button class="btn b-brown" style="width:200px" data-act="back" aria-label="이전">
+          <svg viewBox="0 0 48 48" width="56" height="56"><path d="M40 24H10M22 11L9 24l13 13" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <button class="btn b-yellow" style="flex:1" data-act="dine">먹고가기<br>(다회용컵)</button>
+        <button class="btn b-orange" style="flex:1" data-act="takeout">포장하기<br>(일회용컵)</button></div>
+    </div>`;
+  },
+  disposable() {
+    return `<div class="pop" style="left:200px;top:760px;width:680px">
+      <div class="pt"><span>일회용품 필요여부를 선택해주세요</span></div>
+      <div style="padding-top:18px">${DISPOSABLES.map((d) => `<button class="chk${S.pay.disp.has(d) ? ' on' : ''}" data-act="disp" data-v="${d}"><span class="box">✓</span>${d}</button>`).join('')}</div>
+      <div class="two"><button class="btn b-gray" data-act="disp-none">선택안함</button><button class="btn b-orange" data-act="disp-done">선택완료</button></div>
+    </div>`;
+  },
+  payment() {
+    const d = DISCOUNTS.map((n) => `<button class="pt1${S.pay.discount.has(n) ? ' on' : ''}" data-act="disc" data-v="${esc(n)}"><span class="ic"></span><span>${n.replace('\n', '<br>')}</span></button>`).join('');
+    const big = PAYS_BIG.map(([n, s]) => `<button class="pt2" data-act="method" data-v="${n}"><span class="ic"></span><span><b>${n}</b><small>${s}</small></span></button>`).join('');
+    const small = PAYS.map(([n, s]) => `<button class="pt3" data-act="method" data-v="${n}"><span class="ic"></span><span>${n}</span>${s ? `<small>${s}</small>` : ''}</button>`).join('');
+    return `<div class="pop" style="left:90px;top:300px;width:900px">
+      <div class="pt"><span>결제수단 선택</span>${X('back')}</div>
+      <div class="step"><i>STEP1</i>할인수단을 선택해주세요</div><div class="pg pg3">${d}</div>
+      <div class="step" style="padding-top:28px"><i>STEP2</i>결제수단을 선택해주세요</div><div class="pg pg2">${big}</div><div class="pg pg4">${small}</div>
+      <div class="pay-tot"><span>주문금액</span><span>${won(total())}원</span><span class="due">결제할 금액&nbsp;&nbsp;${won(total())}원</span></div>
+    </div>`;
+  },
+  stamp() {
+    const p = S.pay.phone;
+    const shown = p.length <= 3 ? p + (p.length === 3 ? '-' : '') : p.length <= 7 ? p.slice(0, 3) + '-' + p.slice(3) : p.slice(0, 3) + '-' + p.slice(3, 7) + '-' + p.slice(7);
+    const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '010', '0', '←'];
+    return `<div class="pop" style="left:210px;top:470px;width:660px">
+      <div class="st-title"><b>스탬프 적립</b><small>APP 가입 시 적립된 스탬프 확인 및 사용 가능</small>${X('stamp-skip')}</div>
+      <div class="st-num">${shown || '&nbsp;'}</div>
+      <div class="keys">${keys.map((k) => `<button class="key" data-act="key" data-k="${k}">${k}</button>`).join('')}</div>
+      <div class="st-err">${S.pay.err}</div>
+      <button class="btn b-orange st-go" data-act="earn">적립</button>
+      <div class="st-fine">입력하신 번호는 스탬프 적립, 혜택 제공을 위해 수집 이용됩니다.<br>스탬프 적립 후 6개월 간 미사용 시 수집 정보는 자동 삭제됩니다.<br>(연습용 화면: 번호는 저장하거나 보내지 않습니다)</div>
+    </div>`;
+  },
+  card() {
+    const m = S.pay.method === '카드결제' ? '카드 결제(간편 결제)' : `${S.pay.method} 결제`;
+    return `<div class="pop" style="left:110px;top:430px;width:860px;height:1060px">
+      <div class="pt"><span>${esc(m)}</span>${X('card-cancel')}</div>
+      <div><div class="cd-row"><span>총 결제금액</span><span class="red">${won(total())}원</span></div>
+        <div class="cd-row"><span>할부개월</span><span>일시불</span></div>
+        <div class="cd-row"><span>카드번호</span><span></span></div></div>
+      <div class="cd-btns"><button class="btn b-black" style="width:210px" data-act="card-cancel">취소</button>
+        <button class="btn b-orange" style="flex:1" data-act="approve">${S.pay.approving ? '승인 중…' : '승인 요청'}</button></div>
+      <div class="cd-help">다음 그림과 같이 신용/체크카드를 넣어주세요.<br>(삼성페이는 카드 리더기에, 애플페이는 NFC 리더기에 휴대폰을 터치해주세요.)</div>
+      <div class="cd-pic"><svg viewBox="0 0 400 300" width="420" height="315" aria-hidden="true">
+        <rect x="110" y="70" width="180" height="210" rx="20" fill="#3A3A3A"/><rect x="132" y="92" width="136" height="80" rx="8" fill="#9FD3FF"/>
+        <rect x="140" y="200" width="120" height="12" rx="6" fill="#111"/><g transform="rotate(-6 200 150)"><rect x="150" y="10" width="100" height="70" rx="8" fill="#FFB300"/>
+        <rect x="164" y="26" width="22" height="16" rx="3" fill="#E9D27A"/></g>
+        <path d="M200 112 v-10" stroke="#fff" stroke-width="0"/></svg></div>
+    </div>`;
+  },
+  receipt(o) {
+    return `<div class="pop" style="left:200px;top:740px;width:680px">
+      <div class="rc-top"></div>
+      <div class="rc-body">[정상승인]<br><span style="color:#222">영수증을 출력하시겠습니까?</span><br>${o.left}</div>
+      <div class="two"><button class="btn b-black" data-act="print">출력</button><button class="btn b-orange" data-act="noprint">미출력</button></div>
+    </div>`;
+  },
+  done(o) {
+    return `<div class="done">
+      <div class="ok"><svg viewBox="0 0 48 48" width="100" height="100"><path d="M11 25l9 9 17-19" fill="none" stroke="#3A1A00" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <h1>결제가 완료되었습니다</h1>
+      <div class="no">주문번호<b>${o.no}</b></div>
+      <p>주문번호가 호출되면 픽업대에서 받아 주세요</p>
+      <p style="font-size:24px;color:#999">${o.left}초 뒤 처음 화면으로 돌아갑니다</p>
+    </div>`;
+  },
+  alert(o) {
+    return `<div class="pop" style="left:200px;top:760px;width:680px">
+      <div class="al-msg">${esc(o.msg)}</div>
+      <div class="two">${o.yes ? `<button class="btn b-brown" data-act="al-no">취소</button><button class="btn b-orange" data-act="al-yes">확인</button>`
+        : `<button class="btn b-orange" data-act="al-no">확인</button>`}</div>
+    </div>`;
+  },
+};
+function renderLayer() {
+  $('#layer').innerHTML = S.stack.map((o) => (o.type === 'done' ? '' : '<div class="dim"></div>') + POP[o.type](o)).join('');
+}
+function render(resetScroll) { renderBase(resetScroll); renderLayer(); }
+
+// ---------------------------------------------------------------- 옵션 계산
+function optList(o) {
+  return GROUPS[o.item.kind].flatMap((g) => OPT[g].opts.filter(([id]) => o.sel.has(g + ':' + id)));
+}
+function optUnit(o) { return o.item.price + optList(o).reduce((a, x) => a + x[2], 0); }
+
+// ---------------------------------------------------------------- 동작
+function push(o) { S.stack.push(o); renderLayer(); }
+function pop() { S.stack.pop(); renderLayer(); }
+function replace(o) { S.stack.pop(); push(o); }
+function stopSub() { if (S.sub) { clearInterval(S.sub); S.sub = null; } }
+function alertBox(msg, yes) { push({ type: 'alert', msg, yes }); }
+function resetAll() {
+  stopSub();
+  S.tab = '신메뉴'; S.cart = []; S.stack = []; S.pay = freshPay(); S.timer = TIME;
+  render(true); tick();
+}
+function countdown(from, then) {
+  stopSub();
+  const o = cur();
+  o.left = from;
+  renderLayer();
+  S.sub = setInterval(() => {
+    if (cur() !== o) { stopSub(); return; }
+    o.left -= 1;
+    if (o.left <= 0) { stopSub(); then(); } else renderLayer();
+  }, 1000);
+}
+
+const ACT = {
+  home: () => (S.cart.length ? alertBox('주문 내역이 모두 삭제됩니다.\n처음으로 돌아가시겠습니까?', resetAll) : resetAll()),
+  lang: () => alertBox('현재는 한국어만 지원합니다'),
+  tab: (d) => { S.tab = d.tab; renderBase(true); },
+  item: (d) => push({ type: 'options', item: ITEMS[d.id], qty: 1, sel: new Set() }),
+  opt: (d) => {
+    const o = cur(); const key = d.g + ':' + d.o;
+    if (o.sel.has(key)) o.sel.delete(key);
+    else {
+      if (OPT[d.g].single) OPT[d.g].opts.forEach(([id]) => o.sel.delete(d.g + ':' + id));
+      o.sel.add(key);
+    }
+    renderLayer();
+  },
+  oq: (d) => { const o = cur(); o.qty = Math.min(99, Math.max(1, o.qty + Number(d.d))); renderLayer(); },
+  'opt-reset': () => { cur().sel.clear(); renderLayer(); },
+  'opt-close': () => pop(),
+  'opt-add': () => {
+    const o = cur(); const opts = optList(o);
+    const key = o.item.id + '|' + opts.map((x) => x[0]).join(',');
+    const same = S.cart.find((l) => l.key === key);
+    if (same) same.qty = Math.min(99, same.qty + o.qty);
+    else S.cart.push({ key, item: o.item, opts, unit: optUnit(o), qty: o.qty });
+    pop(); renderCart();
+  },
+  cinc: (d) => { const l = S.cart[d.i]; l.qty = Math.min(99, l.qty + 1); renderCart(); },
+  cdec: (d) => { const l = S.cart[d.i]; if (l.qty > 1) l.qty -= 1; else S.cart.splice(d.i, 1); renderCart(); },
+  clear: () => { S.cart = []; renderCart(); },
+  pay: () => (S.cart.length ? (S.pay = freshPay(), push({ type: 'review' })) : alertBox('메뉴를 먼저 선택해 주세요')),
+  back: () => pop(),
+  dine: () => { S.pay.dine = '먹고가기'; push({ type: 'payment' }); },
+  takeout: () => { S.pay.dine = '포장하기'; push({ type: 'disposable' }); },
+  disp: (d) => { S.pay.disp.has(d.v) ? S.pay.disp.delete(d.v) : S.pay.disp.add(d.v); renderLayer(); },
+  'disp-none': () => { S.pay.disp.clear(); replace({ type: 'payment' }); },
+  'disp-done': () => replace({ type: 'payment' }),
+  disc: (d) => { S.pay.discount.has(d.v) ? S.pay.discount.delete(d.v) : S.pay.discount.add(d.v); renderLayer(); },
+  method: (d) => { S.pay.method = d.v; S.pay.phone = '010'; S.pay.err = ''; S.stack = [{ type: 'stamp' }]; renderLayer(); },
+  key: (d) => {
+    const p = S.pay;
+    if (d.k === '←') p.phone = p.phone.slice(0, -1);
+    else if (d.k === '010') { if (!p.phone) p.phone = '010'; }
+    else if (p.phone.length < 11) p.phone += d.k;
+    p.err = ''; renderLayer();
+  },
+  earn: () => {
+    if (S.pay.phone.length !== 11) { S.pay.err = '휴대폰 번호 11자리를 입력해 주세요'; renderLayer(); return; }
+    S.stack = [{ type: 'card' }]; renderLayer();
+  },
+  'stamp-skip': () => { S.stack = [{ type: 'card' }]; renderLayer(); },
+  'card-cancel': () => { if (S.pay.approving) return; S.stack = [{ type: 'review' }, { type: 'payment' }]; renderLayer(); },
+  approve: () => {
+    if (S.pay.approving) return;
+    S.pay.approving = true; renderLayer();
+    setTimeout(() => {
+      if (cur()?.type !== 'card') return;
+      S.pay.approving = false;
+      S.stack = [{ type: 'receipt' }];
+      countdown(9, finish);
+    }, 1500);
+  },
+  print: () => finish(),
+  noprint: () => finish(),
+  'al-no': () => pop(),
+  'al-yes': () => { const o = cur(); pop(); o.yes(); },
+};
+function finish() {
+  stopSub();
+  S.orderNo += 1;
+  S.cart = []; renderCart();
+  S.stack = [{ type: 'done', no: S.orderNo }];
+  countdown(6, resetAll);
+}
+
+// ---------------------------------------------------------------- 남은시간
+function tick() { $('#tleft').textContent = S.timer; }
+setInterval(() => {
+  if (!S.timerOn) return;
+  const t = cur();
+  if (t && (t.type === 'done' || t.type === 'receipt' || S.pay.approving)) return;
+  S.timer -= 1;
+  if (S.timer <= 0) { resetAll(); alertBox('남은 시간이 지나 처음 화면으로 돌아왔습니다'); return; }
+  tick();
+}, 1000);
+
+// ---------------------------------------------------------------- 입력 (누르기 · 마우스로 끌어 스크롤)
+const kiosk = $('#kiosk');
+let scale = 1;
+let drag = null;
+kiosk.addEventListener('pointerdown', (e) => {
+  S.timer = TIME; tick();
+  const sc = e.target.closest('.scroll');
+  if (sc && e.pointerType === 'mouse') drag = { sc, y: e.clientY, top: sc.scrollTop, moved: false };
+});
+window.addEventListener('pointermove', (e) => {
+  if (!drag) return;
+  const dy = (e.clientY - drag.y) / scale;
+  if (Math.abs(dy) > 8) drag.moved = true;
+  if (drag.moved) drag.sc.scrollTop = drag.top - dy;
+});
+window.addEventListener('pointerup', () => setTimeout(() => { drag = null; }, 0));
+kiosk.addEventListener('click', (e) => {
+  if (drag && drag.moved) return;
+  const el = e.target.closest('[data-act]');
+  if (!el) return;
+  const f = ACT[el.dataset.act];
+  if (f) f(el.dataset);
+});
+function toast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast'; t.textContent = msg; kiosk.appendChild(t);
+  setTimeout(() => { t.style.opacity = '0'; }, 1200);
+  setTimeout(() => t.remove(), 1600);
+}
+window.addEventListener('keydown', (e) => {
+  const k = e.key.toLowerCase();
+  if (k === 'f') { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.(); }
+  else if (k === 'r') resetAll();
+  else if (k === 't') { S.timerOn = !S.timerOn; S.timer = TIME; tick(); toast(S.timerOn ? '남은시간 켜짐' : '남은시간 꺼짐'); }
+});
+
+// ---------------------------------------------------------------- 화면 크기에 맞추기 (9:16)
+function fit() {
+  scale = Math.min(window.innerWidth / 1080, window.innerHeight / 1920);
+  kiosk.style.transform = `translate(-50%,-50%) scale(${scale})`;
+}
+window.addEventListener('resize', fit);
+fit();
+render(true);
+tick();
+</script>
+</body>
+</html>

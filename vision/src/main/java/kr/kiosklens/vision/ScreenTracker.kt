@@ -14,6 +14,11 @@ internal class ScreenTracker(
     /** 기준 글자의 위치. 화면 일부만 바뀐 것(메뉴 위에 뜬 옵션 창)을 찾는 데 쓴다 */
     private var referenceAt = emptyMap<String, NormRect>()
     private var pending: Set<String>? = null
+    private var pendingScene: String? = null
+    private var pendingSelection: String? = null
+    private var referenceScene: String? = null
+    private var referenceSelection: String? = null
+    private val interpreter = ScreenInterpreter()
     private var previous = emptyList<OcrLine>()
     private var stableFrames = 0
     private val ids = ElementIds(builder)
@@ -24,26 +29,39 @@ internal class ScreenTracker(
     fun update(lines: List<OcrLine>, frameId: Long = 0L, timestampMs: Long = 0L): ScreenUpdate? {
         if (lines.size < minimumElements) {
             pending = null
+            pendingScene = null
+            pendingSelection = null
             previous = emptyList()
             stableFrames = 0
             return null
         }
         val at = signature(lines)
         val keys = at.keys
+        val scene = interpreter.classifyLines(lines)
+        val selection = selectionSignature(lines, scene)
         // 히스테리시스: 지금 화면은 STAY만 넘으면 유지하고, 새 화면은 연속 두 프레임이 CONFIRM을 넘어야 확정한다.
         // 흐린 프레임 하나에 "새 화면 후보"가 되어 두 프레임씩 확정이 끊기던 문제 (2026-11-11 웹캠 측정)
         // 전체가 비슷해도 원래 보이던 자리 안쪽이 바뀌었으면(옵션 창이 뜨거나 닫힘) 새 화면이다 ([inner]).
         val inner = if (screenNumber == 0) Inner.NONE else inner(referenceAt, at)
-        val isNew = screenNumber == 0 || similarity(reference, keys) < STAY || inner.changed
+        val isNew = screenNumber == 0 || similarity(reference, keys) < STAY || inner.changed ||
+            (scene != null && scene != referenceScene) ||
+            (selection != null && referenceSelection != null && selection != referenceSelection)
         if (isNew) {
             val candidate = pending
+            val candidateScene = pendingScene
+            val candidateSelection = pendingSelection
             pending = keys
+            pendingScene = scene
+            pendingSelection = selection
             previous = emptyList()
             stableFrames = 0
-            if (candidate == null || similarity(candidate, keys) < CONFIRM) return null
+            if (candidate == null || candidateScene != scene || candidateSelection != selection ||
+                similarity(candidate, keys) < CONFIRM) return null
             screenNumber++
             reference = keys
             referenceAt = at
+            referenceScene = scene
+            referenceSelection = selection
             ids.reset()
             stableFrames = 2
         } else {
@@ -56,11 +74,15 @@ internal class ScreenTracker(
             }
         }
         pending = null
+        pendingScene = null
+        pendingSelection = null
         if (stableFrames < 2) {
             previous = lines
             return null
         }
-        val voted = (lines + previous.filter { old ->
+        // An incomplete foreground dialog demotes every observed label. Do not revive old buttons.
+        val canVote = lines.any { it.kindHint != ElementKind.TEXT }
+        val voted = (lines + previous.filter { old -> canVote &&
             lines.none { current -> Elements.distance(current.rect, old.rect) < 0.04f }
         }).take(ScreenSnapshot.MAX_ELEMENTS)
         previous = lines
@@ -69,6 +91,17 @@ internal class ScreenTracker(
             ScreenSnapshot(screenId, frameId, timestampMs, CartRegion.demoteDuplicates(ids.assign(screenId, voted)), stableFrames),
             isNew && screenNumber > 1,
         )
+    }
+
+    /** Missing summary OCR is unknown, not proof that the user's choice disappeared. */
+    private fun selectionSignature(lines: List<OcrLine>, scene: String?): String? {
+        if (scene != "product-options") return null
+        val strip = lines.firstOrNull { Elements.key(it.text).startsWith("선택된옵션") } ?: return null
+        val inline = Elements.key(strip.text).removePrefix("선택된옵션")
+        val values = lines.filter { it !== strip && it.rect.left >= strip.rect.right &&
+            kotlin.math.abs(it.rect.centerY - strip.rect.centerY) < maxOf(it.rect.height, strip.rect.height) &&
+            Elements.key(it.text) != "초기화" }.map { Elements.key(it.text) }
+        return (listOf(inline) + values).filter(String::isNotEmpty).sorted().joinToString("|")
     }
 
     /**
