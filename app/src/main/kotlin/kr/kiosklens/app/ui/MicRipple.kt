@@ -29,7 +29,8 @@ object MicRipple {
         val l = level.coerceIn(0f, 1f)
         val reach = 0.55f + 0.45f * l                                 // 조용함 55% ~ 큰 소리 100%까지 퍼짐
         val scale = 1f + (MAX_SCALE - 1f) * reach * p
-        val alpha = (1f - p) * (0.30f + 0.40f * l)                    // 퍼질수록 옅게, 큰 소리일수록 진하게
+        // 퍼질수록 옅게, 큰 소리일수록 진하게. 반투명한 밝은 색은 어두운 카메라 화면 위에서 회색으로 섞이므로 진하게 시작한다
+        val alpha = (1f - p) * (0.60f + 0.30f * l)
         return Ring(scale, alpha)
     }
 }

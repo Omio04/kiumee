@@ -1,38 +1,36 @@
 package kr.kiosklens.app.ui
 
+import android.animation.TimeAnimator
 import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Outline
 import android.graphics.Paint
-import android.graphics.Path
-import android.graphics.RadialGradient
 import android.graphics.RectF
-import android.graphics.Shader
 import android.util.TypedValue
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewOutlineProvider
-import android.view.animation.LinearInterpolator
 import kotlin.math.hypot
 import kotlin.math.min
 
 /**
- * 화면 아래 가운데의 동그란 마이크 버튼 (2026-11-12 화면 개편: "말하기" · "그만하기" 버튼과 자막을 이것 하나로).
+ * 화면 아래 가운데의 동그란 마이크 버튼 = 하늘색 구슬 (2026-11-12 화면 개편).
  *
- * - 옅은 하늘색 원: 가운데로 갈수록 더 연해지는 원형 그라데이션 + 하얀 마이크
- * - 듣는 중([listening])에는 둘레로 파동이 퍼진다. 퍼지는 거리 · 진하기는 목소리 크기([level], 0~1)를 따른다 ([MicRipple])
- * - 누르면 살짝 작아진다. 뷰는 파동이 퍼질 자리까지 포함해 크게 잡고, 누르기는 원 안(조금 여유)만 받는다
+ * 자막을 없앴으니 지금 상태를 글자 대신 구슬의 색과 움직임으로 보여 준다 ([OrbState]):
+ * 대기 숨쉬기 · 듣는 중 파동(목소리 크기를 따름) · 생각 중 도는 호 · 말하는 중 소리 막대 · 문제 주황빛.
+ * 기기에서 애니메이션을 끄면 움직이지 않고 그 상태의 한 장면만 그린다.
+ * 뷰는 파동이 퍼질 자리까지 포함해 크게 잡고, 누르기는 구슬 안(조금 여유)만 받는다.
  */
 class MicButtonView(context: Context) : View(context) {
 
-    /** 듣는 중이면 둘레에 파동을 그린다 */
-    var listening = false
+    var state = OrbState.IDLE
         set(value) {
             if (field == value) return
             field = value
-            if (value) ripple.start() else { ripple.cancel(); level = 0f; shown = 0f }
+            if (value != OrbState.LISTENING) { level = 0f; shown = 0f }
+            painter.setWarm(value == OrbState.PROBLEM)
             invalidate()
         }
 
@@ -41,106 +39,111 @@ class MicButtonView(context: Context) : View(context) {
         set(value) { field = value.coerceIn(0f, 1f) }
 
     private var shown = 0f
-    private var phase = 0f
+    private var elapsed = 0L
+    private val painter = OrbPainter()
+    private val halo = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val arc = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND; color = Color.WHITE
+    }
+    private val arcBox = RectF()
 
-    private val ripple: ValueAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
-        duration = MicRipple.PERIOD_MS
-        repeatCount = ValueAnimator.INFINITE
-        interpolator = LinearInterpolator()
-        addUpdateListener {
-            phase = it.animatedValue as Float
+    private val clock = TimeAnimator().apply {
+        setTimeListener { _, total, _ ->
+            elapsed = total
             shown += (level - shown) * 0.2f
             invalidate()
         }
     }
 
-    private val circlePaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = RING }
-    private val iconFill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
-    private val iconLine = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.WHITE; style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND
-    }
-    private val capsule = Path()
-    private val holder = Path()
-    private var stemTop = 0f
-    private var stemBottom = 0f
-    private var cx = 0f
-    private var cy = 0f
-    private var r = 0f
-
     init {
         isClickable = true
         isLongClickable = true
         isFocusable = true
-        // 버튼 원 모양의 그림자: 밝은 카메라 화면 위에서도 버튼이 떠 보이게
-        outlineProvider = object : ViewOutlineProvider() {
+        outlineProvider = object : ViewOutlineProvider() {                       // 구슬 모양 그림자 (밝은 화면 위에서도 떠 보이게)
             override fun getOutline(view: View, outline: Outline) {
-                outline.setOval((cx - r).toInt(), (cy - r).toInt(), (cx + r).toInt(), (cy + r).toInt())
+                val r = painter.r
+                outline.setOval((painter.cx - r).toInt(), (painter.cy - r).toInt(), (painter.cx + r).toInt(), (painter.cy + r).toInt())
             }
         }
         elevation = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 6f, resources.displayMetrics)
     }
 
-    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
-        cx = w / 2f
-        cy = h / 2f
-        r = min(w, h) / 2f / MicRipple.MAX_SCALE
-        circlePaint.shader = RadialGradient(cx, cy, r, intArrayOf(CENTER, EDGE), floatArrayOf(0f, 1f), Shader.TileMode.CLAMP)
+    private val moving get() = ValueAnimator.areAnimatorsEnabled()
 
-        // 마이크: 512칸 그림(둥근 캡슐 · 받침 호 · 기둥, 선 끝은 둥글게)을 원 지름의 55% 크기로 가운데에
-        val s = r * 1.1f / 512f
-        val ox = cx - 256f * s
-        val oy = cy - 252f * s                                       // 그림의 세로 가운데(48~456)를 원 가운데로
-        capsule.reset()
-        capsule.addRoundRect(RectF(ox + 192f * s, oy + 48f * s, ox + 320f * s, oy + 304f * s), 64f * s, 64f * s, Path.Direction.CW)
-        holder.reset()
-        holder.addArc(RectF(ox + 144f * s, oy + 128f * s, ox + 368f * s, oy + 352f * s), 0f, 180f)
-        iconLine.strokeWidth = 32f * s
-        stemTop = oy + 352f * s
-        stemBottom = oy + 456f * s
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        if (moving) clock.start()
+    }
+
+    override fun onDetachedFromWindow() {
+        clock.cancel()
+        super.onDetachedFromWindow()
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        painter.layout(w / 2f, h / 2f, min(w, h) / 2f / MicRipple.MAX_SCALE)
+        arc.strokeWidth = painter.r * 0.07f
         invalidateOutline()
     }
 
     override fun onDraw(canvas: Canvas) {
-        if (listening) {
-            for (i in 0 until MicRipple.RINGS) {
-                val ring = MicRipple.ring(i, phase, shown)
-                ringPaint.alpha = (ring.alpha * 255).toInt()
-                canvas.drawCircle(cx, cy, r * ring.scale, ringPaint)
+        val t = if (moving) elapsed else STILL_MS
+        val cx = painter.cx
+        val cy = painter.cy
+        val r = painter.r
+        when (state) {
+            OrbState.IDLE, OrbState.PROBLEM -> {                                   // 숨 쉬는 빛: 눌러 달라는 신호
+                val b = if (moving) OrbMotion.breath(t) else 0.5f
+                halo.color = if (state == OrbState.PROBLEM) Palette.AMBER_LIGHT else Palette.RIPPLE
+                halo.alpha = ((0.30f + 0.30f * b) * 255).toInt()
+                canvas.drawCircle(cx, cy, r * (1.04f + 0.08f * b), halo)
+            }
+            OrbState.LISTENING -> {                                                // 목소리 크기를 따르는 파동
+                halo.color = Palette.RIPPLE
+                val p = (t % MicRipple.PERIOD_MS).toFloat() / MicRipple.PERIOD_MS
+                val lv = if (moving) shown else 0.5f
+                for (i in 0 until MicRipple.RINGS) {
+                    val ring = MicRipple.ring(i, p, lv)
+                    halo.alpha = (ring.alpha * 255).toInt()
+                    canvas.drawCircle(cx, cy, r * ring.scale, halo)
+                }
+            }
+            OrbState.THINKING -> {                                                 // 둘레를 도는 하얀 호
+                val rr = r * 1.14f
+                arcBox.set(cx - rr, cy - rr, cx + rr, cy + rr)
+                arc.alpha = 70
+                canvas.drawOval(arcBox, arc)
+                arc.alpha = 240
+                canvas.drawArc(arcBox, OrbMotion.spin(t) - 90f, 110f, false, arc)
+            }
+            OrbState.SPEAKING -> {                                                 // 말하는 동안 잔잔한 빛
+                halo.color = Palette.RIPPLE
+                halo.alpha = 55
+                canvas.drawCircle(cx, cy, r * 1.08f, halo)
             }
         }
         val press = if (isPressed) 0.94f else 1f
         val saved = canvas.save()
         canvas.scale(press, press, cx, cy)
-        canvas.drawCircle(cx, cy, r, circlePaint)
-        canvas.drawPath(capsule, iconFill)
-        canvas.drawPath(holder, iconLine)
-        canvas.drawLine(cx, stemTop, cx, stemBottom, iconLine)
+        painter.drawOrb(canvas)
+        if (state == OrbState.SPEAKING) painter.drawBars(canvas, t) else painter.drawMic(canvas)
         canvas.restoreToCount(saved)
     }
 
-    /** 파동 자리(원 밖)를 누른 것은 버튼으로 치지 않는다 */
+    /** 파동 자리(구슬 밖)를 누른 것은 버튼으로 치지 않는다 */
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        if (event.actionMasked == MotionEvent.ACTION_DOWN && hypot(event.x - cx, event.y - cy) > r * 1.15f) return false
+        if (event.actionMasked == MotionEvent.ACTION_DOWN &&
+            hypot(event.x - painter.cx, event.y - painter.cy) > painter.r * 1.15f) return false
         return super.onTouchEvent(event)
     }
 
     override fun drawableStateChanged() {
         super.drawableStateChanged()
-        invalidate()                                                 // 눌림 모양 바꾸기
-    }
-
-    override fun onDetachedFromWindow() {
-        ripple.cancel()
-        super.onDetachedFromWindow()
+        invalidate()                                                               // 눌림 모양 바꾸기
     }
 
     private companion object {
-        /** 옅은 하늘색 (원 가장자리) */
-        val EDGE = Color.rgb(0x5E, 0xBA, 0xEC)
-        /** 가운데로 갈수록 더 연하게 */
-        val CENTER = Color.rgb(0xB4, 0xE1, 0xF8)
-        /** 파동 */
-        val RING = Color.rgb(0x8F, 0xD0, 0xF5)
+        /** 애니메이션을 끈 기기에서 그릴 한 장면 */
+        const val STILL_MS = 300L
     }
 }

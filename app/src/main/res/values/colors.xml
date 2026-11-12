@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 키우미 색 (2026-11-12 디자인 계획). 화면 코드는 ui/Palette.kt의 같은 값을 쓴다 -->
+<resources>
+    <color name="kiumee_sky">#4FB2EA</color>
+    <color name="kiumee_sky_light">#A6DBF7</color>
+    <color name="kiumee_signal">#FFD600</color>
+    <color name="kiumee_morning">#F4FAFE</color>
+    <color name="kiumee_deep">#14344D</color>
+</resources>

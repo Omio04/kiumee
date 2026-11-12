@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Android 12+: 시스템 시작 화면(아이콘)도 아침색 바탕 → 키우미 로딩 화면 → 카메라로 끊김 없이 -->
+    <style name="Theme.KioskLens" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">@color/kiumee_morning</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowSplashScreenBackground">@color/kiumee_morning</item>
+    </style>
+</resources>

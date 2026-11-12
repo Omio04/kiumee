@@ -5,9 +5,11 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import android.provider.Settings
 import android.util.TypedValue
 import android.view.Gravity
@@ -22,6 +24,7 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.view.PreviewView
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -33,8 +36,11 @@ import kr.kiosklens.app.di.AndroidLogger
 import kr.kiosklens.app.di.Graph
 import kr.kiosklens.app.di.GraphFactory
 import kr.kiosklens.app.net.LocalNetwork
+import kr.kiosklens.app.ui.LoadingScreen
 import kr.kiosklens.app.ui.MicButtonView
 import kr.kiosklens.app.ui.MicRipple
+import kr.kiosklens.app.ui.OrbState
+import kr.kiosklens.app.ui.Palette
 import kr.kiosklens.app.ui.RecognitionStatus
 import kr.kiosklens.app.ui.UiTexts
 import kr.kiosklens.core.model.ScreenSnapshot
@@ -60,6 +66,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var micButton: MicButtonView
     private lateinit var settingsBtn: Button
     private lateinit var preview: PreviewView
+    private lateinit var loading: LoadingScreen
+    private var createdAt = 0L
+    private var loadingDone = false
 
     private var graph: Graph? = null
     private var camera: CameraController? = null
@@ -74,8 +83,30 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)          // 안내 중 화면이 꺼지지 않게
+        createdAt = SystemClock.uptimeMillis()
         setContentView(buildUi())
+        lightBars(true)                                                          // 로딩 화면은 밝으니 상태 표시줄 아이콘을 어둡게
         ensurePermissions()
+    }
+
+    // ---------------- 로딩 화면 ----------------
+
+    /**
+     * 카메라가 영상을 보내기 시작하면 로딩 화면을 걷는다. 노란 테두리 그리기를 끝까지 보여 주려고 최소 [MIN_LOADING_MS]는 둔다.
+     * 권한을 거절했거나 카메라가 끝내 안 켜져도(8초) 걷어서 갇히지 않게 한다.
+     */
+    private fun finishLoading() {
+        if (loadingDone) return
+        loadingDone = true
+        val wait = (MIN_LOADING_MS - (SystemClock.uptimeMillis() - createdAt)).coerceAtLeast(0L)
+        loading.postDelayed({ loading.dismiss { lightBars(false) } }, wait)
+    }
+
+    private fun lightBars(light: Boolean) {
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            isAppearanceLightStatusBars = light
+            isAppearanceLightNavigationBars = light
+        }
     }
 
     // ---------------- 권한 ----------------
@@ -111,6 +142,7 @@ class MainActivity : AppCompatActivity() {
             note.text = getString(R.string.need_permission); note.visibility = View.VISIBLE
             settingsBtn.visibility = View.VISIBLE
             micButton.isEnabled = false; micButton.alpha = 0.4f
+            finishLoading()                                                      // 권한 안내 카드가 보이게
         }
     }
 
@@ -127,6 +159,9 @@ class MainActivity : AppCompatActivity() {
         camera = CameraController(this, g.frameSink, logger) { w, h ->
             runOnUiThread { overlay.setAnalysisSize(w, h); recognition?.setAnalysisSize(w, h) }
         }.also { it.start(this, preview) }
+        preview.previewStreamState.observe(this) { if (it == PreviewView.StreamState.STREAMING) finishLoading() }
+        loading.postDelayed({ if (!loadingDone) loading.slow() }, SLOW_LOADING_MS)
+        loading.postDelayed({ finishLoading() }, MAX_LOADING_MS)
         if (BuildConfig.SERVER_URL.isBlank()) { note.text = getString(R.string.need_server); note.visibility = View.VISIBLE }
         if (BuildConfig.DEBUG) ensureLocalNetworkPermission()
         if (BuildConfig.DEBUG) {
@@ -146,7 +181,7 @@ class MainActivity : AppCompatActivity() {
     private fun render() {
         val g = graph ?: return
         val phase = g.runner.state.value.phase
-        micButton.listening = phase == Phase.LISTENING
+        micButton.state = OrbState.of(phase)                                       // 자막 대신 구슬의 색 · 움직임으로 상태를
         val description = UiTexts.micDescription(phase)                          // 자막 대신 TalkBack이 읽는 설명
         if (micButton.contentDescription != description) micButton.contentDescription = description
     }
@@ -170,16 +205,25 @@ class MainActivity : AppCompatActivity() {
         val match = ViewGroup.LayoutParams.MATCH_PARENT
 
         preview = PreviewView(this).apply { scaleType = PreviewView.ScaleType.FILL_CENTER }.also { root.addView(it, FrameLayout.LayoutParams(match, match)) }
+        // 화면 아래 은은한 그림자 띠: 어떤 카메라 화면 위에서도 구슬이 또렷하게. 노란 안내 테두리보다 아래라 테두리는 어두워지지 않는다
+        View(this).apply {
+            background = GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP, intArrayOf(Color.argb(115, 0, 0, 0), Color.TRANSPARENT))
+        }.also { root.addView(it, FrameLayout.LayoutParams(match, dp(280), Gravity.BOTTOM)) }
         if (BuildConfig.DEBUG) recognition = RecognitionView(this).also { root.addView(it, FrameLayout.LayoutParams(match, match)) }   // 노란 테두리보다 아래
         overlay = ViewOverlay(this).also { root.addView(it, FrameLayout.LayoutParams(match, match)) }
 
         // 문제가 있을 때만 보이는 안내 (권한 · 서버 주소 · 로컬 네트워크). 평소 화면에는 글자가 없다
-        note = TextView(this).apply {
+        note = TextView(this).apply {                                                       // 둥근 안내 카드
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f); setTextColor(Color.WHITE); gravity = Gravity.CENTER
-            typeface = Typeface.DEFAULT_BOLD; setBackgroundColor(Color.argb(200, 0, 0, 0))
-            setPadding(dp(16), dp(12), dp(16), dp(12)); visibility = View.GONE
+            typeface = Typeface.DEFAULT_BOLD; setLineSpacing(0f, 1.15f)
+            background = GradientDrawable().apply { cornerRadius = dp(22).toFloat(); setColor(Color.argb(235, 0x14, 0x34, 0x4D)) }
+            setPadding(dp(20), dp(16), dp(20), dp(16)); visibility = View.GONE
         }
-        settingsBtn = bigButton(getString(R.string.open_settings), Color.WHITE, Color.BLACK, 72).apply {
+        settingsBtn = Button(this).apply {                                                 // 알약 모양 "설정 열기"
+            text = getString(R.string.open_settings); isAllCaps = false
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f); setTextColor(Palette.DEEP); typeface = Typeface.DEFAULT_BOLD
+            background = GradientDrawable().apply { cornerRadius = dp(36).toFloat(); setColor(Color.WHITE) }
+            minHeight = dp(72); minimumHeight = dp(72); stateListAnimator = null
             visibility = View.GONE
             setOnClickListener { startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))) }
         }
@@ -195,8 +239,8 @@ class MainActivity : AppCompatActivity() {
         val micSize = (dp(MIC_DP) * MicRipple.MAX_SCALE).toInt()                          // 파동이 퍼질 자리까지
         val bottom = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL
-            addView(note, LinearLayout.LayoutParams(match, ViewGroup.LayoutParams.WRAP_CONTENT))
-            addView(settingsBtn, LinearLayout.LayoutParams(match, ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(dp(16), dp(8), dp(16), 0) })
+            addView(note, LinearLayout.LayoutParams(match, ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(dp(20), 0, dp(20), 0) })
+            addView(settingsBtn, LinearLayout.LayoutParams(match, ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(dp(40), dp(12), dp(40), 0) })
             addView(micButton, LinearLayout.LayoutParams(micSize, micSize))
         }
         ViewCompat.setOnApplyWindowInsetsListener(bottom) { v, insets ->                 // 시스템 내비게이션 바에 가리지 않게
@@ -216,12 +260,8 @@ class MainActivity : AppCompatActivity() {
                 }
             }.also { root.addView(it, FrameLayout.LayoutParams(match, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP)) }
         }
+        loading = LoadingScreen(this).also { root.addView(it, FrameLayout.LayoutParams(match, match)) }   // 맨 위: 카메라가 켜질 때까지
         return root
-    }
-
-    private fun bigButton(label: String, bg: Int, fg: Int, heightDp: Int) = Button(this).apply {
-        text = label; setTextSize(TypedValue.COMPLEX_UNIT_SP, 28f); setTextColor(fg); typeface = Typeface.DEFAULT_BOLD
-        setBackgroundColor(bg); minHeight = dp(heightDp); minimumHeight = dp(heightDp); isAllCaps = false
     }
 
     private companion object {
@@ -229,5 +269,11 @@ class MainActivity : AppCompatActivity() {
         const val REQ_LOCAL = 101
         /** 마이크 버튼(원) 지름. 어르신이 누르기 쉽게 크게 (핵심 버튼 72dp 이상) */
         const val MIC_DP = 96
+        /** 로딩 화면 최소 시간: 노란 테두리 그리기(0.25초 뒤 0.9초)를 끝까지 보여 준다 */
+        const val MIN_LOADING_MS = 1500L
+        /** 이만큼 지나도 카메라가 안 켜지면 "조금만 기다려 주세요" */
+        const val SLOW_LOADING_MS = 4000L
+        /** 이만큼 지나면 카메라가 안 켜져도 로딩 화면을 걷는다 (갇히지 않게) */
+        const val MAX_LOADING_MS = 8000L
     }
 }

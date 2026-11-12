@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 앱 아이콘 앞면: 하얀 마이크(말하면) + 노란 조준 모서리(비추면 짚어 준다). 안전 영역(지름 66) 안 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group android:name="corners">
+        <path android:pathData="M31,42 V36 A5,5 0 0 1 36,31 H42" android:strokeColor="#FFFFD600" android:strokeWidth="4.2" android:strokeLineCap="round" android:strokeLineJoin="round" />
+        <path android:pathData="M66,31 H72 A5,5 0 0 1 77,36 V42" android:strokeColor="#FFFFD600" android:strokeWidth="4.2" android:strokeLineCap="round" android:strokeLineJoin="round" />
+        <path android:pathData="M77,66 V72 A5,5 0 0 1 72,77 H66" android:strokeColor="#FFFFD600" android:strokeWidth="4.2" android:strokeLineCap="round" android:strokeLineJoin="round" />
+        <path android:pathData="M42,77 H36 A5,5 0 0 1 31,72 V66" android:strokeColor="#FFFFD600" android:strokeWidth="4.2" android:strokeLineCap="round" android:strokeLineJoin="round" />
+    </group>
+    <group android:name="mic">
+        <path android:pathData="M48.355,41.645 A5.645,5.645 0 0 1 59.645,41.645 V52.945 A5.645,5.645 0 0 1 48.355,52.945 Z" android:fillColor="#FFFFFFFF" />
+        <path android:pathData="M63.88,52.93 A9.88,9.88 0 0 1 44.12,52.93" android:strokeColor="#FFFFFFFF" android:strokeWidth="3.2" android:strokeLineCap="round" />
+        <path android:pathData="M54,62.81 V71.98" android:strokeColor="#FFFFFFFF" android:strokeWidth="3.2" android:strokeLineCap="round" />
+    </group>
+</vector>
