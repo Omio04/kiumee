@@ -29,6 +29,7 @@ class MicButtonView(context: Context) : View(context) {
         set(value) {
             if (field == value) return
             field = value
+            stateSince = elapsed
             if (value != OrbState.LISTENING) { level = 0f; shown = 0f }
             painter.setWarm(value == OrbState.PROBLEM)
             invalidate()
@@ -40,6 +41,7 @@ class MicButtonView(context: Context) : View(context) {
 
     private var shown = 0f
     private var elapsed = 0L
+    private var stateSince = 0L
     private val painter = OrbPainter()
     private val halo = Paint(Paint.ANTI_ALIAS_FLAG)
     private val arc = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -116,9 +118,9 @@ class MicButtonView(context: Context) : View(context) {
                 arc.alpha = 240
                 canvas.drawArc(arcBox, OrbMotion.spin(t) - 90f, 110f, false, arc)
             }
-            OrbState.SPEAKING -> {                                                 // 말하는 동안 잔잔한 빛
+            OrbState.SPEAKING, OrbState.DONE -> {                                  // 말하는 동안 · 다 마친 뒤 잔잔한 빛
                 halo.color = Palette.RIPPLE
-                halo.alpha = 55
+                halo.alpha = 90
                 canvas.drawCircle(cx, cy, r * 1.08f, halo)
             }
         }
@@ -126,7 +128,11 @@ class MicButtonView(context: Context) : View(context) {
         val saved = canvas.save()
         canvas.scale(press, press, cx, cy)
         painter.drawOrb(canvas)
-        if (state == OrbState.SPEAKING) painter.drawBars(canvas, t) else painter.drawMic(canvas)
+        when (state) {
+            OrbState.SPEAKING -> painter.drawBars(canvas, t)
+            OrbState.DONE -> painter.drawCheck(canvas, if (moving) OrbMotion.check(elapsed - stateSince) else 1f)
+            else -> painter.drawMic(canvas)
+        }
         canvas.restoreToCount(saved)
     }
 

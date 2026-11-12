@@ -15,8 +15,19 @@ class OrbStateTest {
         assertEquals(OrbState.LISTENING, OrbState.of(Phase.LISTENING))
         assertEquals(OrbState.THINKING, OrbState.of(Phase.PLANNING))
         assertEquals(OrbState.THINKING, OrbState.of(Phase.SCANNING))
-        for (p in listOf(Phase.GUIDING, Phase.ASKING, Phase.DONE)) assertEquals("$p", OrbState.SPEAKING, OrbState.of(p))
+        for (p in listOf(Phase.GUIDING, Phase.ASKING)) assertEquals("$p", OrbState.SPEAKING, OrbState.of(p))
+        assertEquals("주문 끝은 체크 표시", OrbState.DONE, OrbState.of(Phase.DONE))
         for (p in listOf(Phase.LOST, Phase.ERROR)) assertEquals("$p", OrbState.PROBLEM, OrbState.of(p))
+    }
+
+    @Test fun `체크 표시는 짧게 그려지고, 로딩 캐릭터는 가끔만 눈을 깜빡인다`() {
+        assertEquals(0f, OrbMotion.check(0), 0f)
+        assertEquals(1f, OrbMotion.check(OrbMotion.CHECK_MS), 0f)
+        assertEquals(0f, OrbMotion.blink(0), 0f)                                        // 처음엔 눈을 뜨고 있다
+        assertTrue("글자가 떠오른 뒤 첫 깜빡임", OrbMotion.blink(1600 + OrbMotion.BLINK_MS / 2) > 0.9f)
+        val closed = (0L until OrbMotion.BLINK_EVERY_MS step 10).count { OrbMotion.blink(it) > 0f }
+        assertTrue("한 주기에서 감은 시간은 짧다", closed * 10 <= OrbMotion.BLINK_MS + 10)
+        for (t in 0L..6000L step 13) assertTrue(OrbMotion.blink(t) in 0f..1f)
     }
 
     @Test fun `움직임 값은 정해진 범위 안에서 반복된다`() {

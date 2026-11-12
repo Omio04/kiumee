@@ -1,19 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 앱 아이콘 앞면: 하얀 마이크(말하면) + 노란 조준 모서리(비추면 짚어 준다). 안전 영역(지름 66) 안 -->
+<!-- 키우미: 웃는 얼굴의 작은 키오스크 (하얀 화면 · 받침, 깊은 바다색 눈과 입, 안내 노랑 볼). 안전 영역(지름 66) 안 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <group android:name="corners">
-        <path android:pathData="M31,42 V36 A5,5 0 0 1 36,31 H42" android:strokeColor="#FFFFD600" android:strokeWidth="4.2" android:strokeLineCap="round" android:strokeLineJoin="round" />
-        <path android:pathData="M66,31 H72 A5,5 0 0 1 77,36 V42" android:strokeColor="#FFFFD600" android:strokeWidth="4.2" android:strokeLineCap="round" android:strokeLineJoin="round" />
-        <path android:pathData="M77,66 V72 A5,5 0 0 1 72,77 H66" android:strokeColor="#FFFFD600" android:strokeWidth="4.2" android:strokeLineCap="round" android:strokeLineJoin="round" />
-        <path android:pathData="M42,77 H36 A5,5 0 0 1 31,72 V66" android:strokeColor="#FFFFD600" android:strokeWidth="4.2" android:strokeLineCap="round" android:strokeLineJoin="round" />
-    </group>
-    <group android:name="mic">
-        <path android:pathData="M48.355,41.645 A5.645,5.645 0 0 1 59.645,41.645 V52.945 A5.645,5.645 0 0 1 48.355,52.945 Z" android:fillColor="#FFFFFFFF" />
-        <path android:pathData="M63.88,52.93 A9.88,9.88 0 0 1 44.12,52.93" android:strokeColor="#FFFFFFFF" android:strokeWidth="3.2" android:strokeLineCap="round" />
-        <path android:pathData="M54,62.81 V71.98" android:strokeColor="#FFFFFFFF" android:strokeWidth="3.2" android:strokeLineCap="round" />
-    </group>
+    <path android:fillColor="#FFFFFFFF" android:pathData="M43,30 H65 A10,10 0 0 1 75,40 V56 A10,10 0 0 1 65,66 H43 A10,10 0 0 1 33,56 V40 A10,10 0 0 1 43,30 Z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M50,64 H58 V72 H50 Z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M44.25,71.5 H63.75 A2.25,2.25 0 0 1 63.75,76 H44.25 A2.25,2.25 0 0 1 44.25,71.5 Z" />
+    <path android:fillColor="#FFFFD600" android:pathData="M38.1,51.5 a3.4,2.3 0 1 0 6.8,0 a3.4,2.3 0 1 0 -6.8,0 Z" />
+    <path android:fillColor="#FFFFD600" android:pathData="M63.1,51.5 a3.4,2.3 0 1 0 6.8,0 a3.4,2.3 0 1 0 -6.8,0 Z" />
+    <path android:fillColor="#FF14344D" android:pathData="M43.5,44.5 a3,3 0 1 0 6,0 a3,3 0 1 0 -6,0 Z" />
+    <path android:fillColor="#FF14344D" android:pathData="M58.5,44.5 a3,3 0 1 0 6,0 a3,3 0 1 0 -6,0 Z" />
+    <path android:strokeColor="#FF14344D" android:strokeWidth="3" android:strokeLineCap="round" android:pathData="M47.5,51.5 Q54,57.5 60.5,51.5" />
 </vector>

@@ -19,14 +19,17 @@ enum class OrbState {
     /** 말하는 중 (안내 · 질문 · 마무리 읽기): 마이크 대신 출렁이는 소리 막대 */
     SPEAKING,
     /** 문제 (화면을 놓침 · 오류): 주황빛으로 숨 쉬기 */
-    PROBLEM;
+    PROBLEM,
+    /** 주문 끝: 하얀 체크 표시가 그려지며 나타난다 (잘 마쳤다는 확인) */
+    DONE;
 
     companion object {
         fun of(phase: Phase): OrbState = when (phase) {
             Phase.IDLE, Phase.WAIT_CHANGE -> IDLE
             Phase.LISTENING -> LISTENING
             Phase.PLANNING, Phase.SCANNING -> THINKING
-            Phase.GUIDING, Phase.ASKING, Phase.DONE -> SPEAKING
+            Phase.GUIDING, Phase.ASKING -> SPEAKING
+            Phase.DONE -> DONE
             Phase.LOST, Phase.ERROR -> PROBLEM
         }
     }
@@ -52,6 +55,26 @@ object OrbMotion {
         val x = ((elapsedMs - TRACE_DELAY_MS).toFloat() / TRACE_MS).coerceIn(0f, 1f)
         val inv = 1f - x
         return 1f - inv * inv * inv
+    }
+
+    /** 주문 끝 체크 표시가 그려지는 시간 */
+    const val CHECK_MS = 450L
+
+    /** 체크 표시가 그려진 정도 0~1 (처음엔 빠르게, 끝에서 천천히) */
+    fun check(sinceMs: Long): Float {
+        val x = (sinceMs.toFloat() / CHECK_MS).coerceIn(0f, 1f)
+        val inv = 1f - x
+        return 1f - inv * inv * inv
+    }
+
+    /** 로딩 화면 캐릭터 눈 깜빡임: [BLINK_EVERY_MS]마다 [BLINK_MS] 동안. 첫 깜빡임은 글자가 떠오른 뒤(약 1.6초) */
+    const val BLINK_EVERY_MS = 2800L
+    const val BLINK_MS = 170L
+
+    /** 눈 감은 정도 0(뜸)~1(감음) */
+    fun blink(elapsedMs: Long): Float {
+        val k = (elapsedMs + BLINK_EVERY_MS - 1600L).mod(BLINK_EVERY_MS)
+        return if (k < BLINK_MS) sin(PI * k / BLINK_MS).toFloat() else 0f
     }
 
     /** 숨 쉬기 0~1 (부드럽게 들어갔다 나옴) */

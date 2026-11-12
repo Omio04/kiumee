@@ -40,7 +40,6 @@ import kr.kiosklens.app.ui.LoadingScreen
 import kr.kiosklens.app.ui.MicButtonView
 import kr.kiosklens.app.ui.MicRipple
 import kr.kiosklens.app.ui.OrbState
-import kr.kiosklens.app.ui.Palette
 import kr.kiosklens.app.ui.RecognitionStatus
 import kr.kiosklens.app.ui.UiTexts
 import kr.kiosklens.core.model.ScreenSnapshot
@@ -64,7 +63,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var overlay: ViewOverlay
     private lateinit var note: TextView
     private lateinit var micButton: MicButtonView
-    private lateinit var settingsBtn: Button
     private lateinit var preview: PreviewView
     private lateinit var loading: LoadingScreen
     private var createdAt = 0L
@@ -92,8 +90,8 @@ class MainActivity : AppCompatActivity() {
     // ---------------- 로딩 화면 ----------------
 
     /**
-     * 카메라가 영상을 보내기 시작하면 로딩 화면을 걷는다. 노란 테두리 그리기를 끝까지 보여 주려고 최소 [MIN_LOADING_MS]는 둔다.
-     * 권한을 거절했거나 카메라가 끝내 안 켜져도(8초) 걷어서 갇히지 않게 한다.
+     * 카메라가 영상을 보내기 시작하면 로딩 화면을 걷는다. 글자가 떠오르는 것까지 보여 주려고 최소 [MIN_LOADING_MS]는 둔다.
+     * 카메라가 끝내 안 켜져도(8초) 걷어서 갇히지 않게 한다. 권한이 없을 때는 걷지 않고 그 화면에서 안내한다.
      */
     private fun finishLoading() {
         if (loadingDone) return
@@ -114,9 +112,20 @@ class MainActivity : AppCompatActivity() {
     private val needed = arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO)
 
     private fun ensurePermissions() {
-        if (needed.all { checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED }) init()
+        if (hasPermissions()) init()
         else requestPermissions(needed, REQ)
     }
+
+    private fun hasPermissions() = needed.all { checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED }
+
+    /** 설정에서 권한을 허용하고 돌아오면 바로 카메라를 켠다 (예전에는 돌아와도 아무 일이 없었다) */
+    override fun onResume() {
+        super.onResume()
+        if (graph == null && hasPermissions()) { loading.waiting(); init() }
+    }
+
+    private fun openAppSettings() =
+        startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
 
     /**
      * 디버그 빌드: 서버가 같은 와이파이의 노트북 · 에뮬레이터의 Mac(사설 IP)이면 Android 17+ 로컬 네트워크 권한을 받는다.
@@ -139,10 +148,8 @@ class MainActivity : AppCompatActivity() {
         if (requestCode != REQ) return
         if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) init()
         else {
-            note.text = getString(R.string.need_permission); note.visibility = View.VISIBLE
-            settingsBtn.visibility = View.VISIBLE
-            micButton.isEnabled = false; micButton.alpha = 0.4f
-            finishLoading()                                                      // 권한 안내 카드가 보이게
+            micButton.isEnabled = false
+            loading.needPermission { openAppSettings() }                         // 밝은 로딩 화면에서 이유와 "설정 열기"
         }
     }
 
@@ -150,9 +157,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun init() {
         if (graph != null) return
-        settingsBtn.visibility = View.GONE
         note.visibility = View.GONE
-        micButton.isEnabled = true; micButton.alpha = 1f
+        micButton.isEnabled = true
         val g = GraphFactory.create(this, work, overlay)
         graph = g
 
@@ -212,25 +218,20 @@ class MainActivity : AppCompatActivity() {
         if (BuildConfig.DEBUG) recognition = RecognitionView(this).also { root.addView(it, FrameLayout.LayoutParams(match, match)) }   // 노란 테두리보다 아래
         overlay = ViewOverlay(this).also { root.addView(it, FrameLayout.LayoutParams(match, match)) }
 
-        // 문제가 있을 때만 보이는 안내 (권한 · 서버 주소 · 로컬 네트워크). 평소 화면에는 글자가 없다
+        // 문제가 있을 때만 보이는 안내 (서버 주소 · 로컬 네트워크). 평소 화면에는 글자가 없다. 권한 안내는 로딩 화면이 맡는다
         note = TextView(this).apply {                                                       // 둥근 안내 카드
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f); setTextColor(Color.WHITE); gravity = Gravity.CENTER
-            typeface = Typeface.DEFAULT_BOLD; setLineSpacing(0f, 1.15f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 19f); setTextColor(Color.WHITE); gravity = Gravity.CENTER
+            setLineSpacing(0f, 1.2f)
             background = GradientDrawable().apply { cornerRadius = dp(22).toFloat(); setColor(Color.argb(235, 0x14, 0x34, 0x4D)) }
             setPadding(dp(20), dp(16), dp(20), dp(16)); visibility = View.GONE
-        }
-        settingsBtn = Button(this).apply {                                                 // 알약 모양 "설정 열기"
-            text = getString(R.string.open_settings); isAllCaps = false
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f); setTextColor(Palette.DEEP); typeface = Typeface.DEFAULT_BOLD
-            background = GradientDrawable().apply { cornerRadius = dp(36).toFloat(); setColor(Color.WHITE) }
-            minHeight = dp(72); minimumHeight = dp(72); stateListAnimator = null
-            visibility = View.GONE
-            setOnClickListener { startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))) }
         }
         micButton = MicButtonView(this).apply {
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE                  // 설명이 바뀌면 TalkBack이 읽어 준다
             contentDescription = UiTexts.micDescription(Phase.IDLE)
-            setOnClickListener { graph?.runner?.pressStart() }                             // 말하기 (안내 중이면 말 보태기)
+            setOnClickListener {                                                           // 말하기 (안내 중이면 말 보태기)
+                performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)                // 눌렸다는 가벼운 진동
+                graph?.runner?.pressStart()
+            }
             setOnLongClickListener {                                                       // 처음부터 (예전 "그만하기")
                 performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
                 graph?.runner?.pressStop(); true
@@ -240,7 +241,6 @@ class MainActivity : AppCompatActivity() {
         val bottom = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL
             addView(note, LinearLayout.LayoutParams(match, ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(dp(20), 0, dp(20), 0) })
-            addView(settingsBtn, LinearLayout.LayoutParams(match, ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(dp(40), dp(12), dp(40), 0) })
             addView(micButton, LinearLayout.LayoutParams(micSize, micSize))
         }
         ViewCompat.setOnApplyWindowInsetsListener(bottom) { v, insets ->                 // 시스템 내비게이션 바에 가리지 않게

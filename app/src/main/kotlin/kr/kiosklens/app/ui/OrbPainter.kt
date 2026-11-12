@@ -4,6 +4,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.PathMeasure
 import android.graphics.RadialGradient
 import android.graphics.RectF
 import android.graphics.Shader
@@ -26,6 +27,9 @@ class OrbPainter {
     }
     private val capsule = Path()
     private val holder = Path()
+    private val tick = Path()
+    private val tickDrawn = Path()
+    private val tickMeasure = PathMeasure()
     private var stemTop = 0f
     private var stemBottom = 0f
 
@@ -43,6 +47,11 @@ class OrbPainter {
         stemTop = oy + 352f * s
         stemBottom = oy + 456f * s
         line.strokeWidth = 32f * s
+        tick.reset()                                                  // 주문 끝 체크 표시 (같은 512칸 기준)
+        tick.moveTo(ox + 150f * s, oy + 262f * s)
+        tick.lineTo(ox + 228f * s, oy + 340f * s)
+        tick.lineTo(ox + 368f * s, oy + 186f * s)
+        tickMeasure.setPath(tick, false)
     }
 
     /** 문제 상태면 주황빛 구슬 */
@@ -64,6 +73,16 @@ class OrbPainter {
         canvas.drawPath(capsule, fill)
         canvas.drawPath(holder, line)
         canvas.drawLine(cx, stemTop, cx, stemBottom, line)
+    }
+
+    /** 주문 끝: 하얀 체크 표시를 [progress](0~1)만큼 그린다 */
+    fun drawCheck(canvas: Canvas, progress: Float) {
+        tickDrawn.reset()
+        tickMeasure.getSegment(0f, tickMeasure.length * progress.coerceIn(0f, 1f), tickDrawn, true)
+        val saved = line.strokeWidth
+        line.strokeWidth = saved * 1.35f
+        canvas.drawPath(tickDrawn, line)
+        line.strokeWidth = saved
     }
 
     /** 말하는 중: 마이크 대신 출렁이는 하얀 소리 막대 (시안 두 번째 그림) */

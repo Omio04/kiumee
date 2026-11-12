@@ -8,4 +8,5 @@
     <string name="loading_tagline">키오스크, 같이 해요</string>
     <string name="loading_camera">카메라를 켜는 중이에요</string>
     <string name="loading_slow">조금만 기다려 주세요</string>
+    <string name="loading_need_permission">카메라와 마이크를\n쓸 수 있게 허용해 주세요</string>
 </resources>

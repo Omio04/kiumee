@@ -7,6 +7,8 @@ package kr.kiosklens.app.ui
 object Palette {
     /** 하늘: 구슬(마이크 버튼) 가장자리 · 아이콘 바탕 */
     const val SKY = 0xFF4FB2EA.toInt()
+    /** 진한 하늘: 밝은 바탕 위 버튼 (하얀 글자가 또렷하게) */
+    const val SKY_DEEP = 0xFF2B8FCF.toInt()
     /** 맑은 하늘: 구슬 가운데 (가운데로 갈수록 연하게) */
     const val SKY_LIGHT = 0xFFA6DBF7.toInt()
     /** 파동 · 숨쉬는 빛. 어두운 카메라 화면 위에서도 밝은 하늘빛으로 보이게 밝게 (8FD0F5는 검은 화면에서 남색 고리로 보였다) */

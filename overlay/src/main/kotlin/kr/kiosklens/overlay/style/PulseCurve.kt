@@ -17,4 +17,14 @@ object PulseCurve {
         val phase = (elapsedMs / 1000.0) * HZ * 2.0 * PI
         return (MIN + (1f - MIN) * (0.5f + 0.5f * sin(phase).toFloat()))
     }
+
+    /** 처음 나타날 때 테두리가 그려지는 시간 (P1 2026-11-12: 버튼을 짚어 주는 몸짓, 키우미 로딩 화면과 같은 언어) */
+    const val TRACE_MS = 400L
+
+    /** 처음 나타난 뒤 테두리가 그려진 정도 0~1. 처음엔 빠르게, 끝에서 천천히 (짚어서 멈추는 느낌) */
+    fun trace(sinceShownMs: Long): Float {
+        val x = (sinceShownMs.toFloat() / TRACE_MS).coerceIn(0f, 1f)
+        val inv = 1f - x
+        return 1f - inv * inv * inv
+    }
 }
