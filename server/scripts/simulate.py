@@ -85,6 +85,8 @@ def topic_of(question):
     """사람은 질문의 마지막 내용에 대답한다: 뒤 문장부터 보고, 그 문장에서 가장 먼저 나온 주제에 대답한다.
     ("HOT으로 선택하셨어요. 샷이나 시럽을 추가하실래요?" → 추가 옵션 / "HOT, ICE, 샷 추가 중에서 고를 수 있어요" → 온도)"""
     import re
+    if "이걸로 하실래요" in (question or ""):               # 메뉴 설명 뒤의 확인 질문: 설명 속 낱말("따뜻한 우유")이 아니라 질문에 대답한다
+        return "confirm"
     sentences = [x for x in re.split(r"(?<=[.?!])\s*", question or "") if x.strip()]
     for sentence in reversed(sentences):
         hits = [(min(sentence.find(w) for w in words if w in sentence), name) for name, words in _TOPICS
