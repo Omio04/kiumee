@@ -10,12 +10,13 @@ import kotlin.math.sin
 object PulseCurve {
     const val HZ = 1.5
     const val MAX_SAFE_HZ = 3.0
-    private const val MIN = 0.55f
+    /** 깜빡임이 가장 약할 때 값 (완전히 꺼지지 않음) */
+    const val MIN_LEVEL = 0.55f
 
     /** 0.55..1.0 */
     fun level(elapsedMs: Long): Float {
         val phase = (elapsedMs / 1000.0) * HZ * 2.0 * PI
-        return (MIN + (1f - MIN) * (0.5f + 0.5f * sin(phase).toFloat()))
+        return (MIN_LEVEL + (1f - MIN_LEVEL) * (0.5f + 0.5f * sin(phase).toFloat()))
     }
 
     /** 처음 나타날 때 테두리가 그려지는 시간 (P1 2026-11-12: 버튼을 짚어 주는 몸짓, 키우미 로딩 화면과 같은 언어) */
