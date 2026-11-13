@@ -19,7 +19,8 @@ import kotlin.math.min
  * 화면 아래 가운데의 동그란 마이크 버튼 = 하늘색 구슬 (2026-11-12 화면 개편).
  *
  * 자막을 없앴으니 지금 상태를 글자 대신 구슬의 색과 움직임으로 보여 준다 ([OrbState]):
- * 대기 숨쉬기 · 듣는 중 파동(목소리 크기를 따름) · 생각 중 도는 호 · 말하는 중 소리 막대 · 문제 주황빛.
+ * 대기 숨쉬기 · 듣는 중 **빨간 구슬** + 파동(목소리 크기를 따름) · 생각 중 도는 호 · 말하는 중 소리 막대 · 문제 주황빛.
+ * 색은 [OrbColors] — 상태가 바뀌면 0.2초 동안 스르륵 바뀐다 (2026-11-13: 듣고 있는지 한눈에 보이게).
  * 기기에서 애니메이션을 끄면 움직이지 않고 그 상태의 한 장면만 그린다.
  * 뷰는 파동이 퍼질 자리까지 포함해 크게 잡고, 누르기는 구슬 안(조금 여유)만 받는다.
  */
@@ -31,7 +32,9 @@ class MicButtonView(context: Context) : View(context) {
             field = value
             stateSince = elapsed
             if (value != OrbState.LISTENING) { level = 0f; shown = 0f }
-            painter.setWarm(value == OrbState.PROBLEM)
+            fadeFrom = shade                                                       // 지금 보이는 색에서 (바뀌는 중이었어도)
+            fadeTo = OrbColors.of(value)
+            if (!moving) applyShade(fadeTo)                                        // 애니메이션을 끈 기기는 바로 바꾼다
             invalidate()
         }
 
@@ -42,6 +45,10 @@ class MicButtonView(context: Context) : View(context) {
     private var shown = 0f
     private var elapsed = 0L
     private var stateSince = 0L
+    /** 지금 보이는 구슬 색 · 바뀌기 전 색 · 바뀔 색 */
+    private var shade = OrbColors.SKY
+    private var fadeFrom = OrbColors.SKY
+    private var fadeTo = OrbColors.SKY
     private val painter = OrbPainter()
     private val halo = Paint(Paint.ANTI_ALIAS_FLAG)
     private val arc = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -53,8 +60,14 @@ class MicButtonView(context: Context) : View(context) {
         setTimeListener { _, total, _ ->
             elapsed = total
             shown += (level - shown) * 0.2f
+            if (shade != fadeTo) applyShade(OrbColors.fade(fadeFrom, fadeTo, elapsed - stateSince))
             invalidate()
         }
+    }
+
+    private fun applyShade(s: OrbColors.Shade) {
+        shade = s
+        painter.setColors(s.center, s.edge)
     }
 
     init {
@@ -74,6 +87,7 @@ class MicButtonView(context: Context) : View(context) {
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
+        applyShade(fadeTo)                                                         // 다시 붙을 때는 시계가 0부터라 바로 맞춘다
         if (moving) clock.start()
     }
 
@@ -96,12 +110,12 @@ class MicButtonView(context: Context) : View(context) {
         when (state) {
             OrbState.IDLE, OrbState.PROBLEM -> {                                   // 숨 쉬는 빛: 눌러 달라는 신호
                 val b = if (moving) OrbMotion.breath(t) else 0.5f
-                halo.color = if (state == OrbState.PROBLEM) Palette.AMBER_LIGHT else Palette.RIPPLE
+                halo.color = shade.halo
                 halo.alpha = ((0.30f + 0.30f * b) * 255).toInt()
                 canvas.drawCircle(cx, cy, r * (1.04f + 0.08f * b), halo)
             }
-            OrbState.LISTENING -> {                                                // 목소리 크기를 따르는 파동
-                halo.color = Palette.RIPPLE
+            OrbState.LISTENING -> {                                                // 빨간 구슬 + 목소리 크기를 따르는 파동
+                halo.color = shade.halo
                 val p = (t % MicRipple.PERIOD_MS).toFloat() / MicRipple.PERIOD_MS
                 val lv = if (moving) shown else 0.5f
                 for (i in 0 until MicRipple.RINGS) {
@@ -119,7 +133,7 @@ class MicButtonView(context: Context) : View(context) {
                 canvas.drawArc(arcBox, OrbMotion.spin(t) - 90f, 110f, false, arc)
             }
             OrbState.SPEAKING, OrbState.DONE -> {                                  // 말하는 동안 · 다 마친 뒤 잔잔한 빛
-                halo.color = Palette.RIPPLE
+                halo.color = shade.halo
                 halo.alpha = 90
                 canvas.drawCircle(cx, cy, r * 1.08f, halo)
             }

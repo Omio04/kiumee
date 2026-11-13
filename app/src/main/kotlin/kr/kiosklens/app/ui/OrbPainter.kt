@@ -10,7 +10,7 @@ import android.graphics.RectF
 import android.graphics.Shader
 
 /**
- * 하늘색 구슬(가운데로 갈수록 연한 원형 그라데이션) + 하얀 마이크 · 소리 막대 그리기.
+ * 구슬(가운데로 갈수록 연한 원형 그라데이션, 색은 [setColors]) + 하얀 마이크 · 소리 막대 그리기.
  * 마이크 버튼([MicButtonView])과 로딩 화면([LoadingScreen])이 같이 쓴다.
  * 마이크는 시안 그림의 비율(512칸: 둥근 캡슐 · 받침 호 · 기둥, 선 끝은 둥글게)을 따른다.
  */
@@ -18,7 +18,8 @@ class OrbPainter {
     var cx = 0f; private set
     var cy = 0f; private set
     var r = 0f; private set
-    private var warm = false
+    private var center = Palette.SKY_LIGHT
+    private var edge = Palette.SKY
 
     private val circle = Paint(Paint.ANTI_ALIAS_FLAG)
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
@@ -54,17 +55,17 @@ class OrbPainter {
         tickMeasure.setPath(tick, false)
     }
 
-    /** 문제 상태면 주황빛 구슬 */
-    fun setWarm(value: Boolean) {
-        if (warm == value) return
-        warm = value
+    /** 구슬 색: 가운데 · 가장자리 ([OrbColors] — 대기 하늘 · 듣는 중 빨강 · 문제 주황) */
+    fun setColors(center: Int, edge: Int) {
+        if (this.center == center && this.edge == edge) return
+        this.center = center
+        this.edge = edge
         shade()
     }
 
     private fun shade() {
         if (r <= 0f) return
-        val colors = if (warm) intArrayOf(Palette.AMBER_LIGHT, Palette.AMBER) else intArrayOf(Palette.SKY_LIGHT, Palette.SKY)
-        circle.shader = RadialGradient(cx, cy, r, colors, floatArrayOf(0f, 1f), Shader.TileMode.CLAMP)
+        circle.shader = RadialGradient(cx, cy, r, intArrayOf(center, edge), floatArrayOf(0f, 1f), Shader.TileMode.CLAMP)
     }
 
     fun drawOrb(canvas: Canvas) = canvas.drawCircle(cx, cy, r, circle)

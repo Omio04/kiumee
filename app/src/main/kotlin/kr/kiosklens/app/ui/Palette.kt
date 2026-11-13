@@ -23,6 +23,12 @@ object Palette {
     const val DEEP = 0xFF14344D.toInt()
     /** 깊은 바다 옅게: 로딩 화면 보조 글자 */
     const val DEEP_SOFT = 0xFF4E6E86.toInt()
+    /** 녹음 빨강: 듣는 중 구슬 가장자리 (2026-11-13: 듣고 있는지 한눈에 보이게) */
+    const val LISTEN = 0xFFE53945.toInt()
+    /** 녹음 빨강 가운데 (하얀 마이크가 하늘색 대기 때보다 더 또렷하게) */
+    const val LISTEN_LIGHT = 0xFFFF8089.toInt()
+    /** 듣는 중 파동. 어두운 카메라 화면 위에서도 보이게 밝게 */
+    const val LISTEN_RIPPLE = 0xFFFFBFC5.toInt()
     /** 주황: 문제 상태 (화면 놓침 · 오류) */
     const val AMBER = 0xFFF5A524.toInt()
     /** 주황 가운데 */
