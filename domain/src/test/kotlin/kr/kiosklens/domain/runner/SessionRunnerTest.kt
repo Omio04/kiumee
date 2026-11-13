@@ -87,8 +87,8 @@ class SessionRunnerTest {
     @Before fun setUp() { scope = CoroutineScope(SupervisorJob() + Dispatchers.Default) }
     @After fun tearDown() { scope.cancel() }
 
-    private fun runner(t: TimeoutPolicy = TimeoutPolicy()) =
-        SessionRunner(scope, SessionStateMachine(t), src, ear, mouth, brain, hand, Clock { System.currentTimeMillis() }, quiet, newSessionId = { "sid-1" })
+    private fun runner(t: TimeoutPolicy = TimeoutPolicy(), gapMs: Long = 120_000L) =
+        SessionRunner(scope, SessionStateMachine(t), src, ear, mouth, brain, hand, Clock { System.currentTimeMillis() }, quiet, newSessionId = { "sid-1" }, newConversationGapMs = gapMs)
 
     private fun waitUntil(ms: Long = 3000, cond: () -> Boolean) = runBlocking {
         withTimeout(ms) { while (!cond()) delay(5) }
@@ -104,6 +104,30 @@ class SessionRunnerTest {
         assertEquals("sid-1", brain.requests.single().sessionId)
         assertEquals("e4", hand.targets.filterNotNull().first().elementId)
         assertTrue(mouth.said.single().let { it.contains("노란색 칸을 눌러 주세요") && it.contains("아메리카노") })
+    }
+
+    @Test fun `마지막 질문 뒤 오래 지나서 다시 누르면 옛 대화를 비우고 새로 시작한다`() {
+        val r = runner(gapMs = 60); r.start()
+        src.snaps.tryEmit(Screens.menu)
+        waitUntil { r.state.value.snapshot != null }
+        r.pressStart()
+        waitUntil { r.state.value.phase == Phase.WAIT_CHANGE }
+        assertEquals(1, r.state.value.history.size)
+        runBlocking { delay(120) }                                                  // 간격(60ms)보다 오래
+        r.pressStart()
+        waitUntil { r.state.value.phase == Phase.LISTENING }
+        assertTrue(r.state.value.history.isEmpty())                                 // 옛 대화는 사라졌다
+    }
+
+    @Test fun `바로 이어서 다시 누르면 대화를 이어 간다`() {
+        val r = runner(gapMs = 60_000); r.start()
+        src.snaps.tryEmit(Screens.menu)
+        waitUntil { r.state.value.snapshot != null }
+        r.pressStart()
+        waitUntil { r.state.value.phase == Phase.WAIT_CHANGE }
+        r.pressStart()
+        waitUntil { r.state.value.phase == Phase.LISTENING }
+        assertEquals(1, r.state.value.history.size)                                 // 이어 간다
     }
 
     @Test fun `화면이 바뀌면 같은 목표로 다시 묻는다`() {

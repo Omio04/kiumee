@@ -318,7 +318,7 @@ class SessionStateMachineTest {
         val denied = Driver().apply { send(StartPressed("s")) }
         val tr = denied.send { SpeechFailed(it, SttError.PERMISSION) }
         assertEquals(Phase.ERROR, denied.phase)
-        assertEquals(Speak("마이크를 쓸 수 있게 허용해 주세요.", denied.ticket), tr.effects.last())
+        assertEquals(Speak("마이크를 쓸 수 없어요. 휴대폰 설정에서 이 앱과 음성 인식 서비스의 마이크 허용을 확인해 주세요.", denied.ticket), tr.effects.last())
     }
 
     // ---------------------------------------------------------------- ⑪ 이력

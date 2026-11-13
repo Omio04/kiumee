@@ -19,6 +19,7 @@ import kr.kiosklens.core.port.Logger
 import kr.kiosklens.core.port.SnapshotSource
 import kr.kiosklens.core.port.SpeechInput
 import kr.kiosklens.core.port.SpeechOutput
+import kr.kiosklens.domain.session.Phase
 import kr.kiosklens.domain.session.SessionEffect
 import kr.kiosklens.domain.session.SessionEvent
 import kr.kiosklens.domain.session.SessionState
@@ -44,6 +45,8 @@ class SessionRunner(
     private val clock: Clock,
     private val logger: Logger,
     private val newSessionId: () -> String = { UUID.randomUUID().toString() },
+    /** 마지막 질문 뒤 이만큼(ms) 지나서 다시 물으면 새 대화로 시작한다 (옛 대화 · 목표가 답을 끌고 가지 않게) */
+    private val newConversationGapMs: Long = NEW_CONVERSATION_GAP_MS,
 ) {
     private val events = Channel<SessionEvent>(Channel.UNLIMITED)
     private val _state = MutableStateFlow(SessionState())
@@ -65,7 +68,15 @@ class SessionRunner(
         sources += scope.launch { guarded("screenChanges") { snapshots.screenChanges.collect { send(SessionEvent.ScreenChanged(it)) } } }
     }
 
-    fun pressStart() = send(SessionEvent.StartPressed(newSessionId()))
+    private var lastPressMs = Long.MIN_VALUE / 2
+
+    fun pressStart() {
+        val now = clock.nowMs()
+        // 답을 기다리는 중에 오래 지나서 다시 누르면 옛 대화는 비우고 새로 시작한다 (같은 자리에서 이어 묻는 경우는 그대로 이어 간다)
+        if (_state.value.phase == Phase.WAIT_CHANGE && now - lastPressMs > newConversationGapMs) send(SessionEvent.StopPressed)
+        lastPressMs = now
+        send(SessionEvent.StartPressed(newSessionId()))
+    }
     fun pressStop() = send(SessionEvent.StopPressed)
 
     fun send(event: SessionEvent) {
@@ -202,5 +213,6 @@ class SessionRunner(
     private companion object {
         const val TAG = "SessionRunner"
         const val MIN_LISTEN_GAP_MS = 700L
+        const val NEW_CONVERSATION_GAP_MS = 120_000L
     }
 }

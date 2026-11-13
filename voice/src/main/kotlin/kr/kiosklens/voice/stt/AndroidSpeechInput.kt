@@ -119,12 +119,12 @@ class AndroidSpeechInput(
                 override fun onEvent(eventType: Int, params: Bundle?) {}
                 override fun onPartialResults(partialResults: Bundle?) {
                     val t = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
-                    logger.w(TAG, "stt partial='${t}' maxRms=$maxRms")
+                    logger.d(TAG, "stt partial chars=${t?.length ?: 0} maxRms=$maxRms")        // 말한 내용은 로그에 남기지 않는다 (길이만)
                     if (!finished && !t.isNullOrBlank()) { lastPartial = t; trySend(SttEvent.Partial(t)) }
                 }
                 override fun onResults(results: Bundle?) {
                     val texts = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION).orEmpty()
-                    logger.w(TAG, "stt results=$texts maxRms=$maxRms")
+                    logger.d(TAG, "stt results n=${texts.size} firstChars=${texts.firstOrNull()?.length ?: 0} maxRms=$maxRms")   // 내용 없이 개수 · 길이만
                     val best = SttMapping.best(texts, results?.getFloatArray(SpeechRecognizer.CONFIDENCE_SCORES))
                     if (best == null) onError(SpeechRecognizer.ERROR_NO_MATCH) else finish(SttEvent.Final(best))
                 }

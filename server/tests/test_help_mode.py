@@ -231,3 +231,34 @@ async def test_say_keeps_the_reason_but_drops_the_press_sentence(snaps):
     llm = ScriptedFakeLlmClient([_guide("e1", "푸드", "케이크는 푸드 탭에 있어요. 위쪽 노란 칸 푸드를 눌러 주세요. 치즈케이크가 보여요.")])
     r = (await agent(llm).next(_food_req(snaps, "케이크를 먹고 싶어", []))).response
     assert r.say == "케이크는 푸드 탭에 있어요. 치즈케이크가 보여요."                  # 눌러 주세요는 앱이 따로 읽는다
+
+
+# ---- 다른 키오스크로 옮겨 가면 옛 대화를 비운다 (2026-11-13 실기기: 버스표 대화가 카페 답에 섞임)
+def _els(*texts):
+    return [{"id": f"e{i}", "text": t, "rect": {"left": 0.05, "top": 0.05 + 0.04 * i, "right": 0.5, "bottom": 0.08 + 0.04 * i}, "confidence": 0.9, "kind": "BUTTON_LIKE"} for i, t in enumerate(texts)]
+
+
+CAFE_COFFEE = ["메가엠지씨커피", "LANGUAGE", "처음으로", "신메뉴 추천메뉴", "커피", "디카페인", "음료", "푸드", "겨울시즌", "아메리카노", "헛개리카노", "장바구니 조회"]
+CAFE_FOOD = ["메가엠지씨커피", "LANGUAGE", "처음으로", "신메뉴 추천메뉴", "커피", "디카페인", "음료", "푸드", "마카롱", "치즈케이크", "허니 브레드", "장바구니 조회"]
+BUS = ["출발 시간을 선택해 주세요", "서울 광주", "06:10 한빛고속", "08:40 새길여객", "12:05 한빛고속", "20:19 한빛고속", "이전", "처음 화면", "좌석 선택"]
+
+
+async def _two_requests(snaps, first, second, llm_answers):
+    llm = ScriptedFakeLlmClient(llm_answers)
+    ag = agent(llm)
+    d1 = make_req(snaps, "s01_dine", "여기서 뭐 해?", history=[]); d1["snapshot"]["elements"] = _els(*first); d1["snapshot"]["screenId"] = "A"
+    await ag.next(GuideRequest.model_validate(d1))
+    hist = [HistoryItem(screenId="A", action="ASK_USER", targetText="출발 시간을 고르셔야 해요")]
+    d2 = make_req(snaps, "s01_dine", "케이크를 먹고 싶어", history=hist); d2["snapshot"]["elements"] = _els(*second); d2["snapshot"]["screenId"] = "B"
+    r = await ag.next(GuideRequest.model_validate(d2))
+    return llm, r
+
+
+async def test_history_is_cleared_when_the_kiosk_changes(snaps):
+    llm, r = await _two_requests(snaps, BUS, CAFE_COFFEE, [answer("가요."), answer("푸드 탭이에요.")])
+    assert "[이전 대화]" not in llm.calls[1]["user"] and r.meta.get("history_reset") is True
+
+
+async def test_history_is_kept_when_only_the_tab_changes(snaps):
+    llm, r = await _two_requests(snaps, CAFE_COFFEE, CAFE_FOOD, [answer("가요."), answer("치즈케이크가 보여요.")])
+    assert "[이전 대화]" in llm.calls[1]["user"] and not r.meta.get("history_reset")

@@ -202,6 +202,8 @@ def _pressed_candidate(message: str, candidates: dict):
     return best if best is not None and verb.start() - best_end <= 40 else None
 
 
+_NEW_KIOSK_OVERLAP = 0.12     # 직전 화면과 글자 겹침이 이보다 낮으면 다른 키오스크로 본다 (같은 키오스크 안 탭 이동은 머리글 · 메뉴 글자가 남아 높다)
+_MIN_LABELS = 4              # 비교할 글자가 이보다 적으면(글자 읽기가 거의 안 된 화면) 판단하지 않는다
 _PRESS_SENTENCE = re.compile(r"눌러|누르|누를|터치")
 _REPEAT_NOTE = ("\n[주의] 어르신이 방금 안내받은 '{t}' 칸은 이미 눌렀을 가능성이 큽니다(화면이 바뀌었을 수 있음). "
                 "같은 칸을 또 가리키지 마세요. 사진과 글자를 다시 보고 **지금 화면에서** 어르신 질문에 맞는 다음 칸을 고르세요.")
@@ -395,6 +397,10 @@ class LlmGuideAgent:
         if change is not None:
             meta["changed_from"] = change.from_type.value
         if help_on:                                              # 도움 모드: 질문에 그 순간의 화면을 보고 답한다
+            if change is not None and change.compared >= _MIN_LABELS and change.overlap < _NEW_KIOSK_OVERLAP and req.history:
+                # 직전 화면과 글자가 거의 안 겹친다 = 다른 키오스크로 옮겨 갔다 → 옛 대화(좌석 · 푸드 …)가 답을 끌고 가지 않게 비운다 (2026-11-13 실기기)
+                req = req.model_copy(update={"history": []})
+                meta["history_reset"] = True
             return await self._answer_question(req, els, goal, prev_goal, stype, probs, kiosk_hint, change, meta, t0)
         if stype == screen_type.ScreenType.LOYALTY and "적립" not in (req.utterance or ""):
             # 적립은 건너뛴다 (P2 인수 문서: 어르신이 요청하지 않았으면). 실제로 보이는 닫기(×)가 있을 때만 안내하고,

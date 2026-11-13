@@ -41,7 +41,7 @@ class GuideTextComposer(private val phraser: PositionPhraser = PositionPhraser()
 
     /** 음성 인식 오류 (NO_SPEECH 제외) */
     fun speechError(error: SttError): String = when (error) {
-        SttError.PERMISSION -> "마이크를 쓸 수 있게 허용해 주세요."
+        SttError.PERMISSION -> "마이크를 쓸 수 없어요. 휴대폰 설정에서 이 앱과 음성 인식 서비스의 마이크 허용을 확인해 주세요."   // 앱 권한이 있어도 음성 인식 서비스(Google) 쪽 권한이 꺼져 있으면 같은 오류가 난다 (2026-11-13 실기기)
         else -> "말씀을 알아듣지 못했어요. 다시 말하기 버튼을 눌러 주세요."
     }
 

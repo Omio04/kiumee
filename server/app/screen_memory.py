@@ -31,6 +31,8 @@ class Change:
     to_type: ScreenType
     appeared: List[str] = field(default_factory=list)     # 새로 보이는 글자 (읽는 순서, 최대 3)
     vanished: List[str] = field(default_factory=list)     # 사라진 글자 (최대 3)
+    overlap: float = 1.0                                  # 직전 화면과 지금 화면의 글자가 얼마나 겹치는지 (0~1, 자카드). 낮으면 완전히 다른 화면 = 다른 키오스크일 수 있다
+    compared: int = 0                                     # 비교에 쓴 글자 수(둘 중 적은 쪽). 너무 적으면 overlap을 믿지 않는다
 
     @property
     def type_changed(self) -> bool:
@@ -81,7 +83,9 @@ class ScreenMemory:
         before, after = {normalize(x) for x in prev.labels}, {normalize(x) for x in labels}
         appeared = [x for x in labels if normalize(x) not in before][:3]
         vanished = [x for x in prev.labels if normalize(x) not in after][:3]
-        return Change(prev.stype, stype, appeared, vanished)
+        union = before | after
+        overlap = (len(before & after) / len(union)) if union else 1.0
+        return Change(prev.stype, stype, appeared, vanished, overlap=overlap, compared=min(len(before), len(after)))
 
     def __len__(self) -> int:
         return len(self._items)
