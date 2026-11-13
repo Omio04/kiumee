@@ -78,7 +78,10 @@ object DtoMapper {
                 runCatching { ScrollDir.valueOf(str("direction")) }.getOrElse { throw BadResponse("direction 오류") },
                 str("guideText"),
             )
-            "WAIT" -> GuideAction.Wait(str("guideText"))
+            "WAIT" -> GuideAction.Wait(
+                str("guideText"),
+                (a["targetIds"] as? List<*>)?.filterIsInstance<String>()?.distinct()?.take(12).orEmpty(),
+            )
             "ASK_USER" -> GuideAction.AskUser(str("question"))
             "DONE" -> GuideAction.Done(str("guideText"))
             "UNKNOWN" -> GuideAction.Unknown(str("reason"))

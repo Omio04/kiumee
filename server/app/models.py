@@ -114,6 +114,7 @@ _ACTION_FIELDS = ("targetId", "guideText", "direction", "question", "reason")
 class GuideAction(BaseModel):
     """앱의 GuideAction. JSON 예: {"type": "TAP", "targetId": "e4", "guideText": "아메리카노"}"""
     type: ActionType
+    targetIds: Optional[List[str]] = Field(default=None, max_length=12)
     targetId: Optional[str] = Field(default=None, max_length=64)
     guideText: Optional[str] = Field(default=None, max_length=MAX_TEXT)
     direction: Optional[ScrollDir] = None
@@ -124,6 +125,10 @@ class GuideAction(BaseModel):
 
     @model_validator(mode="after")
     def _fields_match_type(self) -> "GuideAction":
+        if self.targetIds is not None and (
+            self.type != ActionType.WAIT or any(not 1 <= len(target) <= 64 for target in self.targetIds)
+        ):
+            raise ValueError("targetIds are only supported by WAIT")
         need = _REQUIRED[self.type]
         for name in _ACTION_FIELDS:
             v = getattr(self, name)

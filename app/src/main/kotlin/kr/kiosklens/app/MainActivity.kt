@@ -197,7 +197,14 @@ class MainActivity : AppCompatActivity() {
 
     private fun render() {
         val g = graph ?: return
-        val phase = g.runner.state.value.phase
+        val state = g.runner.state.value
+        val phase = state.phase
+        val guide = state.guide
+        val snapshot = state.snapshot
+        val choices = if (lastScan == ScanStatus.READY && guide != null && snapshot != null && snapshot.screenId == guide.screenId &&
+            (phase == Phase.GUIDING || phase == Phase.WAIT_CHANGE)
+        ) guide.choiceIds.mapNotNull(snapshot::findElement).map { it.rect } else emptyList()
+        overlay.setChoices(choices)
         val orb = OrbState.of(phase)
         micButton.state = orb                                                      // 자막 대신 구슬의 색 · 움직임으로 상태를
         viewfinder.look = ViewfinderLook.of(lastScan == ScanStatus.READY, orb)   // 키오스크를 찾았는지는 조준 모서리로

@@ -84,7 +84,7 @@ class HuddlingScreenTest {
     @Test fun menuBehindIncompletePopupDoesNotOverrideUncertainty() {
         val menu = listOf(line("(ICE)아메리카노", .2f), line("(HOT)아메리카노", .3f),
             line("장바구니 조회", .7f), line("결제하기", .9f))
-        assertNull(ScreenInterpreter().classifyLines(menu))
+        assertEquals("menu-cart", ScreenInterpreter().classifyLines(menu))
         assertNull(ScreenInterpreter().classifyLines(menu + disposable.take(1)))
     }
 }

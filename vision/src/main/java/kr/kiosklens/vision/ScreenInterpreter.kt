@@ -12,8 +12,8 @@ class ScreenInterpreter {
 
     internal fun classifyLines(lines: List<OcrLine>): String? {
         scenes.detect(lines)?.let { return it.name.takeUnless { name-> name=="uncertain-dialog" } }
-        // Menu text can remain visible behind an unreadable popup. Ordinary screens
-        // keep using the generic tracker; do not guess a stage from background names.
-        return null
+        val cart = lines.firstOrNull { Elements.key(it.text) == "장바구니조회" } ?: return null
+        val checkout = lines.any { Elements.key(it.text).endsWith("결제하기") && it.rect.top >= cart.rect.top }
+        return "menu-cart".takeIf { checkout }
     }
 }

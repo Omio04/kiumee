@@ -64,13 +64,12 @@ def test_exact_menu_wins_when_both_are_visible_and_other_cases_are_ignored():
     assert expectation.lookalike_menu(req(both[1:], history=hot)) is None                          # 메뉴 단계가 아니다
 
 
-async def test_the_llm_is_told_about_the_wrong_menu():
+async def test_iced_americano_guide_closes_the_wrong_menu_without_a_question():
     els = [el(1, "선택하신 상품의 옵션상품을 모두 선택해주세요", "TEXT"), el(2, "(ICE)헤이즐넛아메리카노", "TEXT"), el(3, "닫기"), el(4, "담기")]
     llm = ScriptedFakeLlmClient(['{"action":"GUIDE","targetId":"e3","guideText":"닫기"}'])
     r = await agent(llm, fastpath=False).next(req(els, goal="아이스 아메리카노", history=PRESSED))
-    user = llm.calls[0]["user"]
-    assert "비슷하지만 다른 메뉴 '(ICE)헤이즐넛아메리카노'" in user and "닫기(또는 취소·이전)" in llm.calls[0]["system"]
-    assert r.response.action.type.value == "TAP" and r.response.action.guideText == "닫기"
+    assert not llm.calls
+    assert r.response.action.type.value == "TAP" and r.response.action.targetId == "e3"
 
 
 def test_titles_and_cart_lines_that_merely_contain_the_name_are_not_other_menus():

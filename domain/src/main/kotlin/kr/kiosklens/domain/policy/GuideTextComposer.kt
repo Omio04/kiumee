@@ -18,6 +18,7 @@ class GuideTextComposer(private val phraser: PositionPhraser = PositionPhraser()
      */
     fun tap(rect: NormRect, guideText: String): String {
         val name = guideText.trim()
+        if (name.endsWith("눌러 주세요.")) return name
         val obj = if (name.endsWith("버튼")) "${name}을" else "$name 버튼을"
         return "${phraser.phrase(rect)} 깜빡이는 $obj 누르세요"
     }

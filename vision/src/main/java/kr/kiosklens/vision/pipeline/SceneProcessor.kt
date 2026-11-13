@@ -82,19 +82,22 @@ class PaymentDialogRule : SceneRule {
     override fun detect(lines: List<OcrLine>): SceneFocus? {
         val title = lines.firstOrNull { headingMatches(it.text, "결제수단선택") } ?: return null
         if (lines.none { labelKey(it.text).startsWith("카드결제") && it.rect.top > title.rect.bottom }) return null
-        val total = lines.filter { labelKey(it.text).let { key ->
-            key.contains("결제할금액") || key == "주문금액"
-        } }.maxOfOrNull { it.rect.bottom } ?: return null
+        val methods = lines.filter { it.rect.top > title.rect.bottom && labelKey(it.text).let { key ->
+            key.startsWith("카드결제") || key.startsWith("앱카드") || key.contains("페이")
+        } }
+        val bottom = lines.filter { it.rect.top > title.rect.bottom && labelKey(it.text).let { key ->
+            key.contains("결제할금액") || key.startsWith("주문금액")
+        } }.maxOfOrNull { it.rect.bottom } ?: methods.maxOf { it.rect.bottom }
         return SceneFocus("payment", NormRect(0f,
             (title.rect.top - title.rect.height).coerceAtLeast(0f), 1f,
-            (total + 0.04f).coerceAtMost(1f)), setOf("결제수단선택"))
+            (bottom + 0.04f).coerceAtMost(1f)), setOf("결제수단선택"))
     }
 }
 
 class ProductOptionsDialogRule : SceneRule {
     override fun detect(lines: List<OcrLine>): SceneFocus? {
         val title = lines.firstOrNull { headingMatches(it.text, "옵션상품을모두선택") } ?: return null
-        val done = lines.firstOrNull { labelKey(it.text) == "주문담기" && it.rect.top > title.rect.bottom } ?: return null
+        val done = lines.firstOrNull { labelKey(it.text) in setOf("주문담기", "장바구니담기") && it.rect.top > title.rect.bottom } ?: return null
         return SceneFocus("product-options", NormRect(0f,
             (title.rect.top - title.rect.height).coerceAtLeast(0f), 1f,
             (done.rect.bottom + 0.03f).coerceAtMost(1f)))
@@ -182,9 +185,10 @@ class AlertDialogRule : SceneRule {
 class ReceiptDialogRule : SceneRule {
     override fun detect(lines: List<OcrLine>): SceneFocus? {
         val title = lines.firstOrNull { headingMatches(it.text,"영수증을출력") } ?: return null
-        val action = lines.firstOrNull { labelKey(it.text) == "미출력" && it.rect.top > title.rect.bottom } ?: return null
+        val actions = lines.filter { labelKey(it.text) in setOf("출력", "미출력") && it.rect.top > title.rect.bottom }
+        if (actions.isEmpty()) return null
         return SceneFocus("receipt", NormRect(0f,
             (title.rect.top - title.rect.height * 2).coerceAtLeast(0f), 1f,
-            (action.rect.bottom + 0.03f).coerceAtMost(1f)), setOf(labelKey(title.text)))
+            (actions.maxOf { it.rect.bottom } + 0.03f).coerceAtMost(1f)), setOf(labelKey(title.text)))
     }
 }

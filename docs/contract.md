@@ -119,9 +119,9 @@
 
 | `action.type` | 들어 있는 필드 | 앱이 할 일 |
 |---|---|---|
-| `TAP` | `targetId`, `guideText` | `targetId` 요소를 하이라이트 + "{위치} 깜빡이는 {guideText}를 누르세요" → WAIT_CHANGE |
+| `TAP` | `targetId`, `guideText` | `targetId` 요소를 하이라이트하고 버튼 이름 또는 완성된 안내 문장을 읽음 → WAIT_CHANGE |
 | `SCROLL` | `direction` (UP·DOWN·LEFT·RIGHT), `guideText` | "화면을 {방향} 밀어서 {guideText} 찾아 주세요" → WAIT_CHANGE. `guideText`는 **찾는 대상 이름** (짧은 말, 문장 아님) |
-| `WAIT` | `guideText` | `guideText`(문장)를 그대로 읽고 기다림 |
+| `WAIT` | `guideText`, 선택 사항 `targetIds` (요청 스냅샷의 버튼 ID 최대 12개) | 문장을 읽고 해당 버튼을 강조한 뒤 화면 전환을 기다림 |
 | `ASK_USER` | `question` | 그대로 읽고 → LISTENING. 대답은 다음 요청의 `utterance` |
 | `DONE` | `guideText` | 그대로 읽고 → IDLE (세션 끝) |
 | `UNKNOWN` | `reason` | 그대로 읽어도 되는 쉬운 문장 (60자 이내). → SCANNING |
@@ -151,7 +151,7 @@
 
 - 앱이 응답 하나를 실행할 때마다 `HistoryItem.of(screenId, action)`으로 하나 추가한다.
 - 최근 5개(`GuideRequest.MAX_HISTORY`)만, 오래된 것부터 보낸다.
-- `targetText`: TAP · SCROLL · WAIT · DONE은 `guideText`, ASK_USER는 `question`, UNKNOWN은 null.
+- `targetText`: TAP은 버튼 이름(일반 안내에서는 `guideText`), SCROLL · WAIT · DONE은 `guideText`, ASK_USER는 `question`, UNKNOWN은 null.
 
 ```json
 "history": [

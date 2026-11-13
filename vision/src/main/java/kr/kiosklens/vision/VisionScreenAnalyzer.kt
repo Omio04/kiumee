@@ -59,9 +59,9 @@ class VisionScreenAnalyzer(
                     if (update.changed) changes.tryEmit(update.snapshot.screenId)
                 }
                 scan.value = when {
+                    update != null -> ScanStatus.READY
                     lines.size < 3 -> ScanStatus.REPOSITION
-                    update == null -> ScanStatus.SCANNING
-                    else -> ScanStatus.READY
+                    else -> ScanStatus.SCANNING
                 }
                 // 화면 번호 · 새 화면 여부도 남긴다: 시험 기록만으로 "누른 뒤 화면 전환을 잡았는지" 확인하려고 (2026-11-12)
                 log { logger.d("KL_PERF", "ocr ms=${clock.nowMs() - start} lines=${lines.size} published=${update != null}" +
