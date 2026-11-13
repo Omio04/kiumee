@@ -177,6 +177,27 @@ _FUZZY_MIN = 0.65            # 깨진 글자(주문담기 → 주문달기 0.71)
 _FUZZY_MARGIN = 0.15         # 두 번째로 비슷한 칸과 이만큼 차이 나야 믿는다
 
 
+_LATER_RE = re.compile(r"(?:신|은|한|른|간|난)\s?(?:뒤|후)|다음에|누르면\s*안|누르지\s*마|안\s*돼|안\s*됩니다")
+
+
+def _is_later_or_negated(sentence: str) -> bool:
+    """지금 누를 칸이 아니다: "다 고르면 · 고르신 뒤에 · 준비되면"(나중) 또는 "누르면 안 돼요"(부정)."""
+    return any(w in sentence for w in _AFTER_WORDS) or bool(_LATER_RE.search(sentence))
+
+
+_POINT_WORDS = re.compile(r"눌러|누르|누를|터치|탭|칸|버튼|메뉴")
+
+
+def _spoken_targets(message: str) -> List[str]:
+    """AI의 말에서 따옴표로 가리킨 버튼 이름들. 버튼을 가리키는 문장(누르 · 탭 · 칸 · 버튼 · 메뉴)에 있는 것만:
+    "화면에 '모두 선택해주세요'라고 나와요"처럼 화면 문구를 옮긴 것은 버튼이 아니다."""
+    out: List[str] = []
+    for sent in re.split(r"(?<=[.!?])\s+", message or ""):
+        if _POINT_WORDS.search(sent):
+            out += [q.strip() for q in re.findall(r"['\"‘“]([^'\"’”]{2,20})['\"’”]", sent) if q.strip()]
+    return out
+
+
 def _press_sentence(message: str) -> Optional[str]:
     for sent in re.split(r"(?<=[.!?])\s+", message or ""):
         if _PRESS_RE.search(sent):
@@ -219,7 +240,7 @@ def _pressed_candidate(message: str, candidates: dict):
     칸을 찾는 순서: ① 글자가 정확히 "<글자>을 누르" ② 깨진 글자까지 자모 유사도로 ③ 누르라는 말 바로 앞에서 가장 가까이 말한 칸."""
     m = (message or "")
     sent = _press_sentence(m)
-    if not m or sent is None or any(w in sent for w in _AFTER_WORDS):
+    if not m or sent is None or _is_later_or_negated(sent):
         return None
     flat = m.replace(" ", "")
     hits = [c for c in candidates.values()
@@ -278,6 +299,7 @@ _NOT_A_BUTTON = {"화면", "버튼", "아래", "위쪽", "아래쪽", "오른쪽
 MISSING_ID = "MISSING"       # 도움 모드: 누를 칸이 글자 목록에 없을 때 AI가 고르는 값 (형식이 목록 안 번호만 허용하면 아무 칸이나 억지로 고른다)
 _UNDO_BUTTONS = {"처음으로", "처음", "초기화", "취소", "전체취소", "주문취소", "삭제", "전체삭제", "이전", "뒤로", "뒤로가기", "홈"}
 _UNDO_INTENT = re.compile(r"취소|처음|다시|잘못|빼|지우|초기|돌아|그만|이전|뒤로|삭제|안 할|안할|없던")
+_CONDITIONAL_PICK = re.compile(r"(?:이|라)면\s*(?:노란|이\s*칸|그\s*칸|여기)")
 _NAME_AGREE = 0.5            # AI가 쓴 버튼 이름과 고른 칸의 글자가 이보다 덜 비슷하면 고른 칸을 믿지 않는다 (깨진 글자 주문담기↔주문달기 0.71은 통과)
 
 
@@ -308,10 +330,16 @@ def _seek_name(sentence: str) -> Optional[str]:
 
 
 def _seek_text(text: str, name: str) -> str:
-    """누르라는 문장은 빼고(칠 칸이 없으니 "누르세요"라고 말하지 않는다), 그 칸이 안 읽힌다는 말로 바꾼다. 80자 안."""
-    kept = [p for p in re.split(r"(?<=[.!?])\s+", text.strip()) if p and not _PRESS_SENTENCE.search(p)]
+    """누르라는 문장은 빼고(칠 칸이 없으니 "누르세요"라고 말하지 않는다), 그 칸이 안 읽힌다는 말로 바꾼다. 80자 안.
+    앞 문장은 온전한 문장만 남긴다(중간에 자르지 않는다). 묻는 문장은 뺀다: 뒤에 "비춰 주세요"가 오면 어색하다."""
     tail = f"'{name}' 칸이 아직 안 읽혀요. 크게 나오게 비춰 주세요. 보이면 노란색으로 알려 드릴게요."
-    head = (" ".join(kept))[: max(0, 80 - len(tail) - 1)].rstrip()
+    head = ""
+    for p in re.split(r"(?<=[.!?])\s+", (text or "").strip()):
+        if not p or _PRESS_SENTENCE.search(p) or p.rstrip().endswith("?"):
+            continue
+        if len(head) + len(p) + len(tail) + 2 > 80:
+            break
+        head = (head + " " + p).strip()
     return (head + " " + tail).strip()
 
 
@@ -450,7 +478,7 @@ class LlmGuideAgent:
         if self.s.debug_prompts:                       # 개발용 진단 (개인정보 걸러낸 뒤의 내용 · 로컬 기록에만)
             log.info("KL_DEBUG 요청 screen=%s goal=%r utter=%r 이력=%s 화면=%s", req.snapshot.screenId, goal, req.utterance,
                      [(h.action.value, h.targetText, h.screenId) for h in req.history],
-                     [e.text for e in sorted(els, key=lambda e: (round(e.rect.top, 2), e.rect.left))][:30])
+                     [e.text for e in sorted(els, key=lambda e: (round(e.rect.top, 2), e.rect.left))][:80])   # 잘라 보면 아래쪽 버튼이 안 읽힌 것처럼 보인다 (2026-11-13 오진)
 
         key = request_key(goal, req)
         cached = self.cache.get(key)
@@ -658,7 +686,7 @@ class LlmGuideAgent:
 
     async def _answer_question(self, req, els, goal, prev_goal, stype, probs, kiosk_hint, change, meta, t0):
         """도움 모드: 어르신 말을 질문으로 보고, 그 순간의 화면 전체를 보여 주고 AI가 답하게 한다. 답 뒤에 "또 도움이 필요하세요?"를 붙인다."""
-        candidates = help_mode.candidates_for_help(els)
+        candidates = help_mode.candidates_for_help(els, utterance=req.utterance or "")
         by_id = {c.id: c for c in candidates}
         user = help_mode.build_user(req.utterance or "", req.history, els, candidates,
                                     screen=screen_type.describe_probabilities(probs) or screen_type.label(stype),
@@ -701,6 +729,17 @@ class LlmGuideAgent:
             return self._finish(GuideResponse(goal=prev_goal, action=GuideAction.ask_user(fallback), source="fallback"), meta, t0)
         named = (action.guideText or action.boxText or "").strip() if action.action == LlmKind.GUIDE else ""
         chosen = by_id.get(action.targetId or "")
+        spoken = _spoken_targets(action.message or "") if action.action == LlmKind.GUIDE else []
+        if chosen is not None and spoken and all(_name_score(q, chosen.text) < _NAME_AGREE for q in spoken):
+            # 말은 "'커피' 탭에 있어요"인데 칸은 '장바구니 조회'를 골랐다 (2026-11-13 실기기) → 말한 칸을 믿는다
+            alt = max(by_id.values(), key=lambda c: _name_score(spoken[0], c.text))
+            if _name_score(spoken[0], alt.text) >= 0.65:
+                action = action.model_copy(update={"targetId": alt.id, "guideText": alt.text})
+            else:
+                action = action.model_copy(update={"targetId": None, "guideText": spoken[0]})
+            chosen = by_id.get(action.targetId or "")
+            named = (action.guideText or "").strip()
+            meta["spoken_mismatch"] = True
         if chosen is not None and named and _name_score(named, chosen.text) < _NAME_AGREE:
             # 형식이 "목록 안의 번호"를 강제해서, 목록에 없는 버튼(결제하기)을 말하면서 번호는 아무 칸(마카롱 · 상품)이나 고른다 (2026-11-13 실기기).
             # 말한 이름과 고른 칸이 다르면 칸을 믿지 않는다 → 아래에서 사진 위치나 찾기(seek)로 넘어간다
@@ -737,7 +776,11 @@ class LlmGuideAgent:
             say = _reason_only(_clean_message(action.message, "", 80))          # 이유만 (누르라는 문장은 앱이 따로 읽는다)
             if say and (_waiting_talk_text(say) or any(w in normalize(say) for w in _APP_CLAIMS)):
                 say = ""                                                      # 앱이 뭔가 하는 듯한 말은 읽지 않는다
-        if a.type == ActionType.TAP:
+        if a.type == ActionType.TAP and _CONDITIONAL_PICK.search(action.message or "") and normalize(a.guideText or "") not in normalize(req.utterance or ""):
+            # "드실지 포장하실지 골라 주세요. 포장이면 노란 칸을…" — 어르신이 정할 선택을 예로 골라 칠하지 않는다 (2026-11-13 실기기)
+            meta["conditional_pick"] = True
+            resp = GuideResponse(goal=prev_goal, action=GuideAction.ask_user(help_mode.with_follow_up(_reason_only(_clean_message(action.message, "", 80)) or fallback)), source=resp.source)
+        elif a.type == ActionType.TAP:
             resp = resp.model_copy(update={"say": say or None})
         elif a.type == ActionType.DONE:
             resp = GuideResponse(goal=prev_goal, action=GuideAction.done(help_mode.MSG_BYE), source=resp.source)
@@ -755,7 +798,7 @@ class LlmGuideAgent:
                 text = fallback                                               # 앱이 뭔가 하는 듯한 말은 하지 않는다
             seek = None
             sent = _press_sentence(text) if a.type == ActionType.ASK_USER else None
-            if sent and not any(w in sent for w in _AFTER_WORDS):
+            if sent and not _is_later_or_negated(sent):
                 seek = _seek_name(sent)                                       # 누르라면서 칠 칸이 없다 → "누르세요"는 말하지 않고 찾는다고 알린다
             if seek:
                 meta["seek"] = True

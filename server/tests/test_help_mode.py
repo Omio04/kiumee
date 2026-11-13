@@ -233,7 +233,8 @@ async def test_say_keeps_the_reason_but_drops_the_press_sentence(snaps):
 
 # ---- 다른 키오스크로 옮겨 가면 옛 대화를 비운다 (2026-11-13 실기기: 버스표 대화가 카페 답에 섞임)
 def _els(*texts):
-    return [{"id": f"e{i}", "text": t, "rect": {"left": 0.05, "top": 0.05 + 0.04 * i, "right": 0.5, "bottom": 0.08 + 0.04 * i}, "confidence": 0.9, "kind": "BUTTON_LIKE"} for i, t in enumerate(texts)]
+    step = min(0.04, 0.9 / max(1, len(texts)))                     # 몇 개든 화면 안(0~1)에 위에서 아래로 놓는다
+    return [{"id": f"e{i}", "text": t, "rect": {"left": 0.05, "top": 0.05 + step * i, "right": 0.5, "bottom": 0.05 + step * i + step * 0.8}, "confidence": 0.9, "kind": "BUTTON_LIKE"} for i, t in enumerate(texts)]
 
 
 CAFE_COFFEE = ["메가엠지씨커피", "LANGUAGE", "처음으로", "신메뉴 추천메뉴", "커피", "디카페인", "음료", "푸드", "겨울시즌", "아메리카노", "헛개리카노", "장바구니 조회"]
@@ -363,3 +364,86 @@ async def test_missing_target_becomes_a_seek_and_missing_is_offered_to_the_llm(s
     llm = ScriptedFakeLlmClient([_guide_raw('"MISSING"', "결제하기", "치즈케이크가 담겨 있어요.")])
     r = await agent(llm).next(_cart_req(snaps, "결제하고 싶어"))
     assert r.response.seek == "결제하기" and "MISSING" in llm.calls[0]["target_ids"]
+
+
+# ---- 실기기 로그 (2026-11-13 20:12): 말과 칸 · 부정문 · 잘린 문장 · 대신 고르기
+FOOD = ["처음으로", "메가엠지씨커피", "디카페인", "음료", "푸드", "허니 브레드", "치즈케이크", "장바구니 조회", "결제하기"]
+
+
+def _req_with(snaps, texts, said):
+    d = make_req(snaps, "s01_dine", said, history=[]); d["snapshot"]["elements"] = _els(*texts)
+    return GuideRequest.model_validate(d)
+
+
+async def test_spoken_button_wins_over_a_different_chosen_number(snaps):
+    cart = FOOD.index("장바구니 조회")
+    llm = ScriptedFakeLlmClient([_guide_raw(f'"e{cart}"', "장바구니 조회", "지금은 푸드 화면이라 아메리카노가 없어요. 커피 메뉴는 위쪽 '커피' 탭에 있어요.")])
+    r = await agent(llm).next(_req_with(snaps, FOOD, "아메리카노를 먹고 싶다"))
+    assert r.response.action.type.value != "TAP" or r.response.action.guideText != "장바구니 조회"      # 장바구니 조회를 치지 않는다
+    assert r.response.seek == "커피"                                                                     # 커피 탭은 글자 목록에 없다 → 찾는다
+
+
+async def test_spoken_button_present_in_the_list_is_pointed(snaps):
+    texts = FOOD + ["커피"]
+    cart = texts.index("장바구니 조회")
+    llm = ScriptedFakeLlmClient([_guide_raw(f'"e{cart}"', "장바구니 조회", "아메리카노는 위쪽 '커피' 탭에 있어요.")])
+    r = await agent(llm).next(_req_with(snaps, texts, "아메리카노 먹고 싶어"))
+    assert r.response.action.type.value == "TAP" and r.response.action.guideText == "커피"
+
+
+async def test_quoted_screen_message_is_not_mistaken_for_a_button(snaps):
+    texts = ["모두 선택해주세요", "텀블러 선택", "주문달기"]
+    llm = ScriptedFakeLlmClient([_guide_raw('"e2"', "주문달기", "화면에 '모두 선택해주세요'라고 나와요. 그래도 그냥 담으시면 돼요.")])
+    r = await agent(llm).next(_req_with(snaps, texts, "결제하고 싶어"))
+    assert r.response.action.type.value == "TAP" and r.response.action.targetId == "e2"                 # 화면 문구 인용은 버튼이 아니다
+
+
+async def test_dont_press_yet_is_not_turned_into_a_seek(snaps):
+    llm = ScriptedFakeLlmClient([answer("아니요, 아직 '주문담기'를 누르면 안 돼요. 원하시는 옵션을 고르신 뒤에 주문담기를 누르세요.")])
+    r = await agent(llm).next(_req_with(snaps, ["텀블러 선택", "선택", "당도 선택"], "주문 담기 누르면 되나"))
+    assert r.response.seek is None
+
+
+async def test_seek_text_keeps_whole_sentences_and_drops_questions(snaps):
+    llm = ScriptedFakeLlmClient([answer("결제하려면 먼저 옵션을 골라야 해요. 샷·시럽은 안 드셔도 되면 '주문담기'를 누르세요. 필요한 것이 있으세요?")])
+    r = await agent(llm).next(_req_with(snaps, ["텀블러 선택", "선택", "당도 선택"], "결제하고 싶은데"))
+    q = r.response.action.question
+    assert r.response.seek == "주문담기" and "필요한 것" not in q and q.startswith("결제하려면 먼저 옵션을 골라야 해요.") and len(q) <= 80
+
+
+async def test_conditional_example_pick_is_asked_not_highlighted(snaps):
+    texts = ["먹고가기", "포장하기", "결제금액"]
+    llm = ScriptedFakeLlmClient([_guide_raw('"e1"', "포장하기", "매장에서 드실지 포장하실지 골라 주세요. 포장이면 노란 칸을 눌러 주세요.")])
+    r = await agent(llm).next(_req_with(snaps, texts, "이제 뭐 해야 돼"))
+    assert r.response.action.type.value == "ASK_USER"                                                    # 어르신이 정할 일
+    llm2 = ScriptedFakeLlmClient([_guide_raw('"e1"', "포장하기", "포장이면 노란 칸을 눌러 주세요.")])
+    r2 = await agent(llm2).next(_req_with(snaps, texts, "포장할게요 포장하기"))
+    assert r2.response.action.type.value == "TAP"                                                        # 어르신이 말했으면 가리킨다
+
+
+# ---- 근본 원인 (2026-11-13): 후보를 위에서 14개만 넘겨 아래쪽 진행 버튼(결제하기 · 주문담기)이 늘 빠졌다
+LONG_MENU = ["처음으로", "커피", "디카페인", "음료", "푸드"] + [f"메뉴{i}" for i in range(30)] + ["장바구니 조회", "결제하기"]
+
+
+def test_bottom_progress_button_stays_in_the_candidates_of_a_long_screen():
+    from app.models import ScreenElement
+    els = [ScreenElement.model_validate(e) for e in _els(*LONG_MENU)]
+    texts = [c.text for c in help_mode.candidates_for_help(els)]
+    assert "결제하기" in texts and "장바구니 조회" in texts                 # 맨 아래 진행 버튼
+    assert "처음으로" in texts and "푸드" in texts                          # 맨 위 분류 탭
+    assert len(texts) <= 30
+
+
+def test_buttons_named_in_the_question_are_kept_even_in_the_middle():
+    from app.models import ScreenElement
+    els = [ScreenElement.model_validate(e) for e in _els(*LONG_MENU)]
+    assert "메뉴17" in [c.text for c in help_mode.candidates_for_help(els, utterance="메뉴17 주세요")]
+
+
+async def test_the_llm_sees_the_bottom_button_on_a_long_screen(snaps):
+    llm = ScriptedFakeLlmClient([answer("결제하기를 누르세요.")])
+    await agent(llm).next(_req_with(snaps, LONG_MENU, "결제하고 싶어"))
+    user = llm.calls[0]["user"]
+    pay = [line for line in user.splitlines() if line.endswith("|결제하기")]
+    assert pay and pay[0].split("|")[0] in llm.calls[0]["target_ids"]       # 후보 번호로도 고를 수 있다
+    assert "결제하기" in user.split("[후보]")[0]                              # 화면 글자에도 보인다

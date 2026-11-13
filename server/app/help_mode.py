@@ -71,7 +71,8 @@ def build_user(utterance: str, history: Sequence[HistoryItem], elements: Sequenc
     if recent:
         lines.append("[이전 대화] " + " / ".join(f"{_ACTION_KO[h.action]}: {h.targetText[:70]}" for h in recent))
     ordered = sorted(elements, key=lambda e: (round(e.rect.top, 2), e.rect.left))
-    lines.append("[화면 글자(위→아래)] " + " | ".join(e.text[:24] for e in ordered[:40]))
+    shown = _edges_first(ordered, 50, head=30, tail=20)                 # 아래쪽 버튼 글자가 잘리지 않게 (위에서 40개만 보내던 것)
+    lines.append("[화면 글자(위→아래)] " + " | ".join(e.text[:24] for e in shown))
     lines.append("[후보]")
     for c in candidates:
         lines.append(f"{c.id}|{c.text}")
@@ -108,8 +109,28 @@ def with_follow_up(answer: str) -> str:
     return a + FOLLOW_UP
 
 
-def candidates_for_help(elements: Sequence[ScreenElement], limit: int = 14) -> List[ScreenElement]:
-    """도움 모드의 후보: 버튼처럼 보이는 것을 읽는 순서로 (후보 축소는 필요 없다 — 질문은 화면 전체를 보고 답한다)."""
+def _edges_first(items: Sequence, limit: int, head: int, tail: int, extra: Sequence = ()) -> List:
+    """위에서부터 자르지 않는다: 위쪽 head개(분류 탭 · 제목)와 아래쪽 tail개(담기 · 결제 · 다음 · 확인 같은 진행 버튼은
+    어느 키오스크든 화면 맨 아래에 있다)를 먼저 남기고, extra(질문과 관련된 칸)를 넣은 뒤 남는 자리를 가운데에서 채운다.
+    2026-11-13 실기기: 위에서 14개만 후보로 넘겨 결제하기 · 주문담기가 늘 빠졌고, AI가 대신 엉뚱한 칸(마카롱 · 상품)을 골랐다."""
+    if len(items) <= limit:
+        return list(items)
+    keep = list(items[:head]) + [x for x in items[-tail:] if x not in items[:head]]
+    for x in list(extra) + list(items[head:len(items) - tail]):
+        if len(keep) >= limit:
+            break
+        if x not in keep:
+            keep.append(x)
+    order = {id(x): k for k, x in enumerate(items)}
+    return sorted(keep, key=lambda x: order[id(x)])
+
+
+def candidates_for_help(elements: Sequence[ScreenElement], limit: int = 30, utterance: str = "") -> List[ScreenElement]:
+    """도움 모드의 후보: 버튼처럼 보이는 것을 읽는 순서로. 많으면 가장자리(위 탭 · 아래 진행 버튼)와 질문에 나온 칸을 먼저 남긴다."""
+    from .jamo import dice, normalize
     from .ranker import candidate_pool
-    pool = candidate_pool(elements)
-    return sorted(pool, key=lambda e: (round(e.rect.top, 2), e.rect.left))[:limit]
+    pool = sorted(candidate_pool(elements), key=lambda e: (round(e.rect.top, 2), e.rect.left))
+    words = [w for w in (normalize(t) for t in re.split(r"\s+", utterance or "")) if len(w) >= 2]
+    related = sorted((e for e in pool if words and max(dice(w, e.text) for w in words) >= 0.5),
+                     key=lambda e: -max(dice(w, e.text) for w in words))[:8]
+    return _edges_first(pool, limit, head=10, tail=10, extra=related)
