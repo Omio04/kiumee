@@ -21,6 +21,12 @@ class EchoGuard(private val nowMs: () -> Long = System::currentTimeMillis, val q
      */
     fun speakingStopped() { if (speaking) speakingEnded() }
 
+    /**
+     * 사람이 말해서 안내를 끊었다: 울림 대기([quietMs]) 없이 바로 마이크를 켠다.
+     * 기다리면 사람이 말을 시작한 앞부분이 잘린다. 스피커는 이미 멈췄고 사람 목소리가 마이크에 들어오는 중이다.
+     */
+    fun speakingInterrupted() { speaking = false; lastEnd.set(Long.MIN_VALUE / 2) }
+
     /** 지금부터 마이크를 켜도 되기까지 더 기다려야 하는 시간(ms). 0이면 바로 켜도 됨. */
     fun waitMs(): Long {
         if (speaking) return quietMs                                    // 아직 읽는 중이면 짧게 다시 확인하게 한다

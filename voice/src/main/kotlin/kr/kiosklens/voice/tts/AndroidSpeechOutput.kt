@@ -13,7 +13,11 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 import kr.kiosklens.core.port.Logger
 import kr.kiosklens.core.port.SpeechOutput
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kr.kiosklens.voice.EchoGuard
+import kr.kiosklens.voice.barge.BargeInMonitor
 
 /**
  * 한국어 음성 안내 (설계서 7.6): 속도 0.85, 새 안내가 오면 이전 안내를 끊는다.
@@ -26,10 +30,18 @@ class AndroidSpeechOutput(
     private val echo: EchoGuard,
     private val logger: Logger,
     private val rate: Float = 0.85f,
+    /** 읽는 동안 사람 목소리를 들어 말을 끊는다 (null이면 끔). */
+    private val bargeIn: BargeInMonitor? = null,
 ) : SpeechOutput {
     private val ready = CompletableDeferred<Boolean>()
     private val waiting = ConcurrentHashMap<String, () -> Unit>()
     private val ids = AtomicInteger()
+    @Volatile private var interrupted = false
+
+    private val barges = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+
+    /** 사람이 말해서 안내를 끊을 때마다 한 번 (앱은 이것을 "말하기" 버튼과 같게 처리한다: 읽던 것을 끊고 듣는다). */
+    val bargeIns: SharedFlow<Unit> = barges.asSharedFlow()
     private val tts: TextToSpeech = TextToSpeech(context.applicationContext) { status ->
         ready.complete(status == TextToSpeech.SUCCESS)
     }
@@ -52,15 +64,29 @@ class AndroidSpeechOutput(
         tts.language = Locale.KOREA
         tts.setSpeechRate(rate)
         echo.speakingStarted()
+        interrupted = false
+        bargeIn?.start { onUserVoice() }
         try {
             val parts = SpeechSplit.split(clean)
-            parts.forEachIndexed { i, part ->
+            for ((i, part) in parts.withIndex()) {
+                if (interrupted) break                                           // 사람이 끊었으면 남은 문장은 읽지 않는다
                 val mode = if (i == 0 && interrupt) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD
                 playOne(part, mode)
             }
         } finally {
-            echo.speakingEnded()
+            bargeIn?.stop()
+            if (!interrupted) echo.speakingEnded()
         }
+    }
+
+    /** 사람 목소리가 들렸다: 읽던 것을 즉시 멈추고(울림 대기 없이) 앱에 알린다. 마이크는 이미 반납된 뒤다. */
+    private fun onUserVoice() {
+        interrupted = true
+        echo.speakingInterrupted()
+        tts.stop()
+        waiting.values.toList().forEach { it() }
+        waiting.clear()
+        barges.tryEmit(Unit)
     }
 
     private suspend fun playOne(part: String, mode: Int) = suspendCancellableCoroutine<Unit> { cont ->

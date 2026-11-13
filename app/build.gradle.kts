@@ -26,6 +26,8 @@ android {
         buildConfigField("String", "SERVER_URL", "\"${prop("kl.serverUrl")}\"")
         buildConfigField("String", "APP_KEY", "\"${prop("kl.appKey")}\"")
         // 개발자 확인용 인식 표시 (글자 네모 · 위쪽 상태 줄). 평소엔 끔: local.properties 에 kl.showRecognition=true
+        // 말 끊기(안내를 읽는 중 사람이 말하면 멈추고 듣기). 기기에서 오작동하면 local.properties 에 kl.bargeIn=false
+        buildConfigField("boolean", "BARGE_IN", (prop("kl.bargeIn") != "false").toString())
         buildConfigField("boolean", "SHOW_RECOGNITION", (prop("kl.showRecognition") == "true").toString())
     }
     buildFeatures { buildConfig = true }
