@@ -170,6 +170,21 @@ def _generic_unknown(resp: GuideResponse) -> bool:
     return not reason or any(normalize(w) in reason for w in ("버튼을 찾", "화면이 잘 보이게", "정면에서 비춰", "찾지 못했"))
 
 
+_SEQUENCE_WORDS = ("먼저", "다음", "그다음", "뒤에", "후에", "준비되면", "끝나면", "고르면", "넣으면", "대면", "한 뒤", "하신 뒤", "한 후", "하면")
+
+
+def _pressed_candidate(message: str, candidates: dict):
+    """AI가 말로 "~을 누르세요"라고 했는데 칸을 안 가리킨 경우, 그 칸을 찾는다 (말과 표시를 맞춘다).
+    조건: 후보 중 정확히 하나만 "<글자>을/를 누르"로 말했고, "먼저 · 다음 · ~하면" 같은 순서 말이 없어 지금 누를 칸일 때만."""
+    m = (message or "")
+    if not m or any(w in m for w in _SEQUENCE_WORDS):
+        return None
+    flat = m.replace(" ", "")
+    hits = [c for c in candidates.values()
+            if c.text.strip() and re.search(re.escape(c.text.strip().replace(" ", "")) + r"['\"‘’“”]?[을를이가는은]?(?:버튼|칸|메뉴)?[을를]?(?:눌|누르|터치)", flat)]
+    return hits[0] if len(hits) == 1 else None
+
+
 def _photo_box(action, has_image: bool, candidates: dict) -> Optional[tuple]:
     """AI가 사진에서 직접 가리킨 칸: (Box, 칸 글자). 글자 목록(후보)에 없는 칸일 때만, 사진이 있고 박스가 말이 될 때만."""
     if not has_image:
@@ -554,6 +569,10 @@ class LlmGuideAgent:
             resp = resp.model_copy(update={"say": say or None})
         elif a.type == ActionType.DONE:
             resp = GuideResponse(goal=prev_goal, action=GuideAction.done(help_mode.MSG_BYE), source=resp.source)
+        elif a.type == ActionType.ASK_USER and (pressed := _pressed_candidate(a.question or "", by_id)) is not None:
+            # "× 를 누르세요"라고 말하면서 칸은 안 가리켰다 → 말한 그 칸을 노란색으로 가리킨다 (어르신이 어디인지 알 수 있게)
+            say = _clean_message(a.question, "", 80)
+            resp = GuideResponse(goal=prev_goal, action=GuideAction.tap(pressed.id, pressed.text), say=say or None, source=resp.source)
         else:                                                                 # 대답(ASK_USER · EXPLAIN · UNKNOWN · SCROLL) → 말하고 계속 듣는다
             text = a.question or a.reason or fallback
             if a.type == ActionType.SCROLL and not (a.question or a.reason):    # 버튼 이름만 읽으면 알아들을 수 없다 — 문장으로 만든다 (2026-11-13 실기기)

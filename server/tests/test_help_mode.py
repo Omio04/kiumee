@@ -51,7 +51,7 @@ def test_decline_only_counts_right_after_the_follow_up_question():
 
 # ---- 에이전트
 async def test_a_question_gets_the_answer_and_the_follow_up(snaps):
-    llm = ScriptedFakeLlmClient([answer("꼭 하지 않으셔도 돼요. 적립을 안 하시려면 ×를 누르세요.")])
+    llm = ScriptedFakeLlmClient([answer("꼭 하지 않으셔도 돼요. 적립은 선택이라 건너뛸 수 있어요.")])
     r = await agent(llm).next(req(snaps, "s07_loyalty", "이거 꼭 해야 하는 거야?"))
     a = r.response.action
     assert a.type.value == "ASK_USER" and a.question.endswith("또 도움이 필요하세요?") and len(a.question) <= 80
@@ -164,3 +164,25 @@ async def test_photo_box_is_ignored_without_a_photo_or_with_a_silly_box(snaps):
     huge = GUIDE_BOX.replace("[850,500,950,900]", "[0,0,1000,1000]")                                         # 화면 전체를 덮는 박스
     r = (await agent(ScriptedFakeLlmClient([huge])).next(GuideRequest.model_validate(d))).response
     assert r.box is None
+
+
+# ---- 말과 표시: "~을 누르세요"라고만 하고 칸을 안 가리키면 그 칸을 가리킨다
+async def test_pressing_words_without_a_pointer_get_a_pointer(snaps):
+    from app.agent import _pressed_candidate
+    from app.models import ScreenElement
+    mk = lambda i, t: ScreenElement.model_validate({"id": i, "text": t, "rect": {"left": 0.1, "top": 0.1, "right": 0.3, "bottom": 0.2}, "confidence": 0.9, "kind": "BUTTON_LIKE"})
+    cands = {"a": mk("a", "×"), "b": mk("b", "승인 요청"), "c": mk("c", "취소")}
+    assert _pressed_candidate("적립하지 않으시려면 오른쪽 위 ×를 누르시면 닫혀요.", cands).id == "a"
+    assert _pressed_candidate("카드를 대세요. 준비되면 승인 요청을 누르세요.", cands) is None        # 순서 말 → 지금 누를 칸이 아니다
+    assert _pressed_candidate("승인 요청을 누르거나 취소를 누르세요.", cands) is None               # 둘 다 → 모호
+    assert _pressed_candidate("지금은 결제 화면이에요.", cands) is None
+    cands["d"] = mk("d", "티")
+    assert _pressed_candidate("지금 음료 화면에는 아이스티가 안 보여요. 위쪽 '티' 메뉴를 눌러 보세요.", cands).id == "d"      # 따옴표가 붙어도
+
+
+async def test_saying_press_x_also_points_at_x(snaps):
+    """"적립을 안 하시려면 ×를 누르세요"라고만 말하고 칸을 안 가리키던 것 (2026-11-13 실기기) → × 칸을 가리키고 말은 앞에 읽는다."""
+    llm = ScriptedFakeLlmClient([answer("꼭 하지 않으셔도 돼요. 적립을 안 하시려면 ×를 누르세요.")])
+    r = await agent(llm).next(req(snaps, "s07_loyalty", "이거 꼭 해야 하는 거야?"))
+    assert r.response.action.type.value == "TAP" and r.response.action.guideText.strip() == "×"
+    assert r.response.say and "×" in r.response.say
