@@ -776,9 +776,7 @@ class LlmGuideAgent:
         if len(normalize(seek_name)) >= 2 and seek_name not in _NOT_A_BUTTON:
             # 누를 칸은 정했는데 글자 목록에도 사진 위치에도 없다 → "누르세요"라고 하지 않고 찾는다(앱이 읽히는 순간 노란 칸을 친다)
             body = _clean_message(action.message, "", 80)
-            meta["seek"] = True
-            meta["source"] = "help"
-            return self._finish(GuideResponse(goal=prev_goal, action=GuideAction.ask_user(_seek_text(body, seek_name)), seek=seek_name, source="help"), meta, t0)
+            return await self._found_or_seek(req, els, seek_name, body, deadline, prev_goal, meta, t0)
         resp = self.validator.validate(action, by_id, goal=prev_goal)       # 후보 밖 버튼은 안내하지 않는다 (화이트리스트)
         a = resp.action
         say = ""
@@ -811,12 +809,74 @@ class LlmGuideAgent:
             if sent and not _is_later_or_negated(sent):
                 seek = _seek_name(sent)                                       # 누르라면서 칠 칸이 없다 → "누르세요"는 말하지 않고 찾는다고 알린다
             if seek:
-                meta["seek"] = True
-                resp = GuideResponse(goal=prev_goal, action=GuideAction.ask_user(_seek_text(text, seek)), seek=seek, source=resp.source)
+                return await self._found_or_seek(req, els, seek, text, deadline, prev_goal, meta, t0)
             else:
                 resp = GuideResponse(goal=prev_goal, action=GuideAction.ask_user(help_mode.with_follow_up(text)), source=resp.source)
         meta["source"] = "help"
         return self._finish(resp, meta, t0)
+
+    async def _locate_on_grid(self, image: Optional[str], name: str, els, deadline: float, meta: Dict[str, object]):
+        """글자 목록에 없는 버튼을 사진에서 찾는다: 격자(A1~F8)를 그린 사진을 보여 주고 그 버튼이 든 칸 이름 하나만 고르게 한다.
+        흐리거나 반사돼 글자 읽기가 놓친 버튼도 AI는 사진에서 본다 (2026-11-13 실기기: 위쪽 탭 줄에서 '푸드'만 안 읽혔다).
+        → (TAP 할 칸 번호 또는 None, 사진 위치 Box 또는 None). 고른 격자 칸 안에 이름이 비슷한 OCR 칸이 있으면 그 칸에 맞춘다."""
+        if not image or not name or not self.s.grid_locate:
+            return None, None
+        left = deadline - time.perf_counter()
+        if left < 0.8:
+            return None, None
+        drawn = som.draw_grid(image)
+        if drawn is None:
+            return None, None
+        grid_img, cells = drawn
+        user = f"찾을 버튼: {name}"
+        try:
+            raw = await self._complete(user, max(0.5, min(self.s.llm_timeout_s, left)), list(cells) + [MISSING_ID], meta,
+                                       system=help_mode.GRID_SYSTEM, image=grid_img)
+            meta["llm_calls"] = int(meta["llm_calls"]) + 1
+            picked = self.parser.parse(raw).targetId
+        except (LlmTimeout, LlmUpstream, LlmRateLimited, ParseError):
+            return None, None
+        if picked not in cells:
+            return None, None
+        l, t, r, b = cells[picked]
+        meta["grid"] = picked
+        left = deadline - time.perf_counter()
+        if self.s.grid_zoom and left >= 0.8:
+            # 확대해서 한 번 더: 고른 칸과 그 둘레(3×3)를 잘라 키우고 촘촘한 격자로 다시 고른다 (성긴 격자는 바로 옆 칸으로 빗나가기 쉽다)
+            cw, ch = r - l, b - t
+            zoomed = som.crop_grid(image, (max(0.0, l - cw), max(0.0, t - ch), min(1.0, r + cw), min(1.0, b + ch)))
+            if zoomed is not None:
+                zimg, zcells = zoomed
+                try:
+                    raw2 = await self._complete(user, max(0.5, min(self.s.llm_timeout_s, left)), list(zcells) + [MISSING_ID], meta,
+                                                system=help_mode.GRID_SYSTEM, image=zimg)
+                    meta["llm_calls"] = int(meta["llm_calls"]) + 1
+                    fine = self.parser.parse(raw2).targetId
+                    if fine in zcells:
+                        l, t, r, b = zcells[fine]
+                        meta["grid_fine"] = fine
+                except (LlmTimeout, LlmUpstream, LlmRateLimited, ParseError):
+                    pass                                                     # 확대 실패 → 대략 찾은 칸을 쓴다
+        inside = [e for e in els if l <= (e.rect.left + e.rect.right) / 2 <= r and t <= (e.rect.top + e.rect.bottom) / 2 <= b
+                  and _name_score(name, e.text) >= 0.5]
+        if inside:                                                           # 그 칸 안에 깨져 읽힌 같은 이름이 있으면 그 OCR 칸
+            best = max(inside, key=lambda e: _name_score(name, e.text))
+            return best, None
+        pad = 0.02
+        return None, Box(left=max(0.0, l - pad), top=max(0.0, t - pad), right=min(1.0, r + pad), bottom=min(1.0, b + pad))
+
+    async def _found_or_seek(self, req, els, name: str, body: str, deadline: float, prev_goal, meta: Dict[str, object], t0: float):
+        """이름은 아는데 칠 칸이 없다 → 사진 격자로 위치를 찾아 바로 노란 칸을 친다. 그래도 못 찾으면 찾기(seek)로 넘긴다."""
+        el, box = await self._locate_on_grid(req.image, name, els, deadline, meta)
+        say = _reason_only(body) or None
+        meta["source"] = "help"
+        if el is not None:
+            return self._finish(GuideResponse(goal=prev_goal, action=GuideAction.tap(el.id, el.text), say=say, source="help"), meta, t0)
+        if box is not None:
+            meta["photo_box"] = True
+            return self._finish(GuideResponse(goal=prev_goal, action=GuideAction.tap("photo", name), say=say, box=box, source="help"), meta, t0)
+        meta["seek"] = True
+        return self._finish(GuideResponse(goal=prev_goal, action=GuideAction.ask_user(_seek_text(body, name)), seek=name, source="help"), meta, t0)
 
     async def _complete(self, user: str, timeout: float, ids: List[str], meta: Dict[str, object], system: str = SYSTEM, image: Optional[str] = None) -> str:
         """LLM 한 번 부르기 (버튼 번호는 후보 안에서만 고르게 형식 강제).

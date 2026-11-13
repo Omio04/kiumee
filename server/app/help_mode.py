@@ -54,6 +54,11 @@ HELP_SYSTEM = """당신은 키오스크 앞에서 막힌 어르신의 질문에 
 JSON 한 줄만 출력하세요 (설명 금지):
 {"screenAsks":"이 화면이 묻는 것 한 줄","action":"GUIDE|ASK_USER|DONE|UNKNOWN","targetId":"GUIDE일 때 후보 id, 아니면 null","guideText":"GUIDE일 때 버튼 글자, 아니면 null","message":"ASK_USER면 대답 60자 이내, GUIDE면 이유와 방법 80자 이내"}"""
 
+GRID_SYSTEM = """사진에는 하늘색 격자와 칸 이름(A1 ~ F8)이 그려져 있습니다. 글자는 키오스크 화면입니다.
+'찾을 버튼'에 적힌 이름의 버튼(또는 탭 · 메뉴 칸)이 사진 어디에 있는지 보고, 그 버튼 가운데가 들어 있는 격자 칸 이름 하나를 targetId로 고르세요.
+글자가 흐리거나 조금 달라 보여도 모양과 위치로 판단하세요. 사진에 그 버튼이 정말 없으면 MISSING.
+JSON 한 줄만: {"screenAsks":"짧게","action":"GUIDE","targetId":"칸 이름 또는 MISSING","guideText":"찾은 버튼 글자","message":null}"""
+
 _ACTION_KO = {ActionType.TAP: "버튼을 가리킴", ActionType.ASK_USER: "대답함", ActionType.DONE: "끝냄", ActionType.UNKNOWN: "대답함",
               ActionType.SCROLL: "밀기 안내", ActionType.WAIT: "대답함"}
 

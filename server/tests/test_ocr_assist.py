@@ -49,3 +49,28 @@ async def test_short_number_is_mapped_back_to_the_real_element_id(snaps):
     assert r.response.action.targetId == "e3cc2940e"                         # 앱이 아는 원래 번호로 돌아간다
     assert "2|결제하기" in llm.calls[0]["user"] and llm.calls[0]["image"] != d["image"]   # 짧은 번호 + 번호를 그린 사진
     assert "_alias" not in r.meta
+
+
+# ---- OCR이 못 읽은 버튼을 사진 격자로 찾는다 (대략 → 확대해서 정밀)
+async def test_missing_button_is_found_on_the_photo_grid_and_zoomed(snaps):
+    d = make_req(snaps, "s01_dine", "케이크 먹고 싶어", history=[])
+    d["snapshot"]["elements"] = [{"id": "e1", "text": "커피", "rect": {"left": 0.0, "top": 0.05, "right": 0.15, "bottom": 0.12}, "confidence": 0.9, "kind": "BUTTON_LIKE"}]
+    d["image"] = _png_b64(600, 800)
+    llm = ScriptedFakeLlmClient([
+        '{"screenAsks":"x","action":"GUIDE","targetId":"MISSING","guideText":"푸드","message":"케이크는 푸드에 있어요. 노란 칸 푸드를 눌러 주세요."}',
+        '{"screenAsks":"x","action":"GUIDE","targetId":"F1","guideText":"푸드"}',     # 격자: 대략 오른쪽 위
+        '{"screenAsks":"x","action":"GUIDE","targetId":"B2","guideText":"푸드"}'])    # 확대한 격자
+    r = await LlmGuideAgent(llm, Settings(app_key="k", cache_size=0, hedge_after_s=0, help_mode=True, total_budget_s=20)).next(GuideRequest.model_validate(d))
+    assert r.response.action.type.value == "TAP" and r.response.action.targetId == "photo" and r.response.box is not None
+    assert r.meta.get("grid") == "F1" and r.meta.get("grid_fine") == "B2"
+    assert r.response.box.left > 0.5 and r.response.box.top < 0.3                    # 오른쪽 위
+    assert r.response.say == "케이크는 푸드에 있어요."                                # 누르라는 문장은 앱이 읽는다
+    assert "F1" in llm.calls[1]["target_ids"] and llm.calls[1]["image"] != d["image"]   # 격자를 그린 사진
+
+
+async def test_when_the_grid_cannot_find_it_the_app_keeps_seeking(snaps):
+    d = make_req(snaps, "s01_dine", "결제하고 싶어", history=[]); d["image"] = _png_b64()
+    llm = ScriptedFakeLlmClient(['{"screenAsks":"x","action":"GUIDE","targetId":"MISSING","guideText":"결제하기","message":"담겨 있어요."}',
+                                 '{"screenAsks":"x","action":"GUIDE","targetId":"MISSING","guideText":"결제하기"}'])
+    r = await LlmGuideAgent(llm, Settings(app_key="k", cache_size=0, hedge_after_s=0, help_mode=True, total_budget_s=20)).next(GuideRequest.model_validate(d))
+    assert r.response.seek == "결제하기" and r.response.action.type.value == "ASK_USER"
