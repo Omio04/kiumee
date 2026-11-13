@@ -97,7 +97,9 @@ async def test_scroll_and_wait_reach_the_app_contract(snaps):
     assert a.type.value == "SCROLL" and a.direction.value == "DOWN" and a.guideText == "딸기 스무디"
     ag = LlmGuideAgent(ScriptedFakeLlmClient(['{"action":"WAIT"}']), S())
     r = await ag.next(GuideRequest.model_validate(make_req(snaps, "s02_menu", "아무거나")))
-    assert r.response.action.type.value == "WAIT" and r.response.action.guideText
+    a = r.response.action
+    # WAIT는 더 이상 앱에 나가지 않는다 (2026-11-13): "잠시만 기다려 주세요"만 말하고 멈추지 않고 화면이 무엇인지 알려 준다
+    assert a.type.value == "ASK_USER" and "기다" not in a.question and "고를 수 있어요" in a.question
 
 
 @pytest.mark.parametrize("llm_out", [

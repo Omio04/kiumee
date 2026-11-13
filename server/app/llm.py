@@ -22,7 +22,8 @@ ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
 #   Anthropic: 도구 하나(decide)를 tool_choice로 강제 → 입력이 항상 스키마를 따르는 JSON 객체
 #   Gemini   : responseSchema (constrained decoding)
 # 프롬프트에 "JSON만 출력하세요"라고 부탁하는 것보다 형식 오류(= 재요청 = 지연)가 크게 줄어듭니다.
-_ACTIONS = ["GUIDE", "ASK_USER", "DONE", "UNKNOWN", "SCROLL", "WAIT", "EXPLAIN"]
+# WAIT는 뺐다(2026-11-13): 새 화면이 떴을 때 "잠시만 기다려 주세요"만 말하고 멈춰서 어르신이 막혔다. 화면은 항상 바로 판단한다.
+_ACTIONS = ["GUIDE", "ASK_USER", "DONE", "UNKNOWN", "SCROLL", "EXPLAIN"]
 _DIRECTIONS = ["UP", "DOWN", "LEFT", "RIGHT"]
 ACTION_SCHEMA = {
     "type": "object",
@@ -31,7 +32,7 @@ ACTION_SCHEMA = {
         "targetId": {"type": "string", "description": "GUIDE일 때 [후보]의 id"},
         "guideText": {"type": "string", "description": "GUIDE일 때 버튼 글자, SCROLL일 때 찾는 메뉴 이름 (문장 아님)"},
         "message": {"type": "string", "description": "ASK_USER면 어르신께 할 질문(필수, 예: 따뜻한 걸로 드릴까요, 차가운 걸로 드릴까요?). "
-                                                     "DONE · UNKNOWN · WAIT면 쉬운 존댓말 한 문장"},
+                                                     "DONE · UNKNOWN이면 쉬운 존댓말 한 문장"},
         "direction": {"type": "string", "enum": _DIRECTIONS, "description": "SCROLL일 때만"},
     },
     "required": ["action"],

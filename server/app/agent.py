@@ -155,6 +155,16 @@ def _premature_checkout(req: GuideRequest, goal: str, chosen: List[str], target_
     return bool(_goal_words(goal)) and not _item_seen(req.snapshot.elements, goal)
 
 
+# 앱은 읽고 안내만 한다 (키오스크는 어르신이 손으로 누른다). 앱이 무언가 하고 있는 듯한 말은 어르신을 혼란스럽게 한다 (2026-11-13 실기기)
+_WAITING_TALK = tuple(normalize(w) for w in ("바뀌는 중", "바뀌고 있", "바꾸는 중", "처리 중", "로딩", "기다려", "기다리", "기다릴"))
+
+
+def _waiting_talk(resp: GuideResponse) -> bool:
+    a = resp.action
+    text = normalize(" ".join(t for t in (a.question, a.reason, a.guideText) if t))
+    return any(w in text for w in _WAITING_TALK)
+
+
 def _retryable(e: Optional[BaseException]) -> bool:
     """겹쳐 보내도 되는 실패인가: 시간 초과 · 혼잡 · 네트워크. 인증 오류와 사용량 제한(429)은 다시 보내 봐야 소용없다."""
     if isinstance(e, LlmRateLimited):
@@ -304,12 +314,14 @@ class LlmGuideAgent:
         resp = self.validator.validate(action, by_id, goal=goal)
         if action.action == LlmKind.EXPLAIN:                      # 설명은 목표를 바꾸지 않는다
             resp = resp.model_copy(update={"goal": prev_goal})
-        elif resp.action.type == ActionType.UNKNOWN and not asking:
+        elif (resp.action.type in (ActionType.UNKNOWN, ActionType.WAIT) or _waiting_talk(resp)) and not asking:
             # 새 화면인데 고를 버튼을 못 정함: "못 찾았어요"로 끝내지 않고 고를 수 있는 것을 알려 준다
             text = screen_guide.describe(els, changed=new_screen, label=screen_type.label(stype))
             if text:
                 meta["described"] = True
                 resp = GuideResponse(goal=goal, action=GuideAction.ask_user(text), source="rule")
+            elif resp.action.type == ActionType.WAIT or _waiting_talk(resp):    # 설명할 버튼도 없으면 기다리라 하지 않고 다시 비춰 달라고
+                resp = GuideResponse(goal=goal, action=GuideAction.unknown(MSG_UNKNOWN), source="fallback")
         if action.action == LlmKind.GUIDE and resp.action.type == ActionType.UNKNOWN:
             meta["rejected"] = True                    # LLM이 후보에 없는 버튼을 말함
         # 7) 이른 '끝' 막기: 고른 것이 없는데 DONE이면 끝내지 않고 다시 묻는다 (앱은 묻고 나서 바로 듣는다)

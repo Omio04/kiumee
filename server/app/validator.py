@@ -9,6 +9,7 @@
 """
 from __future__ import annotations
 
+import re
 from typing import Dict
 
 from . import privacy
@@ -29,11 +30,25 @@ MSG_EXPLAIN = "어떤 메뉴가 궁금하세요?"
 MAX_SCROLL_TARGET = 20
 
 
+_SENTENCE_END = re.compile(r"(?<=[.?!])\s+")
+
+
 def _clean_message(m: str | None, default: str, limit: int = MAX_MESSAGE) -> str:
+    """LLM 문장을 계약 길이에 맞춘다. 길면 통째로 버리지 않고 문장 단위로 앞에서부터 자른다
+    (2026-11-13: "아이스 유자차는 이미 담으신 것 같아요. 옵션을 고르신 뒤…"가 60자를 넘는다고 "무엇을 드시고 싶으세요?"로 바뀌어
+    어르신이 상황을 알 수 없었다). 첫 문장도 길면 그때만 기본 문구."""
     m = (m or "").strip()
-    if not m or len(m) > limit:
+    if not m:
         return default
-    return m
+    if len(m) <= limit:
+        return m
+    kept = ""
+    for sentence in _SENTENCE_END.split(m):
+        candidate = (kept + " " + sentence).strip()
+        if len(candidate) > limit:
+            break
+        kept = candidate
+    return kept or default
 
 
 def _scroll_target(t: str | None) -> str:
@@ -56,7 +71,7 @@ class ActionValidator:
         if a.action == LlmKind.ASK_USER:
             # 질문이 message가 아니라 guideText 칸에 들어오는 일이 있다 (Gemini, 2026-11-12) → 질문 문장이면 그걸 쓴다
             q = a.message or (a.guideText if (a.guideText or "").strip().endswith(("?", "요", "까")) else None)
-            return GuideResponse(goal=goal, action=GuideAction.ask_user(_clean_message(q, MSG_ASK)), source=source)
+            return GuideResponse(goal=goal, action=GuideAction.ask_user(_clean_message(q, MSG_ASK, MAX_EXPLAIN)), source=source)
         if a.action == LlmKind.EXPLAIN:                # 설명도 앱에는 ASK_USER (읽고 → 듣기). goal은 부른 쪽이 그대로 둔다
             return GuideResponse(goal=goal, action=GuideAction.ask_user(_clean_message(a.message, MSG_EXPLAIN, MAX_EXPLAIN)),
                                  source=source)
