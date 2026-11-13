@@ -7,6 +7,36 @@ from dataclasses import dataclass, field
 VERSION = "0.2.0"   # 0.2.0: API 계약 v1 (docs/contract.md)
 
 
+def load_dotenv(path: "str | os.PathLike | None" = None) -> int:
+    """server/.env 의 KEY=VALUE 를 환경변수로 읽는다 (의존성 없이). 이미 정해진 환경변수는 덮어쓰지 않는다 → 명령줄 값이 .env 보다 우선.
+    따옴표 · 주석(#) · 빈 줄을 처리한다. 파일이 없으면 0. 읽은 개수를 돌려준다. 값은 로그에 남기지 않는다."""
+    from pathlib import Path
+    f = Path(path) if path else Path(__file__).resolve().parent.parent / ".env"
+    try:
+        lines = f.read_text(encoding="utf-8-sig").splitlines()
+    except OSError:
+        return 0
+    n = 0
+    for raw in lines:
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        if line.startswith("export "):
+            line = line[7:].lstrip()
+        k, v = line.split("=", 1)
+        k, v = k.strip(), v.strip()
+        if len(v) >= 2 and v[0] == v[-1] and v[0] in "\"'":
+            v = v[1:-1]
+        elif v.startswith("#"):
+            v = ""                                          # KEY=   # 설명  → 값 없음 (.env.example 모양)
+        elif " #" in v:
+            v = v.split(" #", 1)[0].rstrip()
+        if k and k not in os.environ:
+            os.environ[k] = v
+            n += 1
+    return n
+
+
 def _env_bool(name: str, default: bool) -> bool:
     v = os.environ.get(name)
     if v is None:
@@ -40,6 +70,7 @@ class Settings:
 
     @staticmethod
     def from_env() -> "Settings":
+        load_dotenv()                                   # server/.env (있으면). 명령줄 환경변수가 우선
         e = os.environ.get
         return Settings(
             app_key=e("APP_KEY", ""),

@@ -105,3 +105,23 @@ def test_ratelimit():
     assert not ok and wait > 0
     t[0] += 61
     assert rl.allow("k")[0]
+
+
+def test_dotenv_is_read_but_never_overrides_the_environment(tmp_path, monkeypatch):
+    from app.settings import load_dotenv
+    f = tmp_path / ".env"
+    f.write_text('# 주석\nGEMINI_API_KEY="abc123"\nexport LLM_PROVIDER=gemini  # 설명\n\nEMPTY=\nAPP_KEY=from_file\n', encoding="utf-8")
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+    monkeypatch.setenv("APP_KEY", "from_shell")
+    assert load_dotenv(f) == 3
+    import os
+    assert os.environ["GEMINI_API_KEY"] == "abc123" and os.environ["LLM_PROVIDER"] == "gemini"
+    assert os.environ["APP_KEY"] == "from_shell"                        # 명령줄 값이 우선
+    assert load_dotenv(tmp_path / "없음.env") == 0
+    g = tmp_path / "ex.env"
+    g.write_text("OTHER_KEY=            # 무료 키: https://example.com
+", encoding="utf-8")
+    monkeypatch.delenv("OTHER_KEY", raising=False)
+    load_dotenv(g)
+    assert os.environ["OTHER_KEY"] == ""                                # 주석이 값으로 들어가면 안 된다
