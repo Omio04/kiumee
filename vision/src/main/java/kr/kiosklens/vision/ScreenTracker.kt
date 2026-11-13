@@ -16,6 +16,7 @@ internal class ScreenTracker(
     private var pending: Set<String>? = null
     private var pendingScene: String? = null
     private var pendingSelection: String? = null
+    private var pendingInner: Inner? = null
     private var referenceScene: String? = null
     private var referenceSelection: String? = null
     private val interpreter = ScreenInterpreter()
@@ -23,6 +24,7 @@ internal class ScreenTracker(
     private var stableFrames = 0
     private val ids = ElementIds(builder)
     private val volatileCounter = Regex("""\d+\s*초""")
+    private val temperaturePrefix = Regex("^(?:1ce|lce|ce)(?=[가-힣])")
 
     val needsConfirmation get() = pending != null || stableFrames < 2
 
@@ -32,6 +34,7 @@ internal class ScreenTracker(
             pending = null
             pendingScene = null
             pendingSelection = null
+            pendingInner = null
             previous = emptyList()
             stableFrames = 0
             return null
@@ -43,21 +46,27 @@ internal class ScreenTracker(
         // 흐린 프레임 하나에 "새 화면 후보"가 되어 두 프레임씩 확정이 끊기던 문제 (2026-11-11 웹캠 측정)
         // 전체가 비슷해도 원래 보이던 자리 안쪽이 바뀌었으면(옵션 창이 뜨거나 닫힘) 새 화면이다 ([inner]).
         val inner = if (screenNumber == 0) Inner.NONE else inner(referenceAt, at)
-        val isNew = screenNumber == 0 || similarity(reference, keys) < STAY || inner.changed ||
+        val structuralChange = screenNumber == 0 || similarity(reference, keys) < STAY ||
             (scene != null && scene != referenceScene) ||
             (selection != null && referenceSelection != null && selection != referenceSelection)
+        val isNew = structuralChange || inner.changed
         if (isNew) {
             val candidate = pending
             val candidateScene = pendingScene
             val candidateSelection = pendingSelection
+            val candidateInner = pendingInner
             pending = keys
             pendingScene = scene
             pendingSelection = selection
+            pendingInner = inner
             previous = emptyList()
             stableFrames = 0
             val confirmedStage = scene != null && scene != referenceScene
             if (candidate == null || candidateScene != scene || candidateSelection != selection ||
                 (!confirmedStage && similarity(candidate, keys) < CONFIRM)) return null
+            // Shared background can make two noisy frames look similar even though different
+            // labels broke in each. Confirm the actual appeared/vanished text, not just background.
+            if (!structuralChange && (candidateInner == null || !inner.confirmedBy(candidateInner))) return null
             screenNumber++
             reference = keys
             referenceAt = at
@@ -77,6 +86,7 @@ internal class ScreenTracker(
         pending = null
         pendingScene = null
         pendingSelection = null
+        pendingInner = null
         if (stableFrames < 2) {
             previous = lines
             return null
@@ -100,7 +110,7 @@ internal class ScreenTracker(
         if (scene == "menu-cart") {
             val cart = lines.first { Elements.key(it.text) == "장바구니조회" }
             return lines.asSequence().filter { it.rect.top >= cart.rect.bottom }
-                .map { Elements.key(it.text) }.filter { it.startsWith("ice") || it.startsWith("hot") }
+                .map { screenKey(it.text) }.filter { it.startsWith("ice") || it.startsWith("hot") }
                 .sorted().joinToString("|")
         }
         if (scene != "product-options") return null
@@ -119,18 +129,31 @@ internal class ScreenTracker(
      * 확정 10%). 숫자뿐인 화면이라 다 빠지면 원래대로 전부 쓴다. 인식 결과(스냅샷)에서는 빼지 않는다.
      */
     private fun signature(lines: List<OcrLine>): Map<String, NormRect> {
-        val all = lines.filterNot { it.text.matches(volatileCounter) }.map { Elements.key(it.text) to it.rect }
+        val all = lines.filterNot { it.text.matches(volatileCounter) }.map { screenKey(it.text) to it.rect }
         val words = all.filterNot { (key, _) -> key.count { it.isDigit() } >= 3 }
         return words.ifEmpty { all }.toMap()
     }
 
+    // Camera OCR confuses the I in ICE with 1/l or drops it. Comparison only:
+    // preserve observed labels/IDs and never normalize quantities or HOT into ICE.
+    private fun screenKey(text: String) = Elements.key(text)
+        .replace(temperaturePrefix, "ice")
+
     /** 원래 보이던 자리 안쪽의 변화: 처음 보는 글자가 나타난 수 · 보여야 하는데 사라진 글자 수 */
-    private data class Inner(val appeared: Int, val vanished: Int) {
+    private data class Inner(val appearedKeys: Set<String>, val vanishedKeys: Set<String>) {
+        val appeared get() = appearedKeys.size
+        val vanished get() = vanishedKeys.size
         /** 한쪽은 창 글자(여럿), 다른 쪽은 창에 가려졌거나 다시 드러난 메뉴 글자(적을 수 있음) */
         val changed get() = appeared >= INNER_EACH && vanished >= INNER_EACH && appeared + vanished >= INNER_TOTAL
 
+        fun confirmedBy(other: Inner): Boolean {
+            val appeared = appearedKeys.count { key -> other.appearedKeys.any { Elements.similar(key, it) } }
+            val vanished = vanishedKeys.count { key -> other.vanishedKeys.any { Elements.similar(key, it) } }
+            return appeared >= INNER_EACH && vanished >= INNER_EACH && appeared + vanished >= INNER_TOTAL
+        }
+
         companion object {
-            val NONE = Inner(0, 0)
+            val NONE = Inner(emptySet(), emptySet())
         }
     }
 
@@ -145,12 +168,12 @@ internal class ScreenTracker(
     private fun inner(ref: Map<String, NormRect>, now: Map<String, NormRect>): Inner {
         val unmatched = (now.keys - ref.keys).toMutableList()          // 처음 보는 글자 후보 (오타 짝은 아래에서 뺀다)
         val pairs = ArrayList<Pair<NormRect, NormRect>>()
-        val missing = ArrayList<NormRect>()                             // 기준에는 있는데 지금 안 보이는 글자의 (기준) 위치
+        val missing = LinkedHashMap<String, NormRect>()                  // 기준에는 있는데 지금 안 보이는 글자의 (기준) 위치
         for ((key, r) in ref) {
             val hit = if (key in now) key else unmatched.firstOrNull { Elements.similar(key, it) }?.also { unmatched.remove(it) }
             when {
                 hit != null -> pairs += r to now.getValue(hit)
-                key.length >= 2 -> missing += r
+                key.length >= 2 -> missing[key] = r
             }
         }
         if (pairs.size < 3) return Inner.NONE                          // 움직임을 맞출 수 없음 → 전체 유사도에 맡긴다
@@ -170,12 +193,12 @@ internal class ScreenTracker(
         val nowX = (now.values.minOf { it.centerX } + MARGIN)..(now.values.maxOf { it.centerX } - MARGIN)
         val nowY = (now.values.minOf { it.centerY } + MARGIN)..(now.values.maxOf { it.centerY } - MARGIN)
 
-        val appeared = unmatched.count { key ->
+        val appeared = unmatched.filter { key ->
             val c = now.getValue(key)
             key.length >= 2 && c.centerX in seenX && c.centerY in seenY
         }
-        val vanished = missing.count { r -> mapX(r.centerX) in nowX && mapY(r.centerY) in nowY }
-        return Inner(appeared, vanished)
+        val vanished = missing.filterValues { r -> mapX(r.centerX) in nowX && mapY(r.centerY) in nowY }.keys
+        return Inner(appeared.toSet(), vanished)
     }
 
     private fun median(values: List<Float>): Float {

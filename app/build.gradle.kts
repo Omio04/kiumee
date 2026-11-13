@@ -28,8 +28,9 @@ android {
         // 개발자 확인용 인식 표시 (글자 네모 · 위쪽 상태 줄). 평소엔 끔: local.properties 에 kl.showRecognition=true
         // 계속 듣기(도움 모드에서 답이 끝나면 버튼 없이 다시 듣기). 기본은 끔: 어르신이 "말하기"를 눌러 다시 질문한다
         buildConfigField("boolean", "HANDS_FREE", (prop("kl.handsFree") == "true").toString())
-        // 도움 모드(기본): 어르신이 물어볼 때만 그 순간의 화면을 보고 답하고, 버튼 없이 계속 듣는다. 예전 방식은 local.properties 에 kl.helpMode=false
-        buildConfigField("boolean", "HELP_MODE", (prop("kl.helpMode") != "false").toString())
+        // 기본은 주문 흐름 안내: 안정된 새 화면이 보이면 추가 질문 없이 다음 단계를 알려 준다.
+        // 물어볼 때만 답하는 도움 모드가 필요할 때에만 kl.helpMode=true 로 켠다.
+        buildConfigField("boolean", "HELP_MODE", (prop("kl.helpMode") == "true").toString())
         buildConfigField("boolean", "SEND_IMAGE", (prop("kl.sendImage") != "false").toString())   // 질문 때 카메라 사진을 AI에 보낼지 (기본 켬)
         // 말 끊기(안내를 읽는 중 사람이 말하면 멈추고 듣기). 기본은 끔(2026-11-13): 도움 모드는 AI가 말하는 중 어르신이 끊을 수 없다.
         // 주문 흐름 방식에서 쓰려면 local.properties 에 kl.bargeIn=true (main 의 기본값은 켬이었다 — 합치면서 도움 모드 요구에 맞춰 바꿈)

@@ -1,0 +1,3783 @@
+[
+  {
+    "stage": "menu",
+    "request": {
+      "sessionId": "handheld-order",
+      "utterance": "아이스 아메리카노 한 잔 주세요",
+      "snapshot": {
+        "screenId": "s1",
+        "frameId": 1,
+        "timestampMs": 333,
+        "stableFrames": 2,
+        "elements": [
+          {
+            "id": "eeab42383",
+            "text": "처음으로",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.13333334,
+              "top": 0.0375,
+              "right": 0.23472223,
+              "bottom": 0.05078125
+            },
+            "confidence": 0.7246094
+          },
+          {
+            "id": "e38aeef9d",
+            "text": "메가엠지씨커피",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.4625,
+              "top": 0.04296875,
+              "right": 0.65416664,
+              "bottom": 0.0625
+            },
+            "confidence": 0.83314735
+          },
+          {
+            "id": "ee5443680",
+            "text": "LANGUAGE",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.8888889,
+              "top": 0.0578125,
+              "right": 0.99444443,
+              "bottom": 0.06875
+            },
+            "confidence": 0.79589844
+          },
+          {
+            "id": "e89eb31b0",
+            "text": "신메뉴",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.13333334,
+              "top": 0.075,
+              "right": 0.19861111,
+              "bottom": 0.0890625
+            },
+            "confidence": 0.67057294
+          },
+          {
+            "id": "eda3089da",
+            "text": "추천메뉴",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.2361111,
+              "top": 0.07734375,
+              "right": 0.325,
+              "bottom": 0.0921875
+            },
+            "confidence": 0.68847656
+          },
+          {
+            "id": "ec857ea0c",
+            "text": "커피",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.37361112,
+              "top": 0.08125,
+              "right": 0.41805556,
+              "bottom": 0.09453125
+            },
+            "confidence": 0.8613281
+          },
+          {
+            "id": "e519d1ad1",
+            "text": "디카페인 음료",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.4652778,
+              "top": 0.08359375,
+              "right": 0.6472222,
+              "bottom": 0.0984375
+            },
+            "confidence": 0.74609375
+          },
+          {
+            "id": "ef685e6e4",
+            "text": "티",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.73194444,
+              "top": 0.0890625,
+              "right": 0.75,
+              "bottom": 0.1015625
+            },
+            "confidence": 0.4375
+          },
+          {
+            "id": "e17fffe33",
+            "text": "푸드",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.8333333,
+              "top": 0.09140625,
+              "right": 0.87777776,
+              "bottom": 0.10390625
+            },
+            "confidence": 0.72265625
+          },
+          {
+            "id": "e3cc2a313",
+            "text": "상품",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.94861114,
+              "top": 0.09453125,
+              "right": 0.9930556,
+              "bottom": 0.10703125
+            },
+            "confidence": 0.7988281
+          },
+          {
+            "id": "ef9101352",
+            "text": "겨울시즌",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.525,
+              "top": 0.11796875,
+              "right": 0.6041667,
+              "bottom": 0.13046876
+            },
+            "confidence": 0.75
+          },
+          {
+            "id": "edc656b38",
+            "text": "군고구마 크림브릴",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.1375,
+              "top": 0.1953125,
+              "right": 0.3125,
+              "bottom": 0.2109375
+            },
+            "confidence": 0.7182617
+          },
+          {
+            "id": "e9b660b5a",
+            "text": "(CE)메가리카노",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.36944443,
+              "top": 0.2078125,
+              "right": 0.5152778,
+              "bottom": 0.22109374
+            },
+            "confidence": 0.64453125
+          },
+          {
+            "id": "e7b382be4",
+            "text": "레 슈페너",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.18055555,
+              "top": 0.2109375,
+              "right": 0.26805556,
+              "bottom": 0.2234375
+            },
+            "confidence": 0.8261719
+          },
+          {
+            "id": "eece18041",
+            "text": "(ICE)아메리카노",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.5888889,
+              "top": 0.2125,
+              "right": 0.7361111,
+              "bottom": 0.2265625
+            },
+            "confidence": 0.53945315
+          },
+          {
+            "id": "ec207eee4",
+            "text": "(CE)개리카노",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.80972224,
+              "top": 0.21953125,
+              "right": 0.95416665,
+              "bottom": 0.23203126
+            },
+            "confidence": 0.6147461
+          },
+          {
+            "id": "ecdc74fda",
+            "text": "3,900",
+            "kind": "PRICE",
+            "rect": {
+              "left": 0.1875,
+              "top": 0.22734375,
+              "right": 0.25833333,
+              "bottom": 0.23828125
+            },
+            "confidence": 0.8875
+          },
+          {
+            "id": "e9061fb58",
+            "text": "3,300",
+            "kind": "PRICE",
+            "rect": {
+              "left": 0.4125,
+              "top": 0.23046875,
+              "right": 0.4625,
+              "bottom": 0.2453125
+            },
+            "confidence": 0.8179687
+          },
+          {
+            "id": "eaff23218",
+            "text": "2,000&!",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.6263889,
+              "top": 0.2375,
+              "right": 0.6958333,
+              "bottom": 0.2484375
+            },
+            "confidence": 0.66127235
+          },
+          {
+            "id": "e4f76f498",
+            "text": "2,400",
+            "kind": "PRICE",
+            "rect": {
+              "left": 0.8472222,
+              "top": 0.24296875,
+              "right": 0.9152778,
+              "bottom": 0.25390625
+            },
+            "confidence": 0.846875
+          },
+          {
+            "id": "ebb36df44",
+            "text": "왕메가 헛개리카노",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.125,
+              "top": 0.3140625,
+              "right": 0.3,
+              "bottom": 0.3296875
+            },
+            "confidence": 0.84521484
+          },
+          {
+            "id": "eb2a9ce5e",
+            "text": "할메가커피",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.38055557,
+              "top": 0.31953126,
+              "right": 0.48333332,
+              "bottom": 0.33359376
+            },
+            "confidence": 0.7554687
+          },
+          {
+            "id": "e6f90fe0",
+            "text": "할메가미숫커피",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.56666666,
+              "top": 0.32265624,
+              "right": 0.73194444,
+              "bottom": 0.33984375
+            },
+            "confidence": 0.72991073
+          },
+          {
+            "id": "ef4bd644d",
+            "text": "왕할메가커피",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.80694443,
+              "top": 0.3296875,
+              "right": 0.9305556,
+              "bottom": 0.34453124
+            },
+            "confidence": 0.8046875
+          },
+          {
+            "id": "ec5482797",
+            "text": "3,400",
+            "kind": "PRICE",
+            "rect": {
+              "left": 0.18055555,
+              "top": 0.3375,
+              "right": 0.23055555,
+              "bottom": 0.35078126
+            },
+            "confidence": 0.84296876
+          },
+          {
+            "id": "e1766cd0d",
+            "text": "2,1002!",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.39444444,
+              "top": 0.34375,
+              "right": 0.46666667,
+              "bottom": 0.3546875
+            },
+            "confidence": 0.6735491
+          },
+          {
+            "id": "e56dcc231",
+            "text": "2,900",
+            "kind": "PRICE",
+            "rect": {
+              "left": 0.61388886,
+              "top": 0.34921876,
+              "right": 0.68333334,
+              "bottom": 0.36015624
+            },
+            "confidence": 0.8
+          },
+          {
+            "id": "e5dfd7b8a",
+            "text": "3,2002!",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.8333333,
+              "top": 0.35390624,
+              "right": 0.90416664,
+              "bottom": 0.365625
+            },
+            "confidence": 0.69084823
+          },
+          {
+            "id": "e3f2441af",
+            "text": "(1CE)바닐라아메리카노",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.3361111,
+              "top": 0.425,
+              "right": 0.50277776,
+              "bottom": 0.453125
+            },
+            "confidence": 0.62642044
+          },
+          {
+            "id": "e833afdaa",
+            "text": "(1CE)꿀아메리카노",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.11666667,
+              "top": 0.42578125,
+              "right": 0.28194445,
+              "bottom": 0.44140625
+            },
+            "confidence": 0.6147017
+          },
+          {
+            "id": "ec00620ed",
+            "text": "(ICE",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.5555556,
+              "top": 0.43203124,
+              "right": 0.5875,
+              "bottom": 0.4421875
+            },
+            "confidence": 0.5839844
+          },
+          {
+            "id": "e1418c28b",
+            "text": "(HOT아메리카노",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.7777778,
+              "top": 0.44140625,
+              "right": 0.9375,
+              "bottom": 0.45703125
+            },
+            "confidence": 0.64105904
+          },
+          {
+            "id": "e86adc785",
+            "text": "2,7002",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.1625,
+              "top": 0.45078126,
+              "right": 0.23333333,
+              "bottom": 0.46171874
+            },
+            "confidence": 0.7213542
+          },
+          {
+            "id": "efc19bb82",
+            "text": "2,700",
+            "kind": "PRICE",
+            "rect": {
+              "left": 0.38194445,
+              "top": 0.45625,
+              "right": 0.45277777,
+              "bottom": 0.4671875
+            },
+            "confidence": 0.8734375
+          },
+          {
+            "id": "e871a6875",
+            "text": "2,700",
+            "kind": "PRICE",
+            "rect": {
+              "left": 0.6013889,
+              "top": 0.4609375,
+              "right": 0.67083335,
+              "bottom": 0.47265625
+            },
+            "confidence": 0.85
+          },
+          {
+            "id": "e871a7b3a",
+            "text": "2,700",
+            "kind": "PRICE",
+            "rect": {
+              "left": 0.8208333,
+              "top": 0.46640626,
+              "right": 0.8902778,
+              "bottom": 0.47734374
+            },
+            "confidence": 0.85859376
+          },
+          {
+            "id": "e9573087e",
+            "text": "(HOT헛개리카노",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.108333334,
+              "top": 0.53828126,
+              "right": 0.26527777,
+              "bottom": 0.5523437
+            },
+            "confidence": 0.625
+          },
+          {
+            "id": "e31e4aa8c",
+            "text": "(HOT바닐라아메리카노",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.5375,
+              "top": 0.540625,
+              "right": 0.7152778,
+              "bottom": 0.5703125
+            },
+            "confidence": 0.64453125
+          },
+          {
+            "id": "ec5a4c8f",
+            "text": "(HOT)꿀아메리카노",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.31666666,
+              "top": 0.54375,
+              "right": 0.49444443,
+              "bottom": 0.5578125
+            },
+            "confidence": 0.6516335
+          },
+          {
+            "id": "ed488d5d3",
+            "text": "(HOT)헤이즐넛아메리카노",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.74444443,
+              "top": 0.5453125,
+              "right": 0.94305557,
+              "bottom": 0.5734375
+            },
+            "confidence": 0.59446025
+          },
+          {
+            "id": "e4f77e77f",
+            "text": "2,400",
+            "kind": "PRICE",
+            "rect": {
+              "left": 0.15138888,
+              "top": 0.5625,
+              "right": 0.22083333,
+              "bottom": 0.5734375
+            },
+            "confidence": 0.796875
+          },
+          {
+            "id": "e871db3f7",
+            "text": "2,700",
+            "kind": "PRICE",
+            "rect": {
+              "left": 0.37083334,
+              "top": 0.5671875,
+              "right": 0.44027779,
+              "bottom": 0.57890624
+            },
+            "confidence": 0.8382813
+          },
+          {
+            "id": "e5c32a564",
+            "text": "2,700",
+            "kind": "PRICE",
+            "rect": {
+              "left": 0.5888889,
+              "top": 0.5726563,
+              "right": 0.6597222,
+              "bottom": 0.5835937
+            },
+            "confidence": 0.8296875
+          },
+          {
+            "id": "e5c3476e0",
+            "text": "2,700",
+            "kind": "PRICE",
+            "rect": {
+              "left": 0.80833334,
+              "top": 0.578125,
+              "right": 0.87916666,
+              "bottom": 0.5890625
+            },
+            "confidence": 0.8515625
+          },
+          {
+            "id": "e6a74787c",
+            "text": "|장바구니 조회",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.0625,
+              "top": 0.5960938,
+              "right": 0.23472223,
+              "bottom": 0.61640626
+            },
+            "confidence": 0.6467634
+          },
+          {
+            "id": "ee40d511e",
+            "text": "남은시간",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.68333334,
+              "top": 0.6117188,
+              "right": 0.76805556,
+              "bottom": 0.62421876
+            },
+            "confidence": 0.81152344
+          },
+          {
+            "id": "e9972498a",
+            "text": "전체",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.89305556,
+              "top": 0.625,
+              "right": 0.93194443,
+              "bottom": 0.6375
+            },
+            "confidence": 0.8183594
+          },
+          {
+            "id": "e9c0dbcd7",
+            "text": "120초",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.68333334,
+              "top": 0.6296875,
+              "right": 0.77916664,
+              "bottom": 0.6507813
+            },
+            "confidence": 0.74121094
+          },
+          {
+            "id": "e2211be29",
+            "text": "삭제",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.8902778,
+              "top": 0.6359375,
+              "right": 0.93194443,
+              "bottom": 0.65
+            },
+            "confidence": 0.6894531
+          },
+          {
+            "id": "e2a72c362",
+            "text": "메뉴",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.16805555,
+              "top": 0.6375,
+              "right": 0.21111111,
+              "bottom": 0.6507813
+            },
+            "confidence": 0.6816406
+          },
+          {
+            "id": "efa035cc",
+            "text": "수량",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.40416667,
+              "top": 0.6429688,
+              "right": 0.45,
+              "bottom": 0.65546876
+            },
+            "confidence": 0.76171875
+          },
+          {
+            "id": "e4bb557ab",
+            "text": "가격",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.57222223,
+              "top": 0.646875,
+              "right": 0.61388886,
+              "bottom": 0.66015625
+            },
+            "confidence": 0.86328125
+          },
+          {
+            "id": "e2b2ce3c5",
+            "text": "선택한 상품",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.675,
+              "top": 0.6695312,
+              "right": 0.79444444,
+              "bottom": 0.684375
+            },
+            "confidence": 0.7453125
+          },
+          {
+            "id": "e58fc7947",
+            "text": "0개",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.9152778,
+              "top": 0.6765625,
+              "right": 0.94861114,
+              "bottom": 0.6890625
+            },
+            "confidence": 0.6230469
+          },
+          {
+            "id": "eece15fe1",
+            "text": "0원",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.76666665,
+              "top": 0.8015625,
+              "right": 0.825,
+              "bottom": 0.8179687
+            },
+            "confidence": 0.6542969
+          },
+          {
+            "id": "ed5a65285",
+            "text": "결제하기",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.7347222,
+              "top": 0.828125,
+              "right": 0.8486111,
+              "bottom": 0.8460938
+            },
+            "confidence": 0.8261719
+          }
+        ]
+      },
+      "history": []
+    },
+    "response": {
+      "goal": "아이스 아메리카노 한 잔 주세요",
+      "action": {
+        "type": "TAP",
+        "targetId": "eece18041",
+        "guideText": "아이스 아메리카노를 눌러 주세요."
+      },
+      "source": "rule"
+    }
+  },
+  {
+    "stage": "options",
+    "request": {
+      "sessionId": "handheld-order",
+      "goal": "아이스 아메리카노 한 잔 주세요",
+      "snapshot": {
+        "screenId": "s2",
+        "frameId": 5,
+        "timestampMs": 1665,
+        "stableFrames": 2,
+        "elements": [
+          {
+            "id": "e88cf65ea",
+            "text": "선택하신 상품의 옵션상품을 모두 선택해주세요",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.13472222,
+              "top": 0.0328125,
+              "right": 0.6611111,
+              "bottom": 0.059375
+            },
+            "confidence": 0.865625
+          },
+          {
+            "id": "e273bb4e1",
+            "text": "(1CE)아메리카노",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.27638888,
+              "top": 0.07890625,
+              "right": 0.48333332,
+              "bottom": 0.1
+            },
+            "confidence": 0.64101565
+          },
+          {
+            "id": "eaff244db",
+            "text": "2,000",
+            "kind": "PRICE",
+            "rect": {
+              "left": 0.9111111,
+              "top": 0.0921875,
+              "right": 0.9736111,
+              "bottom": 0.1109375
+            },
+            "confidence": 0.85546875
+          },
+          {
+            "id": "ed4ac482b",
+            "text": "1개",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.7888889,
+              "top": 0.09296875,
+              "right": 0.82361114,
+              "bottom": 0.10546875
+            },
+            "confidence": 0.81640625
+          },
+          {
+            "id": "ea9e2ec49",
+            "text": "240z)[기본 2샷] 블렌드 원두로 추출한 에스프레소에 물을 더해 풍부한 바디감 을 느낄",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.27222222,
+              "top": 0.10390625,
+              "right": 0.99027777,
+              "bottom": 0.13203125
+            },
+            "confidence": 0.72055286
+          },
+          {
+            "id": "ea0181065",
+            "text": "수 있는 스탠다드 커피.",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.27083334,
+              "top": 0.1203125,
+              "right": 0.45972222,
+              "bottom": 0.134375
+            },
+            "confidence": 0.77265626
+          },
+          {
+            "id": "e4b960934",
+            "text": "선택된 옵션",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.119444445,
+              "top": 0.16015625,
+              "right": 0.24861111,
+              "bottom": 0.178125
+            },
+            "confidence": 0.69140625
+          },
+          {
+            "id": "eb71db52e",
+            "text": "초기화",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.90416664,
+              "top": 0.1796875,
+              "right": 0.9930556,
+              "bottom": 0.19453125
+            },
+            "confidence": 0.68359375
+          },
+          {
+            "id": "e9283dd08",
+            "text": "텀블러 선택",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.11388889,
+              "top": 0.2015625,
+              "right": 0.23472223,
+              "bottom": 0.21796875
+            },
+            "confidence": 0.61875
+          },
+          {
+            "id": "e5571d67b",
+            "text": "선택옵선",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.12083333,
+              "top": 0.246875,
+              "right": 0.14722222,
+              "bottom": 0.30078125
+            },
+            "confidence": 0.671875
+          },
+          {
+            "id": "e8f9a02f4",
+            "text": "텀블러(개인컵) 사용",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.18194444,
+              "top": 0.284375,
+              "right": 0.32083333,
+              "bottom": 0.30859375
+            },
+            "confidence": 0.421875
+          },
+          {
+            "id": "e43a4a496",
+            "text": "+0원",
+            "kind": "PRICE",
+            "rect": {
+              "left": 0.22638889,
+              "top": 0.31484374,
+              "right": 0.27083334,
+              "bottom": 0.3265625
+            },
+            "confidence": 0.65494794
+          },
+          {
+            "id": "ec3dd1969",
+            "text": "샷 선택",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.10138889,
+              "top": 0.34296876,
+              "right": 0.17638889,
+              "bottom": 0.35703126
+            },
+            "confidence": 0.7552083
+          },
+          {
+            "id": "ea1965195",
+            "text": "선",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.115277775,
+              "top": 0.38828126,
+              "right": 0.13055556,
+              "bottom": 0.39765626
+            },
+            "confidence": 0.62890625
+          },
+          {
+            "id": "e5172021c",
+            "text": "연하게",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.21111111,
+              "top": 0.42578125,
+              "right": 0.2625,
+              "bottom": 0.4359375
+            },
+            "confidence": 0.8697917
+          },
+          {
+            "id": "efc7e5d9f",
+            "text": "샷 추가",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.38333333,
+              "top": 0.42890626,
+              "right": 0.4513889,
+              "bottom": 0.44140625
+            },
+            "confidence": 0.5963542
+          },
+          {
+            "id": "e870785b0",
+            "text": "2샷 주가",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.57361114,
+              "top": 0.434375,
+              "right": 0.64166665,
+              "bottom": 0.44453126
+            },
+            "confidence": 0.53222656
+          },
+          {
+            "id": "e43a4a498",
+            "text": "+0원",
+            "kind": "PRICE",
+            "rect": {
+              "left": 0.21111111,
+              "top": 0.43984374,
+              "right": 0.25833333,
+              "bottom": 0.45234376
+            },
+            "confidence": 0.7265625
+          },
+          {
+            "id": "e7d38bcb3",
+            "text": "+600",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.38333333,
+              "top": 0.44296876,
+              "right": 0.45416668,
+              "bottom": 0.45703125
+            },
+            "confidence": 0.87402344
+          },
+          {
+            "id": "eeb701558",
+            "text": "+1,200",
+            "kind": "PRICE",
+            "rect": {
+              "left": 0.56805557,
+              "top": 0.44765624,
+              "right": 0.63055557,
+              "bottom": 0.4625
+            },
+            "confidence": 0.81380206
+          },
+          {
+            "id": "eedb017e",
+            "text": "저당 스테비아 슈가 추가",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.094444446,
+              "top": 0.46875,
+              "right": 0.32916668,
+              "bottom": 0.48515624
+            },
+            "confidence": 0.81289065
+          },
+          {
+            "id": "eca4e01b",
+            "text": "저당 스테비아 주가",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.14444445,
+              "top": 0.5484375,
+              "right": 0.3,
+              "bottom": 0.5625
+            },
+            "confidence": 0.73339844
+          },
+          {
+            "id": "e29dd076a",
+            "text": "+600",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.18472221,
+              "top": 0.56640625,
+              "right": 0.25833333,
+              "bottom": 0.578125
+            },
+            "confidence": 0.87109375
+          },
+          {
+            "id": "e626179bb",
+            "text": "당도 선택",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.083333336,
+              "top": 0.5953125,
+              "right": 0.17222223,
+              "bottom": 0.60859376
+            },
+            "confidence": 0.78808594
+          },
+          {
+            "id": "e255c912e",
+            "text": "연유 주가",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.17222223,
+              "top": 0.6773437,
+              "right": 0.24722221,
+              "bottom": 0.68828124
+            },
+            "confidence": 0.70214844
+          },
+          {
+            "id": "eca63d3a",
+            "text": "저당 스테비아 주가",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.31666666,
+              "top": 0.67890626,
+              "right": 0.46805555,
+              "bottom": 0.6929687
+            },
+            "confidence": 0.7426758
+          },
+          {
+            "id": "e91be344b",
+            "text": "+700",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.17083333,
+              "top": 0.6921875,
+              "right": 0.24444444,
+              "bottom": 0.7046875
+            },
+            "confidence": 0.8779297
+          },
+          {
+            "id": "e29de648a",
+            "text": "+600",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.35694444,
+              "top": 0.696875,
+              "right": 0.42916667,
+              "bottom": 0.7085937
+            },
+            "confidence": 0.8886719
+          },
+          {
+            "id": "e5dd67737",
+            "text": "토핑 선택",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.06944445,
+              "top": 0.72265625,
+              "right": 0.15833333,
+              "bottom": 0.734375
+            },
+            "confidence": 0.75878906
+          },
+          {
+            "id": "edfa4ea9",
+            "text": "휘핑주가",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.16111112,
+              "top": 0.803125,
+              "right": 0.23055555,
+              "bottom": 0.81328124
+            },
+            "confidence": 0.7060547
+          },
+          {
+            "id": "e702a3249",
+            "text": "+5002",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.15833333,
+              "top": 0.8179687,
+              "right": 0.23055555,
+              "bottom": 0.8304688
+            },
+            "confidence": 0.7632812
+          },
+          {
+            "id": "e37ae5ede",
+            "text": "추천 옵션",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.045833334,
+              "top": 0.846875,
+              "right": 0.14444445,
+              "bottom": 0.86015624
+            },
+            "confidence": 0.7207031
+          },
+          {
+            "id": "e9799d501",
+            "text": "취소",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.3236111,
+              "top": 0.9,
+              "right": 0.375,
+              "bottom": 0.9140625
+            },
+            "confidence": 0.6621094
+          },
+          {
+            "id": "ea5bfe09e",
+            "text": "주문담기",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.5416667,
+              "top": 0.9015625,
+              "right": 0.6722222,
+              "bottom": 0.92265624
+            },
+            "confidence": 0.74316406
+          }
+        ]
+      },
+      "history": [
+        {
+          "screenId": "s1",
+          "action": "TAP",
+          "targetText": "아이스 아메리카노를 눌러 주세요."
+        }
+      ]
+    },
+    "response": {
+      "goal": "아이스 아메리카노 한 잔 주세요",
+      "action": {
+        "type": "WAIT",
+        "targetIds": [
+          "e8f9a02f4",
+          "e5172021c",
+          "efc7e5d9f",
+          "eedb017e",
+          "ea5bfe09e"
+        ],
+        "guideText": "원하는 옵션이 있으면 선택해 주세요. 없거나 다 고르셨으면 주문담기를 눌러 주세요."
+      },
+      "source": "rule"
+    }
+  },
+  {
+    "stage": "cart",
+    "request": {
+      "sessionId": "handheld-order",
+      "goal": "아이스 아메리카노 한 잔 주세요",
+      "snapshot": {
+        "screenId": "s3",
+        "frameId": 9,
+        "timestampMs": 2997,
+        "stableFrames": 2,
+        "elements": [
+          {
+            "id": "eeab42383",
+            "text": "처음으로",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.13333334,
+              "top": 0.0375,
+              "right": 0.23472223,
+              "bottom": 0.05078125
+            },
+            "confidence": 0.7246094
+          },
+          {
+            "id": "e38aeef9d",
+            "text": "메가엠지씨커피",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.4625,
+              "top": 0.04375,
+              "right": 0.65416664,
+              "bottom": 0.0625
+            },
+            "confidence": 0.82310265
+          },
+          {
+            "id": "ee5443680",
+            "text": "LANGUAGE",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.8888889,
+              "top": 0.0578125,
+              "right": 0.99444443,
+              "bottom": 0.06875
+            },
+            "confidence": 0.79589844
+          },
+          {
+            "id": "e89eb31b0",
+            "text": "신메뉴",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.13333334,
+              "top": 0.075,
+              "right": 0.19861111,
+              "bottom": 0.0890625
+            },
+            "confidence": 0.67057294
+          },
+          {
+            "id": "eda3089da",
+            "text": "추천메뉴",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.2361111,
+              "top": 0.07734375,
+              "right": 0.325,
+              "bottom": 0.0921875
+            },
+            "confidence": 0.6982422
+          },
+          {
+            "id": "ec857ea0c",
+            "text": "커피",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.37361112,
+              "top": 0.08125,
+              "right": 0.41666666,
+              "bottom": 0.09453125
+            },
+            "confidence": 0.86328125
+          },
+          {
+            "id": "e519d1ad1",
+            "text": "디카페인 음료",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.4652778,
+              "top": 0.08359375,
+              "right": 0.6472222,
+              "bottom": 0.0984375
+            },
+            "confidence": 0.7447917
+          },
+          {
+            "id": "ef685e6e4",
+            "text": "티",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.73194444,
+              "top": 0.0890625,
+              "right": 0.75,
+              "bottom": 0.1015625
+            },
+            "confidence": 0.4375
+          },
+          {
+            "id": "e17fffe33",
+            "text": "푸드",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.8333333,
+              "top": 0.09140625,
+              "right": 0.87777776,
+              "bottom": 0.10390625
+            },
+            "confidence": 0.72265625
+          },
+          {
+            "id": "e3cc2a313",
+            "text": "상품",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.94861114,
+              "top": 0.09453125,
+              "right": 0.9930556,
+              "bottom": 0.10703125
+            },
+            "confidence": 0.7988281
+          },
+          {
+            "id": "ef9101352",
+            "text": "겨울시즌",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.525,
+              "top": 0.11796875,
+              "right": 0.6041667,
+              "bottom": 0.13046876
+            },
+            "confidence": 0.75
+          },
+          {
+            "id": "edc656b38",
+            "text": "군고구마 크림브릴",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.1375,
+              "top": 0.19453125,
+              "right": 0.31111112,
+              "bottom": 0.2109375
+            },
+            "confidence": 0.74853516
+          },
+          {
+            "id": "e1466b289",
+            "text": "(1CE)메가리카노",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.36944443,
+              "top": 0.20703125,
+              "right": 0.5152778,
+              "bottom": 0.221875
+            },
+            "confidence": 0.61875
+          },
+          {
+            "id": "e7b382be4",
+            "text": "레 슈페너",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.18055555,
+              "top": 0.2109375,
+              "right": 0.26805556,
+              "bottom": 0.2234375
+            },
+            "confidence": 0.8261719
+          },
+          {
+            "id": "eece18041",
+            "text": "(ICE)아메리카노",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.5888889,
+              "top": 0.2125,
+              "right": 0.7361111,
+              "bottom": 0.2265625
+            },
+            "confidence": 0.53945315
+          },
+          {
+            "id": "ec207eee4",
+            "text": "(CE)개리카노",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.80972224,
+              "top": 0.21953125,
+              "right": 0.95416665,
+              "bottom": 0.23203126
+            },
+            "confidence": 0.6147461
+          },
+          {
+            "id": "ecdc74fda",
+            "text": "3,900",
+            "kind": "PRICE",
+            "rect": {
+              "left": 0.1875,
+              "top": 0.22734375,
+              "right": 0.25833333,
+              "bottom": 0.23828125
+            },
+            "confidence": 0.8875
+          },
+          {
+            "id": "e9061fb58",
+            "text": "3,300",
+            "kind": "PRICE",
+            "rect": {
+              "left": 0.4125,
+              "top": 0.23046875,
+              "right": 0.4625,
+              "bottom": 0.2453125
+            },
+            "confidence": 0.8179687
+          },
+          {
+            "id": "eaff23218",
+            "text": "2,000&!",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.6263889,
+              "top": 0.2375,
+              "right": 0.6958333,
+              "bottom": 0.2484375
+            },
+            "confidence": 0.66127235
+          },
+          {
+            "id": "e4f76f498",
+            "text": "2,400",
+            "kind": "PRICE",
+            "rect": {
+              "left": 0.8472222,
+              "top": 0.24296875,
+              "right": 0.9152778,
+              "bottom": 0.25390625
+            },
+            "confidence": 0.846875
+          },
+          {
+            "id": "ebb36df44",
+            "text": "왕메가 헛개리카노",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.125,
+              "top": 0.3140625,
+              "right": 0.3,
+              "bottom": 0.3296875
+            },
+            "confidence": 0.84521484
+          },
+          {
+            "id": "eb2a9ce5e",
+            "text": "할메가커피",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.38055557,
+              "top": 0.31953126,
+              "right": 0.48333332,
+              "bottom": 0.33359376
+            },
+            "confidence": 0.7554687
+          },
+          {
+            "id": "e6f90fe0",
+            "text": "할메가미숫커피",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.56666666,
+              "top": 0.32265624,
+              "right": 0.73194444,
+              "bottom": 0.33984375
+            },
+            "confidence": 0.72991073
+          },
+          {
+            "id": "ef4bd644d",
+            "text": "왕할메가커피",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.80694443,
+              "top": 0.3296875,
+              "right": 0.9305556,
+              "bottom": 0.34453124
+            },
+            "confidence": 0.8046875
+          },
+          {
+            "id": "ec5482797",
+            "text": "3,400",
+            "kind": "PRICE",
+            "rect": {
+              "left": 0.18055555,
+              "top": 0.3375,
+              "right": 0.23055555,
+              "bottom": 0.35078126
+            },
+            "confidence": 0.84296876
+          },
+          {
+            "id": "e1766cd0d",
+            "text": "2,1002!",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.39444444,
+              "top": 0.34375,
+              "right": 0.46666667,
+              "bottom": 0.3546875
+            },
+            "confidence": 0.6735491
+          },
+          {
+            "id": "e56dcc231",
+            "text": "2,900",
+            "kind": "PRICE",
+            "rect": {
+              "left": 0.61388886,
+              "top": 0.34921876,
+              "right": 0.68333334,
+              "bottom": 0.36015624
+            },
+            "confidence": 0.8
+          },
+          {
+            "id": "e5dfd7b8a",
+            "text": "3,2002!",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.8333333,
+              "top": 0.35390624,
+              "right": 0.90416664,
+              "bottom": 0.365625
+            },
+            "confidence": 0.69084823
+          },
+          {
+            "id": "e3f2441af",
+            "text": "(1CE)바닐라아메리카노",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.3361111,
+              "top": 0.425,
+              "right": 0.50277776,
+              "bottom": 0.453125
+            },
+            "confidence": 0.62642044
+          },
+          {
+            "id": "e833afdaa",
+            "text": "(1CE)꿀아메리카노",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.11666667,
+              "top": 0.42578125,
+              "right": 0.28194445,
+              "bottom": 0.44140625
+            },
+            "confidence": 0.6147017
+          },
+          {
+            "id": "ec00620ed",
+            "text": "(ICE",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.5555556,
+              "top": 0.43203124,
+              "right": 0.5875,
+              "bottom": 0.4421875
+            },
+            "confidence": 0.5839844
+          },
+          {
+            "id": "e1418c28b",
+            "text": "(HOT아메리카노",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.7777778,
+              "top": 0.44140625,
+              "right": 0.9375,
+              "bottom": 0.45703125
+            },
+            "confidence": 0.64105904
+          },
+          {
+            "id": "e86adc785",
+            "text": "2,7002",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.1625,
+              "top": 0.45078126,
+              "right": 0.23333333,
+              "bottom": 0.46171874
+            },
+            "confidence": 0.7213542
+          },
+          {
+            "id": "efc19bb82",
+            "text": "2,700",
+            "kind": "PRICE",
+            "rect": {
+              "left": 0.38194445,
+              "top": 0.45625,
+              "right": 0.45277777,
+              "bottom": 0.4671875
+            },
+            "confidence": 0.8734375
+          },
+          {
+            "id": "e871a6875",
+            "text": "2,700",
+            "kind": "PRICE",
+            "rect": {
+              "left": 0.6013889,
+              "top": 0.4609375,
+              "right": 0.67083335,
+              "bottom": 0.47265625
+            },
+            "confidence": 0.85
+          },
+          {
+            "id": "e871a7b3a",
+            "text": "2,700",
+            "kind": "PRICE",
+            "rect": {
+              "left": 0.8208333,
+              "top": 0.46640626,
+              "right": 0.8902778,
+              "bottom": 0.47734374
+            },
+            "confidence": 0.85859376
+          },
+          {
+            "id": "e9573087e",
+            "text": "(HOT헛개리카노",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.108333334,
+              "top": 0.53828126,
+              "right": 0.26527777,
+              "bottom": 0.553125
+            },
+            "confidence": 0.61848956
+          },
+          {
+            "id": "e31e4aa8c",
+            "text": "(HOT바닐라아메리카노",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.5375,
+              "top": 0.540625,
+              "right": 0.7152778,
+              "bottom": 0.5703125
+            },
+            "confidence": 0.64453125
+          },
+          {
+            "id": "ec5a4c8f",
+            "text": "(HOT)꿀아메리카노",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.31666666,
+              "top": 0.54375,
+              "right": 0.49444443,
+              "bottom": 0.55859375
+            },
+            "confidence": 0.6484375
+          },
+          {
+            "id": "ed488d5d3",
+            "text": "(HOT)헤이즐넛아메리카노",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.74444443,
+              "top": 0.5453125,
+              "right": 0.94305557,
+              "bottom": 0.57421875
+            },
+            "confidence": 0.59446025
+          },
+          {
+            "id": "e4f77e77f",
+            "text": "2,400",
+            "kind": "PRICE",
+            "rect": {
+              "left": 0.15138888,
+              "top": 0.5625,
+              "right": 0.22083333,
+              "bottom": 0.5734375
+            },
+            "confidence": 0.796875
+          },
+          {
+            "id": "e871db3f7",
+            "text": "2,700",
+            "kind": "PRICE",
+            "rect": {
+              "left": 0.37916666,
+              "top": 0.565625,
+              "right": 0.425,
+              "bottom": 0.5796875
+            },
+            "confidence": 0.8359375
+          },
+          {
+            "id": "e5c32a564",
+            "text": "2,700",
+            "kind": "PRICE",
+            "rect": {
+              "left": 0.5888889,
+              "top": 0.5726563,
+              "right": 0.6597222,
+              "bottom": 0.5835937
+            },
+            "confidence": 0.8578125
+          },
+          {
+            "id": "e5c3476e0",
+            "text": "2,700",
+            "kind": "PRICE",
+            "rect": {
+              "left": 0.8138889,
+              "top": 0.5765625,
+              "right": 0.8625,
+              "bottom": 0.58984375
+            },
+            "confidence": 0.85078126
+          },
+          {
+            "id": "e6a74787c",
+            "text": "|장바구니 조회",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.06388889,
+              "top": 0.5960938,
+              "right": 0.22638889,
+              "bottom": 0.615625
+            },
+            "confidence": 0.65178573
+          },
+          {
+            "id": "ee40d511e",
+            "text": "남은시간",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.68333334,
+              "top": 0.6117188,
+              "right": 0.76805556,
+              "bottom": 0.62421876
+            },
+            "confidence": 0.81152344
+          },
+          {
+            "id": "e9972498a",
+            "text": "전체",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.89166665,
+              "top": 0.625,
+              "right": 0.93194443,
+              "bottom": 0.63671875
+            },
+            "confidence": 0.71875
+          },
+          {
+            "id": "e9c0dbcd7",
+            "text": "120초",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.68333334,
+              "top": 0.6296875,
+              "right": 0.78194445,
+              "bottom": 0.6507813
+            },
+            "confidence": 0.7294922
+          },
+          {
+            "id": "e2211be29",
+            "text": "삭제",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.8902778,
+              "top": 0.6359375,
+              "right": 0.93194443,
+              "bottom": 0.65
+            },
+            "confidence": 0.640625
+          },
+          {
+            "id": "e2a72c362",
+            "text": "메뉴",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.16805555,
+              "top": 0.6375,
+              "right": 0.21111111,
+              "bottom": 0.6507813
+            },
+            "confidence": 0.71484375
+          },
+          {
+            "id": "efa035cc",
+            "text": "수량",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.40416667,
+              "top": 0.6429688,
+              "right": 0.4486111,
+              "bottom": 0.65546876
+            },
+            "confidence": 0.78125
+          },
+          {
+            "id": "e4bb557ab",
+            "text": "가격",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.57222223,
+              "top": 0.646875,
+              "right": 0.61388886,
+              "bottom": 0.66015625
+            },
+            "confidence": 0.8691406
+          },
+          {
+            "id": "e2b2ce3c5",
+            "text": "선택한 상품",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.675,
+              "top": 0.6695312,
+              "right": 0.79305553,
+              "bottom": 0.684375
+            },
+            "confidence": 0.78203124
+          },
+          {
+            "id": "eece20dcf",
+            "text": "(ICE)아메리카노",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.0625,
+              "top": 0.67109376,
+              "right": 0.21944444,
+              "bottom": 0.6859375
+            },
+            "confidence": 0.6695312
+          },
+          {
+            "id": "ec0dda626",
+            "text": "1개",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.9111111,
+              "top": 0.675,
+              "right": 0.95555556,
+              "bottom": 0.6890625
+            },
+            "confidence": 0.8652344
+          },
+          {
+            "id": "ed4af84b3",
+            "text": "1개",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.40555555,
+              "top": 0.67890626,
+              "right": 0.43888888,
+              "bottom": 0.6929687
+            },
+            "confidence": 0.80078125
+          },
+          {
+            "id": "e4e532800",
+            "text": "2,000",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.55972224,
+              "top": 0.684375,
+              "right": 0.60694444,
+              "bottom": 0.6976563
+            },
+            "confidence": 0.8
+          },
+          {
+            "id": "e4e54f97f",
+            "text": "2,000",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.7361111,
+              "top": 0.8023437,
+              "right": 0.81666666,
+              "bottom": 0.8179687
+            },
+            "confidence": 0.8671875
+          },
+          {
+            "id": "ed5a65285",
+            "text": "결제하기",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.7361111,
+              "top": 0.82890624,
+              "right": 0.8513889,
+              "bottom": 0.84765625
+            },
+            "confidence": 0.8173828
+          }
+        ]
+      },
+      "history": [
+        {
+          "screenId": "s1",
+          "action": "TAP",
+          "targetText": "아이스 아메리카노를 눌러 주세요."
+        },
+        {
+          "screenId": "s2",
+          "action": "WAIT",
+          "targetText": "원하는 옵션이 있으면 선택해 주세요. 없거나 다 고르셨으면 주문담기를 눌러 주세요."
+        }
+      ]
+    },
+    "response": {
+      "goal": "아이스 아메리카노 한 잔 주세요",
+      "action": {
+        "type": "TAP",
+        "targetId": "ed5a65285",
+        "guideText": "장바구니를 확인하고 결제하기를 눌러 주세요."
+      },
+      "source": "rule"
+    }
+  },
+  {
+    "stage": "review",
+    "request": {
+      "sessionId": "handheld-order",
+      "goal": "아이스 아메리카노 한 잔 주세요",
+      "snapshot": {
+        "screenId": "s4",
+        "frameId": 14,
+        "timestampMs": 4662,
+        "stableFrames": 2,
+        "elements": [
+          {
+            "id": "eeab41c02",
+            "text": "처음으로",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.056944445,
+              "top": 0.07421875,
+              "right": 0.1388889,
+              "bottom": 0.08515625
+            },
+            "confidence": 0.6640625
+          },
+          {
+            "id": "eb0e82eaa",
+            "text": "주문 세부 내역을 다시 한번 확인하여주세요",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.097222224,
+              "top": 0.1046875,
+              "right": 0.58194447,
+              "bottom": 0.1296875
+            },
+            "confidence": 0.843533
+          },
+          {
+            "id": "ed00df9a0",
+            "text": "X",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.8472222,
+              "top": 0.10625,
+              "right": 0.8611111,
+              "bottom": 0.11328125
+            },
+            "confidence": 0.5
+          },
+          {
+            "id": "eaff23d5a",
+            "text": "2,000",
+            "kind": "PRICE",
+            "rect": {
+              "left": 0.79444444,
+              "top": 0.14609376,
+              "right": 0.84583336,
+              "bottom": 0.16015625
+            },
+            "confidence": 0.8171875
+          },
+          {
+            "id": "ed4ac3929",
+            "text": "1개",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.62222224,
+              "top": 0.15,
+              "right": 0.6527778,
+              "bottom": 0.16171876
+            },
+            "confidence": 0.8496094
+          },
+          {
+            "id": "ec69e3f31",
+            "text": "1 0CE)아메리카노",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.0875,
+              "top": 0.153125,
+              "right": 0.30555555,
+              "bottom": 0.17265625
+            },
+            "confidence": 0.6261719
+          },
+          {
+            "id": "ec24ff3eb",
+            "text": "매장 이용 시 일회용컵 사용 불가",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.15138888,
+              "top": 0.75078124,
+              "right": 0.5361111,
+              "bottom": 0.77265626
+            },
+            "confidence": 0.78125
+          },
+          {
+            "id": "ec0ea0bc5",
+            "text": "1개 종 결제금액",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.42083332,
+              "top": 0.7921875,
+              "right": 0.6486111,
+              "bottom": 0.81171876
+            },
+            "confidence": 0.77566963
+          },
+          {
+            "id": "e4e556ddd",
+            "text": "2,000",
+            "kind": "PRICE",
+            "rect": {
+              "left": 0.8194444,
+              "top": 0.79296875,
+              "right": 0.8736111,
+              "bottom": 0.80390626
+            },
+            "confidence": 0.77421874
+          },
+          {
+            "id": "ef2a8ec2f",
+            "text": "종 수량",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.17638889,
+              "top": 0.8015625,
+              "right": 0.25138888,
+              "bottom": 0.8148438
+            },
+            "confidence": 0.52994794
+          },
+          {
+            "id": "e5b48f553",
+            "text": "포장하기",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.7430556,
+              "top": 0.86328125,
+              "right": 0.8388889,
+              "bottom": 0.8773438
+            },
+            "confidence": 0.6738281
+          },
+          {
+            "id": "edb51006a",
+            "text": "먹고가기",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.43888888,
+              "top": 0.86796874,
+              "right": 0.53333336,
+              "bottom": 0.8828125
+            },
+            "confidence": 0.7636719
+          },
+          {
+            "id": "ee6a38896",
+            "text": "(일회응컵)",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.7347222,
+              "top": 0.8773438,
+              "right": 0.8472222,
+              "bottom": 0.8984375
+            },
+            "confidence": 0.3580729
+          },
+          {
+            "id": "ed649452d",
+            "text": "(다회용컵)",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.43055555,
+              "top": 0.884375,
+              "right": 0.5416667,
+              "bottom": 0.9015625
+            },
+            "confidence": 0.46354166
+          }
+        ]
+      },
+      "history": [
+        {
+          "screenId": "s1",
+          "action": "TAP",
+          "targetText": "아이스 아메리카노를 눌러 주세요."
+        },
+        {
+          "screenId": "s2",
+          "action": "WAIT",
+          "targetText": "원하는 옵션이 있으면 선택해 주세요. 없거나 다 고르셨으면 주문담기를 눌러 주세요."
+        },
+        {
+          "screenId": "s3",
+          "action": "TAP",
+          "targetText": "장바구니를 확인하고 결제하기를 눌러 주세요."
+        }
+      ]
+    },
+    "response": {
+      "goal": "아이스 아메리카노 한 잔 주세요",
+      "action": {
+        "type": "WAIT",
+        "targetIds": [
+          "e5b48f553",
+          "edb51006a"
+        ],
+        "guideText": "주문 내역을 확인하고 먹고가기 또는 포장하기를 눌러 주세요."
+      },
+      "source": "rule"
+    }
+  },
+  {
+    "stage": "disposable",
+    "request": {
+      "sessionId": "handheld-order",
+      "goal": "아이스 아메리카노 한 잔 주세요",
+      "snapshot": {
+        "screenId": "s5",
+        "frameId": 17,
+        "timestampMs": 5661,
+        "stableFrames": 2,
+        "elements": [
+          {
+            "id": "eee3bcb87",
+            "text": "일회용품 필요여부를 선택해주세요",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.26527777,
+              "top": 0.39921874,
+              "right": 0.65,
+              "bottom": 0.42421874
+            },
+            "confidence": 0.84791666
+          },
+          {
+            "id": "e4db7e5b1",
+            "text": "빨대/스틱 필요",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.31666666,
+              "top": 0.44453126,
+              "right": 0.48055556,
+              "bottom": 0.46328124
+            },
+            "confidence": 0.7516741
+          },
+          {
+            "id": "e9a0a34e8",
+            "text": "캐리어/봉투 필요",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.31388888,
+              "top": 0.4765625,
+              "right": 0.5013889,
+              "bottom": 0.49609375
+            },
+            "confidence": 0.7583008
+          },
+          {
+            "id": "eb9df4500",
+            "text": "L직접 가져 갈게요",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.24722221,
+              "top": 0.5078125,
+              "right": 0.49444443,
+              "bottom": 0.528125
+            },
+            "confidence": 0.72021484
+          },
+          {
+            "id": "efb70305f",
+            "text": "선택안함",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.3625,
+              "top": 0.5671875,
+              "right": 0.45277777,
+              "bottom": 0.5804688
+            },
+            "confidence": 0.6074219
+          },
+          {
+            "id": "e4910a9e4",
+            "text": "선택완료",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.5777778,
+              "top": 0.571875,
+              "right": 0.66805553,
+              "bottom": 0.58515626
+            },
+            "confidence": 0.78222656
+          }
+        ]
+      },
+      "history": [
+        {
+          "screenId": "s1",
+          "action": "TAP",
+          "targetText": "아이스 아메리카노를 눌러 주세요."
+        },
+        {
+          "screenId": "s2",
+          "action": "WAIT",
+          "targetText": "원하는 옵션이 있으면 선택해 주세요. 없거나 다 고르셨으면 주문담기를 눌러 주세요."
+        },
+        {
+          "screenId": "s3",
+          "action": "TAP",
+          "targetText": "장바구니를 확인하고 결제하기를 눌러 주세요."
+        },
+        {
+          "screenId": "s4",
+          "action": "WAIT",
+          "targetText": "주문 내역을 확인하고 먹고가기 또는 포장하기를 눌러 주세요."
+        }
+      ]
+    },
+    "response": {
+      "goal": "아이스 아메리카노 한 잔 주세요",
+      "action": {
+        "type": "WAIT",
+        "targetIds": [
+          "e4db7e5b1",
+          "e9a0a34e8",
+          "efb70305f",
+          "e4910a9e4"
+        ],
+        "guideText": "필요한 일회용품을 고른 뒤 선택완료를 눌러 주세요. 필요 없으면 선택안함을 눌러 주세요."
+      },
+      "source": "rule"
+    }
+  },
+  {
+    "stage": "payment",
+    "request": {
+      "sessionId": "handheld-order",
+      "goal": "아이스 아메리카노 한 잔 주세요",
+      "snapshot": {
+        "screenId": "s6",
+        "frameId": 25,
+        "timestampMs": 8325,
+        "stableFrames": 2,
+        "elements": [
+          {
+            "id": "e6cf2d62d",
+            "text": "결제수단 선택",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.19583334,
+              "top": 0.178125,
+              "right": 0.34861112,
+              "bottom": 0.19609375
+            },
+            "confidence": 0.7949219
+          },
+          {
+            "id": "ed00dfd63",
+            "text": "X",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.8958333,
+              "top": 0.1984375,
+              "right": 0.9097222,
+              "bottom": 0.20625
+            },
+            "confidence": 0.578125
+          },
+          {
+            "id": "ec94b302f",
+            "text": "STEP1 할인수단을 선택해주세요",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.19166666,
+              "top": 0.21796875,
+              "right": 0.5388889,
+              "bottom": 0.2421875
+            },
+            "confidence": 0.72875977
+          },
+          {
+            "id": "e9142b641",
+            "text": "T VP 초이스",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.26527777,
+              "top": 0.26015624,
+              "right": 0.375,
+              "bottom": 0.2703125
+            },
+            "confidence": 0.50846356
+          },
+          {
+            "id": "e5ba9811b",
+            "text": "T 멤버십",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.50972223,
+              "top": 0.2703125,
+              "right": 0.575,
+              "bottom": 0.28125
+            },
+            "confidence": 0.6464844
+          },
+          {
+            "id": "eac43ed72",
+            "text": "통합 월1회",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.26527777,
+              "top": 0.27109376,
+              "right": 0.35,
+              "bottom": 0.2828125
+            },
+            "confidence": 0.5484375
+          },
+          {
+            "id": "ed987bf5d",
+            "text": "J ONE",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.75416666,
+              "top": 0.271875,
+              "right": 0.8138889,
+              "bottom": 0.2796875
+            },
+            "confidence": 0.6748047
+          },
+          {
+            "id": "eb682ffed",
+            "text": "포인트",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.74722224,
+              "top": 0.28046876,
+              "right": 0.8138889,
+              "bottom": 0.290625
+            },
+            "confidence": 0.4127604
+          },
+          {
+            "id": "edd9ff804",
+            "text": "기아영버스",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.24444444,
+              "top": 0.31640625,
+              "right": 0.35416666,
+              "bottom": 0.33125
+            },
+            "confidence": 0.5859375
+          },
+          {
+            "id": "e8f9c6939",
+            "text": "SKT",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.50416666,
+              "top": 0.3203125,
+              "right": 0.53333336,
+              "bottom": 0.32734376
+            },
+            "confidence": 0.79036456
+          },
+          {
+            "id": "e1ebbf18a",
+            "text": "쿠폰",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.7486111,
+              "top": 0.325,
+              "right": 0.78194445,
+              "bottom": 0.334375
+            },
+            "confidence": 0.5761719
+          },
+          {
+            "id": "e37b8e80d",
+            "text": "우주패스",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.50555557,
+              "top": 0.33125,
+              "right": 0.57222223,
+              "bottom": 0.3421875
+            },
+            "confidence": 0.8173828
+          },
+          {
+            "id": "e370e1c41",
+            "text": "APP 연동 쿠폰",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.74583334,
+              "top": 0.3359375,
+              "right": 0.8611111,
+              "bottom": 0.34921876
+            },
+            "confidence": 0.66183037
+          },
+          {
+            "id": "e4d7f033d",
+            "text": "STEP2 결제수단을 선택해주세요",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.17777778,
+              "top": 0.36328125,
+              "right": 0.5222222,
+              "bottom": 0.38515624
+            },
+            "confidence": 0.8195801
+          },
+          {
+            "id": "e4d8ab1ce",
+            "text": "카드결제",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.27916667,
+              "top": 0.4203125,
+              "right": 0.40416667,
+              "bottom": 0.4421875
+            },
+            "confidence": 0.8251953
+          },
+          {
+            "id": "eefe5a1",
+            "text": "앱카드",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.6597222,
+              "top": 0.43359375,
+              "right": 0.7347222,
+              "bottom": 0.44765624
+            },
+            "confidence": 0.7473958
+          },
+          {
+            "id": "e14e94b54",
+            "text": "삼성페이/애플페이",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.2888889,
+              "top": 0.4421875,
+              "right": 0.42083332,
+              "bottom": 0.45390624
+            },
+            "confidence": 0.64800346
+          },
+          {
+            "id": "e7de6f7a0",
+            "text": "QR/바코드",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.65555555,
+              "top": 0.45234376,
+              "right": 0.73333335,
+              "bottom": 0.4609375
+            },
+            "confidence": 0.5019531
+          },
+          {
+            "id": "e582b70df",
+            "text": "카카오페이",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.2013889,
+              "top": 0.53125,
+              "right": 0.2875,
+              "bottom": 0.5414063
+            },
+            "confidence": 0.7796875
+          },
+          {
+            "id": "e3dc1ee3",
+            "text": "페이코",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.40138888,
+              "top": 0.5359375,
+              "right": 0.45416668,
+              "bottom": 0.5453125
+            },
+            "confidence": 0.8307292
+          },
+          {
+            "id": "e2898e7ae",
+            "text": "네이버페이",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.5541667,
+              "top": 0.5367187,
+              "right": 0.6611111,
+              "bottom": 0.5523437
+            },
+            "confidence": 0.61328125
+          },
+          {
+            "id": "e2c9e90d7",
+            "text": "제로페이",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.75972223,
+              "top": 0.54375,
+              "right": 0.8277778,
+              "bottom": 0.553125
+            },
+            "confidence": 0.6796875
+          },
+          {
+            "id": "e73fd6e9d",
+            "text": "BC페이북",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.19861111,
+              "top": 0.6070312,
+              "right": 0.27222222,
+              "bottom": 0.6171875
+            },
+            "confidence": 0.81953126
+          },
+          {
+            "id": "e78d66675",
+            "text": "하나PAY",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.3888889,
+              "top": 0.6117188,
+              "right": 0.45,
+              "bottom": 0.621875
+            },
+            "confidence": 0.684375
+          },
+          {
+            "id": "e608bc551",
+            "text": "KB PAY",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.5763889,
+              "top": 0.61796874,
+              "right": 0.63055557,
+              "bottom": 0.62578124
+            },
+            "confidence": 0.87578124
+          },
+          {
+            "id": "e54b811a8",
+            "text": "알리페이/위챗페이",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.7125,
+              "top": 0.61796874,
+              "right": 0.85833335,
+              "bottom": 0.6328125
+            },
+            "confidence": 0.6458333
+          },
+          {
+            "id": "ecc499633",
+            "text": "(1C",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.06388889,
+              "top": 0.67265624,
+              "right": 0.090277776,
+              "bottom": 0.68359375
+            },
+            "confidence": 0.50651044
+          },
+          {
+            "id": "e693d18d",
+            "text": "모바일상품권",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.175,
+              "top": 0.67578125,
+              "right": 0.2777778,
+              "bottom": 0.6890625
+            },
+            "confidence": 0.7233073
+          },
+          {
+            "id": "e6d04de8e",
+            "text": "선불카드",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.37638888,
+              "top": 0.68828124,
+              "right": 0.44444445,
+              "bottom": 0.6984375
+            },
+            "confidence": 0.765625
+          },
+          {
+            "id": "ea5231a19",
+            "text": "현대M포인트",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.7277778,
+              "top": 0.690625,
+              "right": 0.8263889,
+              "bottom": 0.7007812
+            },
+            "confidence": 0.7441406
+          },
+          {
+            "id": "ef801f0cb",
+            "text": "C기프트카드",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.5402778,
+              "top": 0.69140625,
+              "right": 0.64305556,
+              "bottom": 0.70234376
+            },
+            "confidence": 0.6894531
+          },
+          {
+            "id": "e5f5e10ff",
+            "text": "교환권/금역권",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.18333334,
+              "top": 0.69375,
+              "right": 0.26944444,
+              "bottom": 0.703125
+            },
+            "confidence": 0.49107143
+          },
+          {
+            "id": "ec7813091",
+            "text": "20% 사은",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.7347222,
+              "top": 0.70625,
+              "right": 0.8055556,
+              "bottom": 0.71484375
+            },
+            "confidence": 0.5804688
+          },
+          {
+            "id": "e10c00905",
+            "text": "주문금액 2,000원",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.15833333,
+              "top": 0.7398437,
+              "right": 0.35277778,
+              "bottom": 0.7554687
+            },
+            "confidence": 0.76523435
+          },
+          {
+            "id": "e4d852c46",
+            "text": "결제할 금액 2,000원",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.5972222,
+              "top": 0.7484375,
+              "right": 0.83194447,
+              "bottom": 0.7671875
+            },
+            "confidence": 0.78196025
+          }
+        ]
+      },
+      "history": [
+        {
+          "screenId": "s1",
+          "action": "TAP",
+          "targetText": "아이스 아메리카노를 눌러 주세요."
+        },
+        {
+          "screenId": "s2",
+          "action": "WAIT",
+          "targetText": "원하는 옵션이 있으면 선택해 주세요. 없거나 다 고르셨으면 주문담기를 눌러 주세요."
+        },
+        {
+          "screenId": "s3",
+          "action": "TAP",
+          "targetText": "장바구니를 확인하고 결제하기를 눌러 주세요."
+        },
+        {
+          "screenId": "s4",
+          "action": "WAIT",
+          "targetText": "주문 내역을 확인하고 먹고가기 또는 포장하기를 눌러 주세요."
+        },
+        {
+          "screenId": "s5",
+          "action": "WAIT",
+          "targetText": "필요한 일회용품을 고른 뒤 선택완료를 눌러 주세요. 필요 없으면 선택안함을 눌러 주세요."
+        }
+      ]
+    },
+    "response": {
+      "goal": "아이스 아메리카노 한 잔 주세요",
+      "action": {
+        "type": "WAIT",
+        "targetIds": [
+          "e4d8ab1ce",
+          "eefe5a1",
+          "e582b70df",
+          "e3dc1ee3",
+          "e2898e7ae",
+          "e2c9e90d7",
+          "e73fd6e9d",
+          "e78d66675",
+          "e608bc551",
+          "e54b811a8",
+          "e693d18d",
+          "e6d04de8e"
+        ],
+        "guideText": "원하는 결제 수단을 눌러 주세요. 삼성페이는 카드결제를 눌러 주세요."
+      },
+      "source": "rule"
+    }
+  },
+  {
+    "stage": "loyalty",
+    "request": {
+      "sessionId": "handheld-order",
+      "goal": "아이스 아메리카노 한 잔 주세요",
+      "snapshot": {
+        "screenId": "s7",
+        "frameId": 29,
+        "timestampMs": 9657,
+        "stableFrames": 2,
+        "elements": [
+          {
+            "id": "e736f85bc",
+            "text": "스탬프 적립",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.47777778,
+              "top": 0.265625,
+              "right": 0.61388886,
+              "bottom": 0.28125
+            },
+            "confidence": 0.83125
+          },
+          {
+            "id": "e3486799",
+            "text": "×",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.7708333,
+              "top": 0.27265626,
+              "right": 0.81527776,
+              "bottom": 0.29765624
+            },
+            "confidence": 0.95
+          },
+          {
+            "id": "e2b782ca2",
+            "text": "APp 가입 시 적립된 스램프 화인 및 사을 가능",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.40555555,
+              "top": 0.28203124,
+              "right": 0.68472224,
+              "bottom": 0.2984375
+            },
+            "confidence": 0.44099507
+          },
+          {
+            "id": "e4d44f67f",
+            "text": "왕메가 헛개리",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.125,
+              "top": 0.3140625,
+              "right": 0.25694445,
+              "bottom": 0.328125
+            },
+            "confidence": 0.72786456
+          },
+          {
+            "id": "eef7ab3e6",
+            "text": "010-",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.5152778,
+              "top": 0.31875,
+              "right": 0.57916665,
+              "bottom": 0.3390625
+            },
+            "confidence": 0.83203125
+          },
+          {
+            "id": "ee34eb3a7",
+            "text": "3,4002",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.18055555,
+              "top": 0.3390625,
+              "right": 0.24583334,
+              "bottom": 0.35
+            },
+            "confidence": 0.71875
+          },
+          {
+            "id": "e2cdaf2a",
+            "text": "1",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.34305555,
+              "top": 0.3703125,
+              "right": 0.35277778,
+              "bottom": 0.384375
+            },
+            "confidence": 0.49609375
+          },
+          {
+            "id": "e589aa3e4",
+            "text": "2",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.5263889,
+              "top": 0.37421876,
+              "right": 0.54444444,
+              "bottom": 0.390625
+            },
+            "confidence": 0.67578125
+          },
+          {
+            "id": "e5a4f8b87",
+            "text": "3",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.7152778,
+              "top": 0.37890625,
+              "right": 0.73194444,
+              "bottom": 0.39296874
+            },
+            "confidence": 0.51171875
+          },
+          {
+            "id": "e2f7f5ae",
+            "text": "4",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.33333334,
+              "top": 0.42421874,
+              "right": 0.35277778,
+              "bottom": 0.4390625
+            },
+            "confidence": 0.83984375
+          },
+          {
+            "id": "e5db92dc2",
+            "text": "5",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.5222222,
+              "top": 0.428125,
+              "right": 0.5375,
+              "bottom": 0.44375
+            },
+            "confidence": 0.8046875
+          },
+          {
+            "id": "e5f6e1565",
+            "text": "6",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.7097222,
+              "top": 0.4328125,
+              "right": 0.7263889,
+              "bottom": 0.4484375
+            },
+            "confidence": 0.6953125
+          },
+          {
+            "id": "efc19a8bd",
+            "text": "2,700",
+            "kind": "PRICE",
+            "rect": {
+              "left": 0.1625,
+              "top": 0.45078126,
+              "right": 0.23472223,
+              "bottom": 0.4625
+            },
+            "confidence": 0.79375
+          },
+          {
+            "id": "e3223c32",
+            "text": "7",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.32916668,
+              "top": 0.47734374,
+              "right": 0.34583333,
+              "bottom": 0.49296874
+            },
+            "confidence": 0.70703125
+          },
+          {
+            "id": "e62d7b7a0",
+            "text": "8",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.5152778,
+              "top": 0.48203126,
+              "right": 0.53333336,
+              "bottom": 0.49765626
+            },
+            "confidence": 0.5390625
+          },
+          {
+            "id": "eef7d1e2e",
+            "text": "010",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.3013889,
+              "top": 0.53125,
+              "right": 0.3611111,
+              "bottom": 0.54765624
+            },
+            "confidence": 0.7734375
+          },
+          {
+            "id": "eb6fecbcb",
+            "text": "리카노",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.80138886,
+              "top": 0.5625,
+              "right": 0.87916666,
+              "bottom": 0.5757812
+            },
+            "confidence": 0.69401044
+          },
+          {
+            "id": "e5c3476e0",
+            "text": "2,700",
+            "kind": "PRICE",
+            "rect": {
+              "left": 0.81805557,
+              "top": 0.57734376,
+              "right": 0.86388886,
+              "bottom": 0.58984375
+            },
+            "confidence": 0.8078125
+          },
+          {
+            "id": "e277d623e",
+            "text": "적립",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.49027777,
+              "top": 0.60234374,
+              "right": 0.5361111,
+              "bottom": 0.61640626
+            },
+            "confidence": 0.73828125
+          },
+          {
+            "id": "ea2d51a4f",
+            "text": "일력하신 번호는 스밸프 적립 혜택 제금을 위해 수집 이름됨니다.",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.31527779,
+              "top": 0.63359374,
+              "right": 0.6944444,
+              "bottom": 0.6515625
+            },
+            "confidence": 0.4351852
+          },
+          {
+            "id": "e2a72c362",
+            "text": "메뉴",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.15833333,
+              "top": 0.63671875,
+              "right": 0.22083333,
+              "bottom": 0.6507813
+            },
+            "confidence": 0.71484375
+          },
+          {
+            "id": "eb38c7a1c",
+            "text": "스밸프 적 후 6개월 간 미사을 시 수집 정보는 자동 삭제된니다.",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.31944445,
+              "top": 0.6460937,
+              "right": 0.69166666,
+              "bottom": 0.6625
+            },
+            "confidence": 0.5488281
+          },
+          {
+            "id": "e92689d6c",
+            "text": "연습을 화면 변조는 저장하거나 보내지 않습니다)",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.34861112,
+              "top": 0.65625,
+              "right": 0.65,
+              "bottom": 0.67265624
+            },
+            "confidence": 0.48697916
+          },
+          {
+            "id": "e4e532800",
+            "text": "2000",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.55,
+              "top": 0.6859375,
+              "right": 0.625,
+              "bottom": 0.69609374
+            },
+            "confidence": 0.7324219
+          }
+        ]
+      },
+      "history": [
+        {
+          "screenId": "s2",
+          "action": "WAIT",
+          "targetText": "원하는 옵션이 있으면 선택해 주세요. 없거나 다 고르셨으면 주문담기를 눌러 주세요."
+        },
+        {
+          "screenId": "s3",
+          "action": "TAP",
+          "targetText": "장바구니를 확인하고 결제하기를 눌러 주세요."
+        },
+        {
+          "screenId": "s4",
+          "action": "WAIT",
+          "targetText": "주문 내역을 확인하고 먹고가기 또는 포장하기를 눌러 주세요."
+        },
+        {
+          "screenId": "s5",
+          "action": "WAIT",
+          "targetText": "필요한 일회용품을 고른 뒤 선택완료를 눌러 주세요. 필요 없으면 선택안함을 눌러 주세요."
+        },
+        {
+          "screenId": "s6",
+          "action": "WAIT",
+          "targetText": "원하는 결제 수단을 눌러 주세요. 삼성페이는 카드결제를 눌러 주세요."
+        }
+      ]
+    },
+    "response": {
+      "goal": "아이스 아메리카노 한 잔 주세요",
+      "action": {
+        "type": "WAIT",
+        "targetIds": [
+          "e3486799"
+        ],
+        "guideText": "적립하려면 전화번호를 입력하고 적립을 눌러 주세요. 적립하지 않으시면 오른쪽 위 X를 눌러 주세요."
+      },
+      "source": "rule"
+    }
+  },
+  {
+    "stage": "card",
+    "request": {
+      "sessionId": "handheld-order",
+      "goal": "아이스 아메리카노 한 잔 주세요",
+      "snapshot": {
+        "screenId": "s8",
+        "frameId": 33,
+        "timestampMs": 10989,
+        "stableFrames": 2,
+        "elements": [
+          {
+            "id": "eece18041",
+            "text": "(ICE)아메리카노",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.5888889,
+              "top": 0.2125,
+              "right": 0.7361111,
+              "bottom": 0.2265625
+            },
+            "confidence": 0.6039063
+          },
+          {
+            "id": "e9a7d376d",
+            "text": "(CE)헛개리카노",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.80833334,
+              "top": 0.21875,
+              "right": 0.9527778,
+              "bottom": 0.23203126
+            },
+            "confidence": 0.62022567
+          },
+          {
+            "id": "e8e5c346b",
+            "text": "카드 결제(간편 결제)",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.20694445,
+              "top": 0.240625,
+              "right": 0.43472221,
+              "bottom": 0.26171875
+            },
+            "confidence": 0.79765624
+          },
+          {
+            "id": "ecb7d8018",
+            "text": "총 결제금액",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.19861111,
+              "top": 0.2765625,
+              "right": 0.33472222,
+              "bottom": 0.29609376
+            },
+            "confidence": 0.80390626
+          },
+          {
+            "id": "eaff23d5d",
+            "text": "2,000!",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.80277777,
+              "top": 0.29296875,
+              "right": 0.8819444,
+              "bottom": 0.30859375
+            },
+            "confidence": 0.73046875
+          },
+          {
+            "id": "ea7e595ed",
+            "text": "왕메 할부개월",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.125,
+              "top": 0.3109375,
+              "right": 0.29722223,
+              "bottom": 0.33046874
+            },
+            "confidence": 0.6738281
+          },
+          {
+            "id": "ee2e91008",
+            "text": "일시불 피",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.8,
+              "top": 0.328125,
+              "right": 0.93472224,
+              "bottom": 0.3453125
+            },
+            "confidence": 0.66308594
+          },
+          {
+            "id": "e1da6618f",
+            "text": "카드번호",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.2,
+              "top": 0.35234374,
+              "right": 0.29583332,
+              "bottom": 0.36640626
+            },
+            "confidence": 0.7763672
+          },
+          {
+            "id": "e4e3ea5d",
+            "text": "취소",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.25833333,
+              "top": 0.4015625,
+              "right": 0.30555555,
+              "bottom": 0.41484374
+            },
+            "confidence": 0.70703125
+          },
+          {
+            "id": "eab0d56a1",
+            "text": "승인 요청",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.5763889,
+              "top": 0.4078125,
+              "right": 0.6805556,
+              "bottom": 0.4234375
+            },
+            "confidence": 0.7207031
+          },
+          {
+            "id": "e61087981",
+            "text": "(ICE)",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.11805555,
+              "top": 0.428125,
+              "right": 0.15694444,
+              "bottom": 0.4390625
+            },
+            "confidence": 0.66484374
+          },
+          {
+            "id": "ed71aa560",
+            "text": "다음 그림과 같이 신용/제크카드를 넣어주세요.",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.3513889,
+              "top": 0.43984374,
+              "right": 0.7027778,
+              "bottom": 0.4578125
+            },
+            "confidence": 0.75967264
+          }
+        ]
+      },
+      "history": [
+        {
+          "screenId": "s3",
+          "action": "TAP",
+          "targetText": "장바구니를 확인하고 결제하기를 눌러 주세요."
+        },
+        {
+          "screenId": "s4",
+          "action": "WAIT",
+          "targetText": "주문 내역을 확인하고 먹고가기 또는 포장하기를 눌러 주세요."
+        },
+        {
+          "screenId": "s5",
+          "action": "WAIT",
+          "targetText": "필요한 일회용품을 고른 뒤 선택완료를 눌러 주세요. 필요 없으면 선택안함을 눌러 주세요."
+        },
+        {
+          "screenId": "s6",
+          "action": "WAIT",
+          "targetText": "원하는 결제 수단을 눌러 주세요. 삼성페이는 카드결제를 눌러 주세요."
+        },
+        {
+          "screenId": "s7",
+          "action": "WAIT",
+          "targetText": "적립하려면 전화번호를 입력하고 적립을 눌러 주세요. 적립하지 않으시면 오른쪽 위 X를 눌러 주세요."
+        }
+      ]
+    },
+    "response": {
+      "goal": "아이스 아메리카노 한 잔 주세요",
+      "action": {
+        "type": "WAIT",
+        "targetIds": [
+          "eab0d56a1"
+        ],
+        "guideText": "카드는 단말기에 넣고 삼성페이는 휴대폰을 리더기에 대 주세요. 연습 화면에서는 승인 요청을 눌러 주세요."
+      },
+      "source": "rule"
+    }
+  },
+  {
+    "stage": "processing",
+    "request": {
+      "sessionId": "handheld-order",
+      "goal": "아이스 아메리카노 한 잔 주세요",
+      "snapshot": {
+        "screenId": "s9",
+        "frameId": 37,
+        "timestampMs": 12321,
+        "stableFrames": 2,
+        "elements": [
+          {
+            "id": "eece18041",
+            "text": "(ICE)아메리카노",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.5888889,
+              "top": 0.2125,
+              "right": 0.7361111,
+              "bottom": 0.2265625
+            },
+            "confidence": 0.6039063
+          },
+          {
+            "id": "e9a7d376d",
+            "text": "(CE)헛개리카노",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.80833334,
+              "top": 0.21875,
+              "right": 0.9527778,
+              "bottom": 0.23203126
+            },
+            "confidence": 0.62022567
+          },
+          {
+            "id": "e8e5c346b",
+            "text": "카드 결제(간편 결제)",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.20694445,
+              "top": 0.240625,
+              "right": 0.43472221,
+              "bottom": 0.26171875
+            },
+            "confidence": 0.79765624
+          },
+          {
+            "id": "ecb7d8018",
+            "text": "총 결제금액",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.19861111,
+              "top": 0.2765625,
+              "right": 0.33472222,
+              "bottom": 0.29609376
+            },
+            "confidence": 0.80390626
+          },
+          {
+            "id": "eaff23d5d",
+            "text": "2,000",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.80277777,
+              "top": 0.29453126,
+              "right": 0.88472223,
+              "bottom": 0.30859375
+            },
+            "confidence": 0.7734375
+          },
+          {
+            "id": "ea7e595ed",
+            "text": "왕메 할부개월",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.125,
+              "top": 0.3109375,
+              "right": 0.29722223,
+              "bottom": 0.33046874
+            },
+            "confidence": 0.6738281
+          },
+          {
+            "id": "ee2e91008",
+            "text": "일시불 피",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.8,
+              "top": 0.328125,
+              "right": 0.93472224,
+              "bottom": 0.3453125
+            },
+            "confidence": 0.66308594
+          },
+          {
+            "id": "e1da6618f",
+            "text": "카드번호",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.2,
+              "top": 0.35234374,
+              "right": 0.29583332,
+              "bottom": 0.36640626
+            },
+            "confidence": 0.7763672
+          },
+          {
+            "id": "e4e3ea5d",
+            "text": "취소",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.25833333,
+              "top": 0.4015625,
+              "right": 0.30555555,
+              "bottom": 0.41484374
+            },
+            "confidence": 0.70703125
+          },
+          {
+            "id": "e98154e87",
+            "text": "승인 중...",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.5777778,
+              "top": 0.4078125,
+              "right": 0.6791667,
+              "bottom": 0.42421874
+            },
+            "confidence": 0.49739584
+          },
+          {
+            "id": "e61087981",
+            "text": "(ICE)",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.11805555,
+              "top": 0.428125,
+              "right": 0.15694444,
+              "bottom": 0.4390625
+            },
+            "confidence": 0.66484374
+          },
+          {
+            "id": "ed71aa560",
+            "text": "다음 그림과 같이 신용/제크카드를 넣어주세요.",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.3513889,
+              "top": 0.43984374,
+              "right": 0.70416665,
+              "bottom": 0.4578125
+            },
+            "confidence": 0.75558037
+          },
+          {
+            "id": "e3cae6e3a",
+            "text": "(삼성페이는 카드 리더기에, 애플페이는 NFC 리더기에 휴대폰를 터치해주세요)",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.22638889,
+              "top": 0.4515625,
+              "right": 0.82361114,
+              "bottom": 0.47578126
+            },
+            "confidence": 0.6843533
+          }
+        ]
+      },
+      "history": [
+        {
+          "screenId": "s4",
+          "action": "WAIT",
+          "targetText": "주문 내역을 확인하고 먹고가기 또는 포장하기를 눌러 주세요."
+        },
+        {
+          "screenId": "s5",
+          "action": "WAIT",
+          "targetText": "필요한 일회용품을 고른 뒤 선택완료를 눌러 주세요. 필요 없으면 선택안함을 눌러 주세요."
+        },
+        {
+          "screenId": "s6",
+          "action": "WAIT",
+          "targetText": "원하는 결제 수단을 눌러 주세요. 삼성페이는 카드결제를 눌러 주세요."
+        },
+        {
+          "screenId": "s7",
+          "action": "WAIT",
+          "targetText": "적립하려면 전화번호를 입력하고 적립을 눌러 주세요. 적립하지 않으시면 오른쪽 위 X를 눌러 주세요."
+        },
+        {
+          "screenId": "s8",
+          "action": "WAIT",
+          "targetText": "카드는 단말기에 넣고 삼성페이는 휴대폰을 리더기에 대 주세요. 연습 화면에서는 승인 요청을 눌러 주세요."
+        }
+      ]
+    },
+    "response": {
+      "goal": "아이스 아메리카노 한 잔 주세요",
+      "action": {
+        "type": "WAIT",
+        "guideText": "결제가 진행 중이에요. 잠시 기다려 주세요."
+      },
+      "source": "rule"
+    }
+  },
+  {
+    "stage": "receipt",
+    "request": {
+      "sessionId": "handheld-order",
+      "goal": "아이스 아메리카노 한 잔 주세요",
+      "snapshot": {
+        "screenId": "s10",
+        "frameId": 42,
+        "timestampMs": 13986,
+        "stableFrames": 2,
+        "elements": [
+          {
+            "id": "e8a8c3de3",
+            "text": "D아메리카노",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.8041667,
+              "top": 0.4453125,
+              "right": 0.91805553,
+              "bottom": 0.4609375
+            },
+            "confidence": 0.4544271
+          },
+          {
+            "id": "eea79838d",
+            "text": "[정상승인]",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.4611111,
+              "top": 0.45625,
+              "right": 0.56527776,
+              "bottom": 0.47109374
+            },
+            "confidence": 0.5182292
+          },
+          {
+            "id": "e1ee0ab26",
+            "text": "0CE)꿀아메리",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.097222224,
+              "top": 0.4578125,
+              "right": 0.21388888,
+              "bottom": 0.475
+            },
+            "confidence": 0.40625
+          },
+          {
+            "id": "e5afc1e0a",
+            "text": "2.7009",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.81527776,
+              "top": 0.4703125,
+              "right": 0.87222224,
+              "bottom": 0.484375
+            },
+            "confidence": 0.68880206
+          },
+          {
+            "id": "edd6aee74",
+            "text": "영수증을 출력하시겠습니까?",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.36805555,
+              "top": 0.475,
+              "right": 0.6597222,
+              "bottom": 0.49296874
+            },
+            "confidence": 0.8016827
+          },
+          {
+            "id": "e5a815695",
+            "text": "2.70091",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.14861111,
+              "top": 0.4796875,
+              "right": 0.21666667,
+              "bottom": 0.49609375
+            },
+            "confidence": 0.6266741
+          },
+          {
+            "id": "e2d0576d9",
+            "text": "9",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.50972223,
+              "top": 0.503125,
+              "right": 0.5236111,
+              "bottom": 0.51171875
+            },
+            "confidence": 0.4765625
+          },
+          {
+            "id": "ed6325e25",
+            "text": "헤이즐넛아메",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.81527776,
+              "top": 0.5515625,
+              "right": 0.9361111,
+              "bottom": 0.5671875
+            },
+            "confidence": 0.47721353
+          },
+          {
+            "id": "ec327a560",
+            "text": "미출력",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.59305555,
+              "top": 0.5523437,
+              "right": 0.6625,
+              "bottom": 0.565625
+            },
+            "confidence": 0.4231771
+          },
+          {
+            "id": "ed7e06773",
+            "text": "출력",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.37916666,
+              "top": 0.55390626,
+              "right": 0.4486111,
+              "bottom": 0.57109374
+            },
+            "confidence": 0.5917969
+          },
+          {
+            "id": "eb6ff402a",
+            "text": "리카노",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.8125,
+              "top": 0.56875,
+              "right": 0.89305556,
+              "bottom": 0.58125
+            },
+            "confidence": 0.73046875
+          },
+          {
+            "id": "e220de003",
+            "text": "HOT)헛개리",
+            "kind": "BUTTON_LIKE",
+            "rect": {
+              "left": 0.11111111,
+              "top": 0.5703125,
+              "right": 0.22083333,
+              "bottom": 0.5875
+            },
+            "confidence": 0.4765625
+          },
+          {
+            "id": "e5c34eb3f",
+            "text": "2.700",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.8263889,
+              "top": 0.5835937,
+              "right": 0.88611114,
+              "bottom": 0.5960938
+            },
+            "confidence": 0.715625
+          },
+          {
+            "id": "e9e2fc7aa",
+            "text": "24009",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.15833333,
+              "top": 0.5914062,
+              "right": 0.21944444,
+              "bottom": 0.60625
+            },
+            "confidence": 0.7390625
+          }
+        ]
+      },
+      "history": [
+        {
+          "screenId": "s5",
+          "action": "WAIT",
+          "targetText": "필요한 일회용품을 고른 뒤 선택완료를 눌러 주세요. 필요 없으면 선택안함을 눌러 주세요."
+        },
+        {
+          "screenId": "s6",
+          "action": "WAIT",
+          "targetText": "원하는 결제 수단을 눌러 주세요. 삼성페이는 카드결제를 눌러 주세요."
+        },
+        {
+          "screenId": "s7",
+          "action": "WAIT",
+          "targetText": "적립하려면 전화번호를 입력하고 적립을 눌러 주세요. 적립하지 않으시면 오른쪽 위 X를 눌러 주세요."
+        },
+        {
+          "screenId": "s8",
+          "action": "WAIT",
+          "targetText": "카드는 단말기에 넣고 삼성페이는 휴대폰을 리더기에 대 주세요. 연습 화면에서는 승인 요청을 눌러 주세요."
+        },
+        {
+          "screenId": "s9",
+          "action": "WAIT",
+          "targetText": "결제가 진행 중이에요. 잠시 기다려 주세요."
+        }
+      ]
+    },
+    "response": {
+      "goal": "아이스 아메리카노 한 잔 주세요",
+      "action": {
+        "type": "WAIT",
+        "targetIds": [
+          "ec327a560",
+          "ed7e06773"
+        ],
+        "guideText": "영수증이 필요하면 출력을, 필요 없으면 미출력을 눌러 주세요."
+      },
+      "source": "rule"
+    }
+  },
+  {
+    "stage": "done",
+    "request": {
+      "sessionId": "handheld-order",
+      "goal": "아이스 아메리카노 한 잔 주세요",
+      "snapshot": {
+        "screenId": "s11",
+        "frameId": 45,
+        "timestampMs": 14985,
+        "stableFrames": 2,
+        "elements": [
+          {
+            "id": "e7bc024b3",
+            "text": "결제가 완료되었습니다",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.2847222,
+              "top": 0.43984374,
+              "right": 0.7736111,
+              "bottom": 0.47734374
+            },
+            "confidence": 0.86757815
+          },
+          {
+            "id": "e5cde9aec",
+            "text": "주문번호",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.46666667,
+              "top": 0.48984376,
+              "right": 0.5777778,
+              "bottom": 0.50703126
+            },
+            "confidence": 0.81152344
+          },
+          {
+            "id": "e612545d2",
+            "text": "101",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.43333334,
+              "top": 0.521875,
+              "right": 0.59583336,
+              "bottom": 0.57109374
+            },
+            "confidence": 0.9296875
+          },
+          {
+            "id": "e72cbe3e8",
+            "text": "주문번호가 호줄되면 픽업대에서 받아 주세요",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.27083334,
+              "top": 0.58671874,
+              "right": 0.75277776,
+              "bottom": 0.6125
+            },
+            "confidence": 0.8137336
+          },
+          {
+            "id": "ec25a8979",
+            "text": "6조 뒤 처음 화면으로 돌아갑니다",
+            "kind": "TEXT",
+            "rect": {
+              "left": 0.34583333,
+              "top": 0.61796874,
+              "right": 0.6597222,
+              "bottom": 0.6382812
+            },
+            "confidence": 0.7672991
+          }
+        ]
+      },
+      "history": [
+        {
+          "screenId": "s6",
+          "action": "WAIT",
+          "targetText": "원하는 결제 수단을 눌러 주세요. 삼성페이는 카드결제를 눌러 주세요."
+        },
+        {
+          "screenId": "s7",
+          "action": "WAIT",
+          "targetText": "적립하려면 전화번호를 입력하고 적립을 눌러 주세요. 적립하지 않으시면 오른쪽 위 X를 눌러 주세요."
+        },
+        {
+          "screenId": "s8",
+          "action": "WAIT",
+          "targetText": "카드는 단말기에 넣고 삼성페이는 휴대폰을 리더기에 대 주세요. 연습 화면에서는 승인 요청을 눌러 주세요."
+        },
+        {
+          "screenId": "s9",
+          "action": "WAIT",
+          "targetText": "결제가 진행 중이에요. 잠시 기다려 주세요."
+        },
+        {
+          "screenId": "s10",
+          "action": "WAIT",
+          "targetText": "영수증이 필요하면 출력을, 필요 없으면 미출력을 눌러 주세요."
+        }
+      ]
+    },
+    "response": {
+      "goal": "아이스 아메리카노 한 잔 주세요",
+      "action": {
+        "type": "DONE",
+        "guideText": "번호표를 받고 기다려 주세요. 주문번호가 불리면 픽업대에서 받아 주세요."
+      },
+      "source": "rule"
+    }
+  }
+]

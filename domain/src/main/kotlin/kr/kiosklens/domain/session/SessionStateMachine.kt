@@ -116,6 +116,9 @@ class SessionStateMachine(
 
     private fun onSnapshot(state: SessionState, s: ScreenSnapshot): Transition {
         val updated = state.copy(snapshot = s)
+        if (awaitingChoice(state) && s.screenId != state.requestedSnapshot?.screenId) {
+            return screenChanged(updated)
+        }
         if (helpMode && state.phase == Phase.WAIT_CHANGE && state.seek != null) seekFound(updated, s)?.let { return it }
         return when (state.phase) {
             Phase.SCANNING -> requestOrScan(updated, listOf(CancelPending))                 // 화면을 찾음 → 서버에 묻기
@@ -136,6 +139,9 @@ class SessionStateMachine(
     private fun onScreenChanged(state: SessionState, screenId: String): Transition {
         // 지금 들고 있는 스냅샷이 옛 화면이면 버린다 (새 화면 스냅샷이 먼저 왔으면 그대로 둠)
         val updated = state.copy(snapshot = state.snapshot?.takeIf { it.screenId == screenId })
+        if (awaitingChoice(state) && screenId != state.requestedSnapshot?.screenId) {
+            return screenChanged(updated)
+        }
         return when (state.phase) {
             Phase.PLANNING ->
                 if (!helpMode && screenId != state.requestedSnapshot?.screenId) requestOrScan(updated, listOf(CancelPending)) else stay(updated)
@@ -180,6 +186,13 @@ class SessionStateMachine(
 
     private fun phaseIsListening(state: SessionState) = state.phase == Phase.LISTENING
 
+    // 사용자는 질문에 말로 답하는 대신 키오스크를 직접 누를 수도 있다.
+    // 처음 주문을 말하거나 변경 사항을 보태는 중에는 화면 변화로 말을 끊지 않는다.
+    private fun awaitingChoice(state: SessionState) = !helpMode &&
+        state.phase in setOf(Phase.ASKING, Phase.LISTENING) &&
+        !state.listeningToAdd && state.pendingUtterance == null &&
+        state.requestedSnapshot != null && inProgress(state)
+
     /**
      * 도움 모드: 안내하던 화면 번호가 바뀌어도(카메라가 흔들려 다시 읽었거나 어르신이 눌렀거나) 노란 칸을 지우지 않는다.
      * 새 스냅샷에서 같은 글자의 칸이 보이면 그 칸을 따라가고, 안 보이면 마지막 위치에 그대로 둔다.
@@ -199,7 +212,9 @@ class SessionStateMachine(
 
     /** 안내하던 화면이 바뀌었다 = 어르신이 눌렀다. 안내를 멈추고 새 화면으로 다시 묻는다. */
     private fun screenChanged(state: SessionState): Transition =
-        requestOrScan(state.copy(guide = null), listOf(StopSpeaking, ClearHighlight, CancelPending))
+        requestOrScan(state.copy(guide = null),
+            (if (state.phase == Phase.LISTENING) listOf(StopListening) else emptyList()) +
+                listOf(StopSpeaking, ClearHighlight, CancelPending))
 
     /**
      * 같은 화면의 새 스냅샷: 하이라이트가 버튼을 따라가게 위치를 갱신한다 (위치가 바뀌었을 때만).

@@ -29,7 +29,7 @@ async def test_200_omits_null_fields_and_has_no_flat_fields(snaps):
         r = await c.post("/v1/guide/next", json=make_req(snaps, "s06_card"), headers=H)
     body = r.json()
     assert set(body) <= {"goal", "action", "source"}                 # 예전 평평한 형식(최상위 targetId·message) 없음
-    assert set(body["action"]) == {"type", "guideText"} and body["action"]["type"] == "DONE"   # null 필드는 빠짐
+    assert set(body["action"]) == {"type", "guideText"} and body["action"]["type"] == "WAIT"   # null 필드는 빠짐. 카드 삽입은 아직 완료가 아니다.
 
 
 async def test_400_missing_session_id(snaps):

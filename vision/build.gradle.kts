@@ -6,7 +6,10 @@ plugins { alias(libs.plugins.android.library) }
 android {
     namespace = "kr.kiosklens.vision"
     compileSdk = 37
-    defaultConfig { minSdk = 26 }
+    defaultConfig {
+        minSdk = 26
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -14,6 +17,8 @@ android {
     // 계약 예시 JSON은 저장소 루트 testdata/contract 하나만 쓴다 (서버 · :agent와 같은 정답지).
     // 테스트는 클래스패스의 /contract/*.json 으로 읽는다.
     sourceSets["test"].resources.srcDir(rootProject.file("testdata"))
+    // Generated locally from the user's original HTML; never bundled in the app.
+    sourceSets["androidTest"].assets.srcDir(rootProject.file(providers.gradleProperty("kioskAssets").orElse(".local/kiosk-sim").get()))
 }
 
 dependencies {
@@ -24,4 +29,6 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)              // 스냅샷 JSON 저장 (SnapshotJson)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
 }

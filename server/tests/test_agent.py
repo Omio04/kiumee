@@ -26,9 +26,9 @@ async def test_contract_guide(snaps, name, screen, goal):
 
 
 @pytest.mark.parametrize("name", ["fake", "llm"])
-async def test_contract_done_on_card_screen(snaps, name):
+async def test_card_screen_waits_for_approval_instead_of_ending_session(snaps, name):
     r = (await agents()[name].next(GuideRequest.model_validate(make_req(snaps, "s06_card", "")))).response
-    assert r.action.type == ActionType.DONE and r.action.guideText and r.action.targetId is None
+    assert r.action.type == ActionType.WAIT and r.action.guideText and r.action.targetId is None
 
 
 @pytest.mark.parametrize("name", ["fake", "llm"])
