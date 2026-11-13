@@ -173,8 +173,9 @@ class SessionStateMachine(
         if (g.targetId == null && g.rect == null) return stay(state)                    // 칸을 가리키던 안내가 아니다
         val r = HelpTracker.track(g.targetText, g.rect, prev, s) ?: return stay(state)
         val id = r.element?.id ?: g.targetId ?: "photo"
-        if (r.rect == g.rect && id == g.targetId) return stay(state)
-        return Transition(state.copy(guide = g.copy(screenId = s.screenId, targetId = id, rect = r.rect)), listOf(Highlight(HighlightTarget(id, r.rect))))
+        val rect = r.element?.let { g.wholeButton(it.rect) } ?: r.rect                   // 버튼 전체 칸이 있으면 글자에 붙여 옮긴다
+        if (rect == g.rect && id == g.targetId) return stay(state)
+        return Transition(state.copy(guide = g.copy(screenId = s.screenId, targetId = id, rect = rect)), listOf(Highlight(HighlightTarget(id, rect))))
     }
 
     private fun phaseIsListening(state: SessionState) = state.phase == Phase.LISTENING
@@ -191,7 +192,7 @@ class SessionStateMachine(
         val same = s.elements.filter { it.text.trim().replace(" ", "") == key }
         val found = (g.rect?.let { r -> same.minByOrNull { abs(it.rect.centerX - r.centerX) + abs(it.rect.centerY - r.centerY) } } ?: same.firstOrNull())
             ?: return stay(state)
-        val rect = HighlightArea.of(found, s.elements)
+        val rect = g.wholeButton(found.rect) ?: HighlightArea.of(found, s.elements)
         if (rect == g.rect && g.screenId == s.screenId) return stay(state)
         return Transition(state.copy(guide = g.copy(screenId = s.screenId, targetId = found.id, rect = rect)), listOf(Highlight(HighlightTarget(found.id, rect))))
     }
@@ -208,7 +209,8 @@ class SessionStateMachine(
     private fun follow(state: SessionState, g: Guidance, prev: ScreenSnapshot?, s: ScreenSnapshot): Transition {
         val id = g.targetId ?: return stay(state)
         val element = s.findElement(id)
-        val rect = if (element != null) HighlightArea.of(element, s.elements) else HighlightArea.shift(g.rect, prev, s, id)
+        val rect = if (element != null) g.wholeButton(element.rect) ?: HighlightArea.of(element, s.elements)
+                   else HighlightArea.shift(g.rect, prev, s, id)
         if (rect == null) {
             if (helpMode) return stay(state)                                  // 도움 모드: 잠깐 안 읽혀도 마지막 위치에 둔다
             return if (g.rect == null) stay(state) else Transition(state.copy(guide = g.copy(rect = null)), listOf(ClearHighlight))
@@ -326,20 +328,29 @@ class SessionStateMachine(
         )
         return when (action) {
             is GuideAction.Tap -> {
-                val photoBox = response.box                                        // AI가 사진에서 직접 찾은 칸 (글자 목록에 없음)
-                val element = asked.findElement(action.targetId)
+                val photoBox = response.box                                        // AI가 사진에서 본 칸 (글자 목록에 없는 칸, 또는 고른 버튼의 전체 칸)
+                val known = asked.findElement(action.targetId)
+                val element = known
                     ?: if (photoBox != null) UiElement(action.targetId, action.guideText, photoBox, 1f, ElementKind.BUTTON_LIKE)
                     else return speakAndWait(base, asked.screenId, texts.notFound(), retry = true)   // 계약 위반 방어
+                // 글자로 고른 버튼에 상자도 왔으면 버튼 전체 칸: 그 글자 상자에 붙여 두고 따라간다 (어긋난 상자는 버린다)
+                val button = if (known != null && photoBox != null) HighlightArea.button(photoBox, known.rect)?.padded(PHOTO_BOX_PAD) else null
+                val anchor = known?.rect?.takeIf { button != null }
                 // 응답을 기다리는 사이 같은 화면의 새 스냅샷이 왔으면 최신 위치를 쓴다. 메뉴 칸이면 칸 전체를 감싼다
                 val latest = base.snapshot?.takeIf { it.screenId == asked.screenId }
                 val now = latest?.findElement(element.id)
-                val rect = if (photoBox != null && asked.findElement(action.targetId) == null) photoBox.padded(PHOTO_BOX_PAD)   // 사진 박스는 그대로(약간만 넉넉히)
-                           else if (latest != null && now != null) HighlightArea.of(now, latest.elements) else HighlightArea.of(element, asked.elements)
+                val rect = when {
+                    known == null && photoBox != null -> photoBox.padded(PHOTO_BOX_PAD)     // 사진에서만 찾은 칸은 그대로(약간만 넉넉히)
+                    button != null && anchor != null -> if (now != null) HighlightArea.follow(button, anchor, now.rect) else button
+                    latest != null && now != null -> HighlightArea.of(now, latest.elements)
+                    else -> HighlightArea.of(element, asked.elements)
+                }
                 val pointer = texts.tap(rect, action.guideText)
                 val spoken = response.say?.trim()?.takeIf { it.isNotEmpty() }?.let { "$it $pointer" } ?: pointer   // 이유 · 방법 + 어느 칸을 누를지
                 val t = base.ticket + 1
                 Transition(
-                    base.copy(phase = Phase.GUIDING, ticket = t, guide = Guidance(asked.screenId, element.id, rect, spokenText = spoken, targetText = element.text)),
+                    base.copy(phase = Phase.GUIDING, ticket = t, guide = Guidance(asked.screenId, element.id, rect, spokenText = spoken,
+                        targetText = element.text, button = button, anchor = anchor)),
                     listOf(Highlight(HighlightTarget(element.id, rect)), Speak(spoken, t)),
                 )
             }
@@ -471,6 +482,14 @@ class SessionStateMachine(
         const val SEEK_WAIT_MS = 90_000L
 
         fun NormRect.padded(p: Float) = NormRect((left - p).coerceAtLeast(0f), (top - p).coerceAtLeast(0f), (right + p).coerceAtMost(1f), (bottom + p).coerceAtMost(1f))
+
+        /** 버튼 전체 칸이 있으면 지금 글자 상자([text])에 맞춰 옮기고 키운 칸, 없으면 null */
+        fun Guidance.wholeButton(text: NormRect): NormRect? {
+            val b = button ?: return null
+            val a = anchor ?: return null
+            return HighlightArea.follow(b, a, text)
+        }
+
         /** 앱이 말하거나 생각 중이라 "말하기"를 눌러도 소용없는 단계 (도움 모드 · 버튼 방식) */
         val BUSY_PHASES = setOf(Phase.ASKING, Phase.GUIDING, Phase.PLANNING, Phase.LOST, Phase.DONE, Phase.ERROR)
 

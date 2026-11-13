@@ -51,4 +51,32 @@ class HighlightAreaTest {
         val farUp = moved.map { it.copy(rect = NormRect(it.rect.left, it.rect.top - 0.6f, it.rect.right, it.rect.bottom - 0.6f)) }
         assertNull("화면 밖", HighlightArea.shift(last, before, after.copy(elements = farUp), "n1"))
     }
+
+    // ---- 버튼 전체 칸 (2026-11-13 요청: "버튼을 다 감싸듯이") — 서버가 사진에서 본 버튼 전체 상자
+
+    @Test fun `버튼 전체 칸은 글자 상자까지 품고, 글자와 어긋난 칸은 버린다`() {
+        val text = NormRect(0.75f, 0.87f, 0.90f, 0.90f)                      // "결제하기" 글자
+        val whole = HighlightArea.button(NormRect(0.70f, 0.85f, 0.94f, 0.95f), text)
+        assertEquals(NormRect(0.70f, 0.85f, 0.94f, 0.95f), whole)
+        val cut = HighlightArea.button(NormRect(0.70f, 0.88f, 0.85f, 0.95f), text)   // 글자 일부만 덮음 → 글자까지 넓힌다
+        assertEquals(NormRect(0.70f, 0.87f, 0.90f, 0.95f), cut)
+        assertNull(HighlightArea.button(NormRect(0.10f, 0.10f, 0.30f, 0.20f), text))  // 엉뚱한 곳 (휴대폰이 움직였거나 AI가 빗나감)
+    }
+
+    private fun assertRect(expected: NormRect, actual: NormRect) {
+        assertEquals(expected.left, actual.left, 1e-4f); assertEquals(expected.top, actual.top, 1e-4f)
+        assertEquals(expected.right, actual.right, 1e-4f); assertEquals(expected.bottom, actual.bottom, 1e-4f)
+    }
+
+    @Test fun `글자가 움직이고 커진 만큼 버튼 전체 칸도 옮기고 키운다`() {
+        val anchor = NormRect(0.40f, 0.50f, 0.60f, 0.54f)                     // 글자 높이 0.04, 가운데 (0.5, 0.52)
+        val button = NormRect(0.30f, 0.45f, 0.70f, 0.60f)
+        assertRect(button, HighlightArea.follow(button, anchor, anchor))      // 그대로면 그대로
+        assertRect(NormRect(0.20f, 0.35f, 0.60f, 0.50f),                      // 왼쪽 위로 0.1씩
+            HighlightArea.follow(button, anchor, NormRect(0.30f, 0.40f, 0.50f, 0.44f)))
+        assertRect(NormRect(0.20f, 0.405f, 0.80f, 0.63f),                     // 가까워짐: 글자 높이 1.5배 → 칸도 1.5배, 글자 기준 자리는 그대로
+            HighlightArea.follow(button, anchor, NormRect(0.35f, 0.48f, 0.65f, 0.54f)))
+        val wild = HighlightArea.follow(button, anchor, NormRect(0.40f, 0.40f, 0.60f, 0.60f))     // 글자가 5배? 잘못 읽은 것 → 1.7배까지만
+        assertEquals(button.height * 1.7f, wild.height, 1e-4f)
+    }
 }

@@ -65,6 +65,9 @@ class Settings:
     grid_zoom: bool = True                    # 격자로 대략 찾은 뒤 그 주변을 확대해 한 번 더 고른다
     lexicon_fix: bool = False                 # 도움 모드: 키오스크 공통 낱말로 OCR 오타를 바로잡아 AI에게 보인다 (app/lexicon.py)
     help_mode: bool = False                   # 도움 모드: 어르신이 물어보면 그 순간의 화면을 보고 답한다 (app/help_mode.py)
+    # 기본 안내도 사진을 보고 판단한다 (사진이 붙은 요청만): 글자 읽기가 깨지거나 놓친 버튼 · 앞에 뜬 창 · 장바구니를 AI가 사진으로 본다.
+    # 2026-11-13 평가(연습 키오스크 17장면 + 웹캠 사진 2장, 3번 평균): 글자 정상 11.7 → 17.3/19, 글자 불량 7.3 → 15.0/19 (decisions.md 11장)
+    photo_guide: bool = True
     cache_size: int = 256                     # 같은 요청 재처리 방지 (0이면 끔)
     cache_ttl_s: float = 30.0
     fastpath: bool = True                     # 확실한 경우 LLM을 건너뜀(로컬 규칙)
@@ -95,6 +98,7 @@ class Settings:
             progress_hint=_env_bool(env, "PROGRESS_HINT", True),
             expectation_check=_env_bool(env, "EXPECTATION_CHECK", True),
             help_mode=_env_bool(env, "HELP_MODE", False),
+            photo_guide=_env_bool(env, "PHOTO_GUIDE", True),
             som_marks=_env_bool(env, "SOM_MARKS", False),
             lexicon_fix=_env_bool(env, "LEXICON_FIX", False),
             grid_locate=_env_bool(env, "GRID_LOCATE", True),

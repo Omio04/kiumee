@@ -1,13 +1,13 @@
 # AI 키오스크 렌즈 · P4 에이전트 서버 (v0.2 · 계약 v1)
 
 `POST /v1/guide/next` — OCR 글자·좌표와 어르신 발화를 받아 "다음에 누를 버튼 하나"를 돌려줍니다. **사진(`image`, base64 JPEG)은 선택**이며 켠 경우에만 옵니다(저장하지 않고 LLM에만 보여 줌, 민감한 글자가 읽히면 버림). 그 밖의 모르는 필드는 400.
-응답에는 선택 필드 `say`(버튼을 가리킬 때 먼저 읽을 이유 한 문장)와 `box`(글자 목록에 없는 칸을 사진에서 찾았을 때의 위치, targetId는 "photo")가 있을 수 있습니다. 모르는 앱은 무시합니다. `seek`는 "누를 칸의 이름은 AI가 아는데 글자 읽기에 아직 없다"는 알림(ASK_USER와 함께, 말은 "크게 나오게 비춰 주세요")이고, 앱은 이름을 기억했다가 비슷한 글자가 읽히는 순간 노란 칸을 칩니다.
+응답에는 선택 필드 `say`(버튼을 가리킬 때 먼저 읽을 이유 한 문장)와 `box`(AI가 사진에서 본 칸: 글자 목록에 없는 칸이면 targetId는 "photo", 글자 목록의 버튼이면 그 **버튼 전체 칸** — 앱은 글자 상자 대신 이 칸을 그린다)가 있을 수 있습니다. 모르는 앱은 무시합니다. `seek`는 "누를 칸의 이름은 AI가 아는데 글자 읽기에 아직 없다"는 알림(ASK_USER와 함께, 말은 "크게 나오게 비춰 주세요")이고, 앱은 이름을 기억했다가 비슷한 글자가 읽히는 순간 노란 칸을 칩니다.
 설정은 `server/.env`(KEY=VALUE)에 넣으면 읽습니다. 명령줄 환경변수가 우선. Claude가 일시 오류를 내면 `GEMINI_API_KEY`가 있을 때 Gemini가 대신 답합니다.
 
 ## 실행
 ```
 pip install -r requirements-dev.txt
-KL_SKIP_APP_INIT=1 pytest -q                       # 테스트 105개 (키·네트워크 불필요)
+KL_SKIP_APP_INIT=1 pytest -q                       # 테스트 410개 (키·네트워크 불필요)
 APP_KEY=dev LLM_PROVIDER=fake uvicorn app.main:app --port 8080     # 키 없이 연동 연습 (Android가 바로 붙일 수 있음)
 APP_KEY=... ANTHROPIC_API_KEY=... uvicorn app.main:app             # 실제 LLM
 docker build -t kl-agent . && docker run -p 8080:8080 -e APP_KEY=... -e ANTHROPIC_API_KEY=... kl-agent
@@ -61,6 +61,16 @@ v0.1의 "가정" 표를 설계서 · `:core-model`에 맞춰 확정했습니다.
 
 ## 미검증
 실제 Anthropic 호출, Docker 이미지 빌드(이 환경에 데몬 없음), 실제 OCR 입력, 실제 p95는 **아직 해보지 않았습니다**. Anthropic 호출부는 모의 HTTP(MockTransport)로 상태코드·타임아웃 매핑만 확인했습니다.
+
+## 기본: Claude Haiku 5.5가 사진을 보고 판단 (2026-11-13, P1)
+
+- `server/.env`에 `ANTHROPIC_API_KEY`(각자 직접 넣기, 채팅 · 저장소에 올리지 않기). 기본 모델 `claude-haiku-5-5`, **생각 끔**(`thinking: disabled`).
+- **기본 안내도 사진을 본다** (`PHOTO_GUIDE`, 기본 켬 · `false`면 예전처럼 글자만): 앱이 보내는 사진(`image`)을 글자 목록과 함께 AI에 보이고, 사진 규칙(`prompt.py` `PHOTO_NOTE`)과 사진 크기를 붙인다.
+  - 글자 읽기가 놓친 버튼: AI가 `MISSING`을 고르고 이름 · 사진 상자를 준다 → 이름으로 글자 전체에서 다시 찾고(깨진 글자 포함), 없으면 사진 상자로 가리킨다.
+  - 노란 칸 = **버튼 전체**: AI가 고른 버튼의 전체 상자를 항상 받아, 그 버튼 글자 칸을 품으면 응답 `box`에 싣는다.
+  - 사진이 있으면 빠른 길(AI 없이 고르기)을 쓰지 않는다. 적립(전화번호 숫자판) · 카드 화면이면 사진을 버린다.
+- Python **3.10 이상**(`kiosk_flow.py`), 사진 그리기 · 크기 읽기에 `pillow`가 필요하다(`requirements.txt`).
+- 평가: `python scripts/photo_eval.py [--camera cases.json]` — 연습 키오스크 장면을 Chrome으로 찍어 사진 끔/켬 × 글자 정상/불량을 비교한다. 요청마다 비용이 든다(Haiku 약 $0.0004). 근거 · 결과는 [decisions.md](../docs/decisions.md) 11장.
 
 ## 무료로 쓰기: Gemini
 

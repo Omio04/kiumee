@@ -202,7 +202,7 @@ class LlmAction(BaseModel):
     guideText: Optional[str] = None
     message: Optional[str] = None
     direction: Optional[str] = None
-    box: Optional[List[float]] = None      # 도움 모드: 사진에서 누를 칸 [위, 왼쪽, 아래, 오른쪽] 0~1000 (후보에 없을 때만)
+    box: Optional[List[float]] = None      # 사진에서 본 누를 버튼 전체: 사진 크기를 알면 픽셀 [왼쪽, 위, 오른쪽, 아래], 모르면 예전 0~1000 [위, 왼쪽, 아래, 오른쪽]
     boxText: Optional[str] = None          # 그 칸에 적힌 글자
 
     @field_validator("box", mode="before")

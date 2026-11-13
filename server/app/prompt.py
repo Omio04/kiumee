@@ -47,6 +47,21 @@ JSON 한 줄만 출력하세요 (설명 금지):
 RETRY_NOTE = "\n\n(앞 응답은 형식이 틀렸습니다. 위 JSON 한 줄만, 설명 없이 다시 출력하세요.)"
 
 
+# 기본 안내에 카메라 사진이 붙었을 때 질문 끝에 붙인다 (2026-11-13, decisions.md 11장).
+# SYSTEM은 그대로 둔다: 사진이 없는 요청은 예전과 똑같이 판단한다.
+PHOTO_NOTE = """[사진] 지금 카메라 사진이 함께 있습니다. 판단은 사진을 먼저 보고 하세요.
+- 앞에 뜬 창(팝업)이 있으면 그 창만 봅니다. 뒤에 어둡게 깔린 화면은 누를 수 없습니다.
+- 직전 단계가 맞게 됐는지 사진으로 확인하세요: 옵션 창 제목의 메뉴 이름, 장바구니에 담긴 것, 선택 표시(✓ · 테두리), 금액.
+- [화면 글자]와 [후보]는 글자 읽기 결과라 글자가 깨지거나 버튼이 빠질 수 있습니다. 사진과 다르면 사진을 믿으세요.
+- 누를 버튼이 [후보]에 있으면 그 id. 사진에는 보이는데 [후보]에 없으면 (위의 UNKNOWN 규칙 대신) GUIDE로 하고 targetId는 MISSING, guideText에 그 버튼 글자를 주세요. 비슷한 자리의 다른 칸(전체 · 삭제 · 연하게 …)을 대신 고르지 마세요.
+- GUIDE면 box를 항상 주세요(id가 있어도): 누를 버튼 전체를 감싸는 사진 속 위치입니다. 글자만이 아니라 버튼의 테두리 · 배경까지, 메뉴는 그림 · 이름 · 가격이 든 칸 전체. 노란 칸을 그 자리에 그립니다.
+- 메뉴는 이름이 목표와 같은 것만 고릅니다(아메리카노 ≠ 카페라떼). 이름에 HOT/ICE가 따로 있으면 목표 온도에 맞는 쪽.
+- [후보] 글자가 조금 깨져 있어도(가드결제 = 카드결제, 주문달기 = 주문담기) 사진에서 같은 버튼이면 그 id를 고르세요. 깨진 글자를 피해 다른 칸을 고르지 마세요.
+- 목표 메뉴가 사진에 없으면 (위의 '안 보이면 UNKNOWN' 대신) 그 메뉴가 있을 분류 탭(예: 커피)을 GUIDE로 고르세요. 그런 탭이 없을 때만 SCROLL이나 UNKNOWN.
+- 목표가 아닌 메뉴의 옵션 창이 떠 있으면(창 제목의 메뉴 이름이 다름) 그 창의 취소 · 닫기(×)를 GUIDE로 고르세요.
+- 목표 수량이 두 개 이상이면 담기 전에 옵션 창의 + 로 수량을 맞추게 하세요 (지금 수량은 사진에서 확인).
+- "주문 내역이 모두 삭제됩니다" 같은 창은 어르신이 처음부터 다시 하길 원한 게 아니면 '취소'를 고르세요."""
+
 PRESSED_PREFIX = "방금 안내한 버튼: "
 CHOSEN_PREFIX = "앞서 안내한 메뉴: "
 SCREEN_PREFIX = "화면 글자(위→아래): "
@@ -57,7 +72,7 @@ def build_user(goal: str, history: Sequence[HistoryItem], candidates: Sequence[S
                chosen: Optional[Sequence[str]] = None, question: bool = False, new_screen: bool = False,
                progress: Optional[str] = None, unseen: Optional[str] = None,
                screen: Optional[str] = None, kiosk: Optional[str] = None, change: Optional[str] = None,
-               lookalike: Optional[tuple] = None) -> str:
+               lookalike: Optional[tuple] = None, photo: bool = False, photo_size: Optional[tuple] = None) -> str:
     """pressed: 직전 '누르기' 안내 뒤 화면이 바뀌었으면 그 버튼 글자 (어르신이 이미 눌렀음 → 다음 단계를 고를 것).
     chosen: 이번 세션에서 이미 고른 메뉴 (진행 · 옵션 버튼 제외). '다음' · '확인'은 화면마다 또 누를 수 있어 넣지 않는다."""
     lines: List[str] = [f"목표(어르신 말): {goal.strip() or '(없음)'}"]
@@ -89,7 +104,11 @@ def build_user(goal: str, history: Sequence[HistoryItem], candidates: Sequence[S
         lines.append("[새 화면] 어르신이 누른 뒤 화면이 바뀌었음")
     if context_texts:                              # 화면 전체를 읽는 순서로: 무슨 화면인지(옵션 창 · 다른 분류 · 장바구니) 판단용
         lines.append(SCREEN_PREFIX + " | ".join(t[:20] for t in context_texts[:30]))
-    lines.append("[후보]")
+    lines.append("[후보] (글자 읽기로 찾은 버튼이 없음 — 사진을 보고 box로 가리키세요)" if photo and not candidates else "[후보]")
     for c in candidates:
         lines.append(f"{c.id}|{c.text}")
+    if photo:
+        lines.append(PHOTO_NOTE)
+        if photo_size:
+            lines.append(f"사진 크기: {photo_size[0]}×{photo_size[1]} 픽셀 (box는 [왼쪽, 위, 오른쪽, 아래] 픽셀 좌표)")
     return "\n".join(lines)

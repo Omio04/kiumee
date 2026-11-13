@@ -2,6 +2,7 @@ package kr.kiosklens.domain.policy
 
 import kotlin.math.abs
 import kotlin.math.max
+import kotlin.math.min
 import kr.kiosklens.core.model.ElementKind
 import kr.kiosklens.core.model.NormRect
 import kr.kiosklens.core.model.ScreenSnapshot
@@ -35,6 +36,33 @@ object HighlightArea {
             (t.centerX + halfW).coerceIn(0f, 1f), bottom.coerceIn(0f, 1f),
         )
     }
+
+    /**
+     * 서버가 사진에서 본 **버튼 전체 칸**을 쓸 수 있나 (2026-11-13 요청: "버튼을 다 감싸듯이").
+     * 글자 상자의 가운데가 칸 안에 있어야 한다: 사진과 글자 읽기는 다른 순간이라 휴대폰이 움직였으면 어긋난다.
+     * 쓸 수 있으면 글자 상자까지 품은 칸, 아니면 null (글자 상자 · 메뉴 칸으로 그린다).
+     */
+    fun button(box: NormRect, text: NormRect): NormRect? {
+        if (!box.isValid) return null
+        val s = BUTTON_SLACK
+        if (text.centerX !in (box.left - s)..(box.right + s) || text.centerY !in (box.top - s)..(box.bottom + s)) return null
+        return NormRect(min(box.left, text.left), min(box.top, text.top), max(box.right, text.right), max(box.bottom, text.bottom))
+    }
+
+    /**
+     * 버튼 전체 칸 따라가기: 칸을 처음 글자 상자([anchor])에 붙여 두고, 지금 글자 상자([now])가 움직이고 커진 만큼 칸도 옮기고 키운다.
+     * 배율은 글자 높이의 비 (한 번에 크게 달라지면 잘못 읽은 것이라 0.6~1.7배로 묶는다).
+     */
+    fun follow(button: NormRect, anchor: NormRect, now: NormRect): NormRect {
+        val scale = if (anchor.height > 0f) (now.height / anchor.height).coerceIn(MIN_SCALE, MAX_SCALE) else 1f
+        fun x(v: Float) = (now.centerX + (v - anchor.centerX) * scale).coerceIn(0f, 1f)
+        fun y(v: Float) = (now.centerY + (v - anchor.centerY) * scale).coerceIn(0f, 1f)
+        return NormRect(x(button.left), y(button.top), x(button.right), y(button.bottom))
+    }
+
+    private const val BUTTON_SLACK = 0.01f
+    private const val MIN_SCALE = 0.6f
+    private const val MAX_SCALE = 1.7f
 
     fun shift(last: NormRect?, prev: ScreenSnapshot?, now: ScreenSnapshot, targetId: String): NormRect? {
         if (last == null || prev == null) return null

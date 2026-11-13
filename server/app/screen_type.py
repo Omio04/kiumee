@@ -117,9 +117,19 @@ def label(t: ScreenType) -> Optional[str]:
 _SKIP = _k("×", "x", "✕", "✖", "닫기", "건너뛰기", "적립안함", "적립안해", "다음에", "생략", "아니오", "아니요", "괜찮습니다", "나중에")
 
 
+# 닫기 기호: 글자 정리(normalize)를 하면 빈 글자가 되어 '←'(숫자판 지우기) 같은 다른 기호와 구별이 안 된다 → 원래 글자로 비교
+_CLOSE_SYMBOLS = frozenset({"×", "✕", "✖", "x", "X"})
+
+
 def skip_button(elements: Sequence[ScreenElement]) -> Optional[ScreenElement]:
-    """적립 같은 창을 닫는 버튼 (종류와 상관없이 글자로). 없으면 None."""
-    for word in _SKIP:                                  # 앞쪽 낱말이 더 확실한 닫기 (× · 닫기 먼저)
+    """적립 같은 창을 닫는 버튼 (종류와 상관없이 글자로). 없으면 None.
+    2026-11-13: '×'가 빈 낱말("")로 바뀌어 적립 창 숫자판의 '←'를 닫기로 골랐다 → 기호는 원래 글자로, 빈 낱말은 건너뛴다."""
+    for e in elements:                                  # 닫기 기호(×)가 가장 확실하다
+        if e.text.strip() in _CLOSE_SYMBOLS:
+            return e
+    for word in _SKIP:                                  # 그다음 낱말 순서대로 (닫기 · 건너뛰기 …)
+        if not word:
+            continue
         for e in elements:
             if normalize(e.text) == word:
                 return e

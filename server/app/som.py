@@ -8,9 +8,22 @@ from __future__ import annotations
 
 import base64
 import io
-from typing import Dict, Optional, Sequence
+from typing import Dict, Optional, Sequence, Tuple
 
 from .models import ScreenElement
+
+
+def image_size(image_b64: Optional[str]) -> Optional[Tuple[int, int]]:
+    """사진(base64 JPEG)의 가로 · 세로 픽셀. 머리만 읽는다. 못 읽으면 None.
+    AI에게 사진 크기를 알려 주고 박스를 픽셀 좌표로 받는다 (2026-11-13: Claude는 픽셀 좌표가 정확하다, decisions.md 11장)."""
+    if not image_b64:
+        return None
+    try:
+        from PIL import Image
+        with Image.open(io.BytesIO(base64.b64decode(image_b64))) as im:
+            return im.size
+    except Exception:
+        return None
 
 
 def draw_marks(image_b64: str, marks: Dict[str, ScreenElement]) -> Optional[str]:

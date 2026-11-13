@@ -36,7 +36,8 @@ ACTION_SCHEMA = {
         "message": {"type": "string", "description": "ASK_USER면 어르신께 할 질문(필수, 예: 따뜻한 걸로 드릴까요, 차가운 걸로 드릴까요?). "
                                                      "DONE · UNKNOWN이면 쉬운 존댓말 한 문장"},
         "direction": {"type": "string", "enum": _DIRECTIONS, "description": "SCROLL일 때만"},
-        "box": {"type": "array", "items": {"type": "integer"}, "description": "사진이 있고 누를 칸이 [후보]에 없을 때만: 사진에서 그 칸을 딱 감싸는 [위, 왼쪽, 아래, 오른쪽], 사진 전체를 0~1000으로"},
+        # 픽셀 좌표 (2026-11-13): 예전 [위, 왼쪽, 아래, 오른쪽] 0~1000(Gemini 방식)은 Claude가 자주 빗나갔다 (decisions.md 11장)
+        "box": {"type": "array", "items": {"type": "integer"}, "description": "사진이 있을 때 GUIDE: 누를 버튼 전체(글자만이 아니라 테두리 · 배경까지)를 딱 감싸는 사진 픽셀 좌표 [왼쪽, 위, 오른쪽, 아래] (사진 크기는 질문에 있음)"},
         "boxText": {"type": "string", "description": "box 칸에 적힌 글자 (문장 아님)"},
     },
     "required": ["screenAsks", "action"],

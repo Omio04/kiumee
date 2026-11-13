@@ -343,20 +343,100 @@ def _seek_text(text: str, name: str) -> str:
     return (head + " " + tail).strip()
 
 
-def _photo_box(action, has_image: bool, candidates: dict) -> Optional[tuple]:
-    """AI가 사진에서 직접 가리킨 칸: (Box, 칸 글자). 글자 목록(후보)에 없는 칸일 때만, 사진이 있고 박스가 말이 될 때만."""
+def _photo_box(action, has_image: bool, candidates: dict, size: Optional[tuple] = None) -> Optional[tuple]:
+    """AI가 사진에서 직접 가리킨 칸: (Box, 칸 글자). 글자 목록(후보)에 없는 칸일 때만, 사진이 있고 박스가 말이 될 때만.
+    좌표: 사진 크기(size)를 알면 픽셀 [왼쪽, 위, 오른쪽, 아래] (질문에 크기를 적어 준다). 모르면 예전 형식 0~1000 [위, 왼쪽, 아래, 오른쪽]."""
     if not has_image:
         return None
     if action.targetId and action.targetId in candidates:
         return None                                                          # 후보에 있으면 글자 목록의 칸을 쓴다 (더 정확)
-    b, text = action.box, (action.boxText or action.guideText or "").strip()
-    if not b or len(b) != 4 or not text:
+    text = (action.boxText or action.guideText or "").strip()
+    box = _box_from(action.box, size) if text else None
+    return (box, text[:40]) if box is not None else None
+
+
+def _box_from(b, size: Optional[tuple] = None) -> Optional[Box]:
+    """AI가 사진에서 준 좌표 → 0~1 칸. 사진 크기(size)를 알면 픽셀 [왼쪽, 위, 오른쪽, 아래], 모르면 예전 0~1000 [위, 왼쪽, 아래, 오른쪽].
+    점 같거나 화면 반을 덮는 박스는 믿지 않는다 (None)."""
+    if not b or len(b) != 4:
         return None
-    top, left, bottom, right = (max(0, min(1000, int(v))) / 1000.0 for v in b)
+    try:
+        vals = [int(v) for v in b]
+    except (TypeError, ValueError):
+        return None
+    if size:
+        w0, h0 = size
+        l, t, r, bt = vals
+        left, right = sorted((max(0.0, min(1.0, l / w0)), max(0.0, min(1.0, r / w0))))
+        top, bottom = sorted((max(0.0, min(1.0, t / h0)), max(0.0, min(1.0, bt / h0))))
+    else:
+        top, left, bottom, right = (max(0, min(1000, v)) / 1000.0 for v in vals)
     w, h = right - left, bottom - top
-    if w < 0.02 or h < 0.01 or w * h > 0.35:                                 # 점 같거나 화면 반을 덮는 박스는 믿지 않는다
+    if w < 0.02 or h < 0.01 or w * h > 0.35:
         return None
-    return Box(left=left, top=top, right=right, bottom=bottom), text[:40]
+    return Box(left=left, top=top, right=right, bottom=bottom)
+
+
+_BUTTON_BOX_SLACK = 0.01     # 글자 칸 가운데가 버튼 상자 밖으로 이만큼까지는 봐준다 (0~1)
+
+
+def _button_box(action, el: Optional[ScreenElement], size: Optional[tuple]) -> Optional[Box]:
+    """노란 칸을 버튼 전체에 그리기 (2026-11-13 요청: "버튼을 다 감싸듯이"). 글자 읽기는 글자 상자만 주므로,
+    AI가 사진에서 본 그 버튼의 전체 상자를 같이 보낸다. 단, 상자가 그 버튼 글자 칸의 가운데를 품을 때만:
+    사진과 글자 읽기는 다른 순간이라 휴대폰이 움직였으면 어긋나고, AI 상자가 빗나갈 수도 있다 (웹캠 사진 평가).
+    글자 칸까지 품게 넓혀서 돌려준다. 앱은 이 칸을 글자 칸에 붙여 따라간다 (domain HighlightArea.follow)."""
+    box = _box_from(action.box, size)
+    if box is None or el is None:
+        return None
+    r, s = el.rect, _BUTTON_BOX_SLACK
+    cx, cy = (r.left + r.right) / 2, (r.top + r.bottom) / 2
+    if not (box.left - s <= cx <= box.right + s and box.top - s <= cy <= box.bottom + s):
+        return None
+    return Box(left=min(box.left, r.left), top=min(box.top, r.top), right=max(box.right, r.right), bottom=max(box.bottom, r.bottom))
+
+
+def _photo_pick(action, by_id: dict, els, size: Optional[tuple], meta: Dict[str, object]):
+    """사진을 볼 때 AI가 고른 칸을 AI가 말한 버튼 이름으로 맞춘다 (기본 안내, 2026-11-13). (고친 action, 새로 찾은 글자 칸 또는 None)
+    ① 고른 칸의 글자가 말한 이름과 다르면 칸을 버린다: 결제하기라고 말하면서 번호는 '전체'를 고르는 일 (도움 모드와 같은 규칙)
+    ② 칸이 없으면(MISSING · 버림) 글자 읽기 전체에서 그 이름의 칸을 다시 찾는다: 후보 30개 밖이거나 깨진 글자(결재하기)여도
+       글자 칸이 사진 박스보다 정확하다. 같은 이름이 여럿이면 AI 박스와 가장 가까운 칸, 박스도 없으면 고르지 않는다."""
+    named = _clean_name(action.guideText or action.boxText or "")
+    chosen = by_id.get(action.targetId or "")
+    if chosen is not None:
+        if not named or _name_score(named, chosen.text) >= _NAME_AGREE:
+            return action, None
+        meta["target_mismatch"] = True
+        action = action.model_copy(update={"targetId": None})
+    if len(normalize(named)) < 1:
+        return action, None
+    # 가격 · 긴 안내 문장("결제하기 전에 주문 내역을 확인하세요")은 버튼이 아니다
+    pool = [e for e in els if e.kind != ElementKind.PRICE and len(normalize(e.text)) <= 2 * len(normalize(named)) + 4]
+    scored = [(e, _name_score(named, e.text)) for e in pool]
+    top = max((s for _, s in scored), default=0.0)
+    if top < 0.65:
+        return action, None
+    same = [e for e, s in scored if s == top]
+    if len(same) > 1:
+        box = _photo_box(action, True, by_id, size=size)
+        if box is None:
+            return action, None
+        cx, cy = (box[0].left + box[0].right) / 2, (box[0].top + box[0].bottom) / 2
+        same.sort(key=lambda e: abs((e.rect.left + e.rect.right) / 2 - cx) + abs((e.rect.top + e.rect.bottom) / 2 - cy))
+    meta["name_found"] = True
+    return action.model_copy(update={"targetId": same[0].id}), same[0]      # 이름은 AI가 사진에서 읽은 그대로 둔다 (_photo_name)
+
+
+def _photo_name(said: str, text: str, els) -> Optional[str]:
+    """글자 읽기가 한두 글자 틀린 버튼 이름(가드결제 · 주문달기)은 AI가 사진에서 읽은 이름(카드결제 · 주문담기)으로 말한다.
+    좁게만: 4글자 이상 · 길이가 같고 다른 글자가 4글자에 1개 이하 · 그 이름의 버튼이 화면에 따로 없을 때.
+    '매장하기'를 고르고 '포장하기'라고 말하면 다른 버튼일 수 있다(둘 다 화면에 있음) → 바꾸지 않는다."""
+    name = _clean_name(said)
+    a, b = re.sub(r"\s+", "", name), re.sub(r"\s+", "", text or "")
+    if len(a) < 4 or a == b or len(a) != len(b) or sum(x != y for x, y in zip(a, b)) > len(a) // 4:
+        return None
+    if any(normalize(e.text) == normalize(name) for e in els):
+        return None
+    return name[:40]
 
 
 def _waiting_talk_text(text: str) -> bool:
@@ -451,6 +531,10 @@ def _is_done_screen(elements: List[ScreenElement]) -> bool:
     return False
 
 
+# 사진을 AI에 보내지 않는 화면: 전화번호를 누르는 적립 화면 · 카드번호가 뜨는 카드 결제 화면
+_PRIVATE_SCREENS = (screen_type.ScreenType.LOYALTY, screen_type.ScreenType.CARD)
+
+
 class LlmGuideAgent:
     def __init__(self, llm: LlmClient, settings: Settings):
         self.llm = llm
@@ -508,6 +592,11 @@ class LlmGuideAgent:
         # 2-0) 화면 종류: 글자로 이 화면이 무슨 화면인지 먼저 정한다 (LLM 추측에 맡기지 않는다)
         stype = screen_type.classify(els)
         meta["screen"] = stype.value
+        if req.image and stype in _PRIVATE_SCREENS:
+            # 적립(전화번호 입력) · 카드 결제 화면의 사진에는 번호가 찍힐 수 있다. 앱은 그 글자를 먼저 지워 보내서(1차 방어선)
+            # 위 privacy는 지운 글자가 없다고 보고 사진을 넘긴다 → 화면 종류로 사진을 버린다 (도움 모드 · 기본 안내 모두, 2026-11-13)
+            req = req.model_copy(update={"image": None})
+            meta["photo_dropped"] = stype.value
         probs = screen_type.probabilities(els)                  # 이 종류일 확률 (글자 단서의 상대 비율)
         meta["screen_p"] = probs[0][1] if probs else 0.0
         kiosk_info = kiosk.identify(els)
@@ -533,8 +622,14 @@ class LlmGuideAgent:
                 return self._finish(GuideResponse(goal=goal, action=GuideAction.tap(close.id, close.text), source="rule"), meta, t0)
             return self._finish(GuideResponse(goal=goal, action=GuideAction.unknown(MSG_LOYALTY_NO_CLOSE), source="rule"), meta, t0)
 
-        # 2-0b) 하려는 일의 버튼(담기 · 결제하기)이 화면에 아예 안 보이면 지어내지 않고 카메라를 조정하게 한다
-        hidden = hidden_button.missing_button(req.utterance, els) if stype not in (screen_type.ScreenType.LOYALTY,) else None
+        # 사진을 보고 판단하는가 (기본 안내, 사진이 붙은 요청만). 개인정보 글자를 지웠으면 privacy가 사진도 버려서 False
+        use_photo = self.s.photo_guide and bool(req.image)
+        photo_size = som.image_size(req.image) if use_photo else None      # 질문에 적고, 박스를 픽셀로 받는다
+        meta["photo"] = use_photo
+        # 2-0b) 하려는 일의 버튼(담기 · 결제하기)이 화면에 아예 안 보이면 지어내지 않고 카메라를 조정하게 한다.
+        #       사진이 있으면 건너뛴다: 글자 읽기가 놓친 버튼도 AI가 사진에서 본다
+        hidden = (hidden_button.missing_button(req.utterance, els)
+                  if stype not in (screen_type.ScreenType.LOYALTY,) and not use_photo else None)
         if hidden:
             meta.update(source="rule", candidates=0, hidden=hidden)
             return self._finish(GuideResponse(goal=goal, action=GuideAction.unknown(hidden_button.message(hidden)), source="rule"), meta, t0)
@@ -555,7 +650,7 @@ class LlmGuideAgent:
 
         ranked = self.ranker.rank(els, goal, req.utterance)          # 짧은 대답("네" 등)은 이번 발화로만 판단
         meta["candidates"] = len(ranked)
-        if not ranked:
+        if not ranked and not use_photo:                             # 사진이 있으면 글자를 하나도 못 읽어도 AI가 사진에서 찾는다
             meta["source"] = "fallback"
             return self._finish(GuideResponse(goal=goal, action=GuideAction.unknown(MSG_UNKNOWN), source="fallback"),
                                 meta, t0)
@@ -566,7 +661,10 @@ class LlmGuideAgent:
         #      "샷 추가하실래요?" → "아니요"를 '취소' 버튼으로 누르면 주문이 취소된다 (2026-11-12)
         pressed = _pressed_text(req)
         chosen = _chosen_items(req)
-        if self.s.fastpath and goal and not asking and answer_button(req.utterance) is None and stype in screen_type.FASTPATH_TYPES:
+        # 사진을 볼 때는 빠른 길을 쓰지 않는다: 빠른 길은 글자만 보고 골라서 버튼 전체 상자(노란 칸)도 모르고,
+        # 선택 표시(✓) · 장바구니처럼 사진에만 보이는 것도 못 본다. 대신 그 경우 AI를 한 번 더 부른다(약 1.2초)
+        if (self.s.fastpath and ranked and goal and not use_photo and not asking and answer_button(req.utterance) is None
+                and stype in screen_type.FASTPATH_TYPES):
             top = ranked[0]
             second = ranked[1].match if len(ranked) > 1 else 0.0
             repeat = any(same_item(top.element.text, c) for c in chosen)
@@ -587,6 +685,11 @@ class LlmGuideAgent:
 
         # 5) LLM
         candidates = [r.element for r in ranked]
+        if use_photo:
+            # 사진을 볼 때는 후보를 넓힌다: 목표와 글자가 비슷한 8개만 주면 '커피' 탭 · '결제하기' 같은 진행 버튼이 빠져서
+            # 사진에서 맞는 버튼을 보고도 고르지 못했다 (2026-11-13 평가). 넓힌 쪽은 도움 모드와 같다(위 탭 · 아래 진행 버튼 먼저)
+            known = {c.id for c in candidates}
+            candidates = (candidates + [e for e in help_mode.candidates_for_help(els, utterance=goal) if e.id not in known])[:30]
         by_id = {c.id: c for c in candidates}
         # 화면 전체 글자를 위→아래로: 바뀐 화면이 원하는 메뉴의 옵션 창인지 · 다른 메뉴인지 · 다른 분류인지 LLM이 판단한다
         # (예전엔 일반 글자 6개만 보여서 판단할 근거가 없었다, 2026-11-12 시험)
@@ -602,16 +705,21 @@ class LlmGuideAgent:
                           question=asking, new_screen=new_screen,
                           progress=progress.summarize(req.history) if (self.s.progress_hint and ordering) else None,
                           unseen=unseen, screen=screen_type.describe_probabilities(probs) or screen_type.label(stype),
-                          kiosk=kiosk_hint, change=_change_line(change), lookalike=lookalike)
+                          kiosk=kiosk_hint, change=_change_line(change), lookalike=lookalike, photo=use_photo,
+                          photo_size=photo_size)
 
         action = None
         deadline = t0 + self.s.total_budget_s
+        # 사진을 볼 때는 '목록에 없음(MISSING)'도 고를 수 있게 한다: 형식이 목록 안 번호만 허용하면, 사진에서 결제하기를 보고도
+        # 글자 읽기가 놓친 그 버튼 대신 아무 칸(전체 · 연하게)이나 고른다 (2026-11-13 평가, 도움 모드와 같은 문제)
+        ids = list(by_id) + ([MISSING_ID] if use_photo else [])
         for attempt in range(2):                       # 최초 1회 + 형식 오류 시 1회
             remaining = deadline - time.perf_counter()
             if attempt > 0 and remaining < self.s.min_retry_s:
                 break                                  # 앱 타임아웃(6초) 안에 답하려면 재요청을 포기하고 UNKNOWN으로
             timeout = max(0.5, min(self.s.llm_timeout_s, remaining))
-            raw = await self._complete(user if attempt == 0 else user + RETRY_NOTE, timeout, list(by_id), meta)
+            raw = await self._complete(user if attempt == 0 else user + RETRY_NOTE, timeout, ids, meta,
+                                       image=req.image if use_photo else None)
             meta["llm_calls"] = int(meta["llm_calls"]) + 1
             if self.s.debug_prompts:
                 log.info("KL_DEBUG LLM 원답=%s", raw)
@@ -625,8 +733,27 @@ class LlmGuideAgent:
             return self._finish(GuideResponse(goal=goal, action=GuideAction.unknown(MSG_UNKNOWN), source="fallback"),
                                 meta, t0)
 
+        # 5-1) 사진에서 찾은 칸: 글자 목록(후보)에 없지만 AI가 사진에서 가리킨 버튼은 사진 위치로 안내한다.
+        #      앱은 응답의 box로 노란 칸을 친다 (domain: 스냅샷에 없는 targetId + box → 사진 칸). 캐시하지 않는다(폰이 움직이면 위치가 바뀜)
+        if use_photo and action.action == LlmKind.GUIDE:
+            action, found = _photo_pick(action, by_id, els, photo_size, meta)
+            if found is not None:                     # 이름이 맞는 글자 칸이 있으면 그 칸 (사진 박스보다 정확하다)
+                by_id = {**by_id, found.id: found}
+            photo = _photo_box(action, True, by_id, size=photo_size)
+            if photo is not None:
+                box, name = photo
+                meta.update(source="photo", photo_box=True)
+                resp = _repeat_guard(req, _scrub_claims(GuideResponse(goal=goal, action=GuideAction.tap("photo", name),
+                                                                      box=box, source="photo")))
+                return self._finish(resp, meta, t0)
+
         # 6) 검증 (+ LLM 형식 GUIDE… → 앱 계약 TAP…)
         resp = self.validator.validate(action, by_id, goal=goal)
+        if use_photo and resp.action.type == ActionType.TAP and action.action == LlmKind.GUIDE:
+            fixed = _photo_name(action.guideText or action.boxText or "", resp.action.guideText or "", els)
+            if fixed:                                  # 깨진 글자 대신 사진에서 읽은 이름으로 말한다 (칸은 글자 읽기 칸 그대로)
+                resp = resp.model_copy(update={"action": resp.action.model_copy(update={"guideText": fixed})})
+                meta["name_fixed"] = True
         if action.action == LlmKind.EXPLAIN:                      # 설명은 목표를 바꾸지 않는다
             resp = resp.model_copy(update={"goal": prev_goal})
         elif (resp.action.type == ActionType.WAIT or _waiting_talk(resp) or _generic_unknown(resp)) and not asking:
@@ -651,13 +778,21 @@ class LlmGuideAgent:
             meta["rejected"] = True
             resp = GuideResponse(goal=goal, action=GuideAction.ask_user(MSG_NOT_DONE), source="rule")
         # 8) 고른 것 없이 결제로 가지 않기: 원하는 메뉴가 안 보이면 '모름' → 앱이 말하고 화면을 다시 보며 기다렸다가 다시 묻는다
-        if resp.action.type == ActionType.TAP and _premature_checkout(req, goal, chosen, resp.action.guideText):
+        #    사진이 있으면 건너뛴다: 글자만 보던 AI가 결제를 지어내서 생긴 규칙이라, 장바구니를 사진으로 볼 때는 맞는 결제까지 막는다
+        if (resp.action.type == ActionType.TAP and not use_photo
+                and _premature_checkout(req, goal, chosen, resp.action.guideText)):
             meta["rejected"] = True
             resp = GuideResponse(goal=goal, action=GuideAction.unknown(MSG_NOT_SEEN), source="rule")
         resp = _repeat_guard(req, _scrub_claims(resp))
+        # 9) 노란 칸을 버튼 전체에: 글자 칸으로 고른 버튼도 AI가 사진에서 본 버튼 전체 상자를 같이 보낸다 (앱이 글자에 붙여 따라간다)
+        if use_photo and resp.box is None and resp.action.type == ActionType.TAP:
+            btn = _button_box(action, by_id.get(resp.action.targetId or ""), photo_size)
+            if btn is not None:
+                resp = resp.model_copy(update={"box": btn})
+                meta["button_box"] = True
         meta["source"] = resp.source
         if resp.source == "llm":
-            self.cache.put(key, resp)
+            self.cache.put(key, resp)                  # 키에 글자 위치가 들어 있어서 같은 위치일 때만 상자째 다시 쓴다
         return self._finish(resp, meta, t0)
 
     @staticmethod
@@ -701,6 +836,9 @@ class LlmGuideAgent:
         user = help_mode.build_user(req.utterance or "", req.history, els, candidates,
                                     screen=screen_type.describe_probabilities(probs) or screen_type.label(stype),
                                     kiosk=kiosk_hint, change=_change_line(change))
+        size = som.image_size(req.image) if image else None
+        if size:                                                            # 박스는 이 사진의 픽셀 좌표로 받는다
+            user += f"\n사진 크기: {size[0]}×{size[1]} 픽셀 (box는 [왼쪽, 위, 오른쪽, 아래] 픽셀 좌표)"
         meta["help"] = True
         meta["candidates"] = len(candidates)
         if self.s.debug_prompts:
@@ -762,7 +900,8 @@ class LlmGuideAgent:
             action = action.model_copy(update={"action": LlmKind.ASK_USER, "targetId": None, "guideText": None,
                                                "message": _reason_only(action.message or "") or None})
             named = ""
-        photo = _photo_box(action, bool(req.image), by_id) if action.action == LlmKind.GUIDE else None
+        photo = (_photo_box(action, bool(req.image), by_id, size=som.image_size(req.image))
+                 if action.action == LlmKind.GUIDE else None)
         if photo is not None:                                                # 글자 목록에 없지만 사진에서 찾은 칸: 박스로 가리킨다
             box, name = photo
             say = _clean_message(action.message, "", 80)

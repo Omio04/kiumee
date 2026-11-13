@@ -237,6 +237,34 @@ class SessionStateMachineTest {
         assertTrue("위치가 같으면 다시 보내지 않음", tr.effects.isEmpty())
     }
 
+    // 버튼 전체 칸 (2026-11-13 요청: "버튼을 다 감싸듯이"): 서버가 사진에서 본 버튼 전체 상자를 글자 상자 대신 그린다
+    @Test fun `버튼 전체 칸이 오면 글자 상자 대신 그 칸을 그리고 글자를 따라 옮긴다`() {
+        val d = planningOnMenu()
+        val whole = NormRect(0.58f, 0.86f, 0.97f, 0.98f)                   // "장바구니 보기" 글자(0.6, 0.9, 0.95, 0.97)를 품은 버튼 전체
+        var tr = d.send { GuideReceived(it, GuideResponse(goal, GuideAction.Tap("e11", "장바구니 보기"), box = whole)) }
+        val drawn = tr.effects.filterIsInstance<Highlight>().single().target
+        assertEquals("e11", drawn.elementId)
+        assertTrue("버튼 전체를 약간 넉넉히: ${drawn.rect}", drawn.rect.left < 0.58f && drawn.rect.top < 0.86f && drawn.rect.right > 0.97f && drawn.rect.bottom > 0.98f)
+        assertTrue("두 배로 키우지 않음", drawn.rect.width < whole.width + 0.05f)
+        d.send { SpeechFinished(it) }
+
+        val shaken = menu.copy(frameId = 11, elements = menu.elements.map { if (it.id == "e11") it.copy(rect = NormRect(0.5f, 0.8f, 0.85f, 0.87f)) else it })
+        tr = d.send(SnapshotReceived(shaken))                                  // 휴대폰이 움직여 글자가 왼쪽 위로 0.1씩
+        val followed = tr.effects.filterIsInstance<Highlight>().single().target.rect
+        assertEquals(drawn.rect.left - 0.1f, followed.left, 1e-4f)
+        assertEquals(drawn.rect.top - 0.1f, followed.top, 1e-4f)
+        assertEquals(drawn.rect.width, followed.width, 1e-4f)                  // 글자 상자로 줄어들지 않는다
+        assertEquals(drawn.rect.height, followed.height, 1e-4f)
+    }
+
+    @Test fun `글자와 어긋난 버튼 전체 칸은 버리고 글자 상자를 그린다`() {
+        val d = planningOnMenu()
+        val elsewhere = NormRect(0.05f, 0.05f, 0.3f, 0.2f)                    // 사진을 찍은 뒤 휴대폰이 움직였거나 AI가 빗나감
+        val tr = d.send { GuideReceived(it, GuideResponse(goal, GuideAction.Tap("e11", "장바구니 보기"), box = elsewhere)) }
+        assertEquals(listOf(HighlightTarget("e11", menu.findElement("e11")!!.rect)), tr.effects.filterIsInstance<Highlight>().map { it.target })
+        assertNull(d.state.guide?.button)
+    }
+
     @Test fun `목표가 가려지면 주변이 움직인 만큼 하이라이트를 옮기고 단서가 없으면 숨겼다가 다시 보이면 그린다`() {
         val d = waitingOnMenu()
         val start = d.state.guide!!.rect!!
