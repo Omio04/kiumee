@@ -120,8 +120,7 @@ def test_dotenv_is_read_but_never_overrides_the_environment(tmp_path, monkeypatc
     assert os.environ["APP_KEY"] == "from_shell"                        # 명령줄 값이 우선
     assert load_dotenv(tmp_path / "없음.env") == 0
     g = tmp_path / "ex.env"
-    g.write_text("OTHER_KEY=            # 무료 키: https://example.com
-", encoding="utf-8")
+    g.write_text("OTHER_KEY=            # 무료 키: https://example.com\n", encoding="utf-8")
     monkeypatch.delenv("OTHER_KEY", raising=False)
     load_dotenv(g)
     assert os.environ["OTHER_KEY"] == ""                                # 주석이 값으로 들어가면 안 된다
