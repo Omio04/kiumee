@@ -47,7 +47,7 @@ async def test_fast_answer_sends_only_one_request(snaps):
 async def test_busy_error_is_resent_at_once_but_rate_limit_is_not(snaps):
     busy = ScriptedFakeLlmClient([LlmUpstream("http_503"), '{"action":"UNKNOWN"}'])
     r = await LlmGuideAgent(busy, Settings(app_key="k", fastpath=False)).next(_req(snaps))
-    assert len(busy.calls) == 2 and r.response.action.type.value == "UNKNOWN"
+    assert len(busy.calls) == 2 and r.response.action.type.value == "ASK_USER"   # 재전송 성공 (UNKNOWN은 화면 안내로 바뀜)
 
     limited = ScriptedFakeLlmClient([LlmRateLimited(5), '{"action":"UNKNOWN"}'])
     with pytest.raises(LlmRateLimited):

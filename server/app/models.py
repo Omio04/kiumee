@@ -165,6 +165,7 @@ class LlmKind(str, Enum):
     UNKNOWN = "UNKNOWN"
     SCROLL = "SCROLL"          # 찾는 버튼이 후보에 없지만 화면을 밀면 있을 것 같을 때
     WAIT = "WAIT"              # 화면이 아직 바뀌는 중이거나 불러오는 중일 때
+    EXPLAIN = "EXPLAIN"        # 어르신이 메뉴 · 옵션이 무엇인지 물었을 때 (앱에는 ASK_USER로 나감, 목표는 그대로)
 
 
 class LlmAction(BaseModel):

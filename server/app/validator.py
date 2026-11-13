@@ -24,12 +24,14 @@ MSG_NOT_SEEN = "찾으시는 것이 화면에서 안 보여요. 화면이 잘 �
 SCROLL_TARGET_DEFAULT = "원하시는 메뉴"    # 찾는 대상을 모를 때. 앱: "화면을 아래로 밀어서 원하시는 메뉴 찾아 주세요"
 MSG_WAIT = "화면이 바뀔 때까지 잠시 기다려 주세요."
 MAX_MESSAGE = 60
+MAX_EXPLAIN = 80          # 설명 + 되물음 (계약: ASK_USER question 80자)
+MSG_EXPLAIN = "어떤 메뉴가 궁금하세요?"
 MAX_SCROLL_TARGET = 20
 
 
-def _clean_message(m: str | None, default: str) -> str:
+def _clean_message(m: str | None, default: str, limit: int = MAX_MESSAGE) -> str:
     m = (m or "").strip()
-    if not m or len(m) > MAX_MESSAGE:
+    if not m or len(m) > limit:
         return default
     return m
 
@@ -55,6 +57,9 @@ class ActionValidator:
             # 질문이 message가 아니라 guideText 칸에 들어오는 일이 있다 (Gemini, 2026-11-12) → 질문 문장이면 그걸 쓴다
             q = a.message or (a.guideText if (a.guideText or "").strip().endswith(("?", "요", "까")) else None)
             return GuideResponse(goal=goal, action=GuideAction.ask_user(_clean_message(q, MSG_ASK)), source=source)
+        if a.action == LlmKind.EXPLAIN:                # 설명도 앱에는 ASK_USER (읽고 → 듣기). goal은 부른 쪽이 그대로 둔다
+            return GuideResponse(goal=goal, action=GuideAction.ask_user(_clean_message(a.message, MSG_EXPLAIN, MAX_EXPLAIN)),
+                                 source=source)
         if a.action == LlmKind.DONE:
             return GuideResponse(goal=goal, action=GuideAction.done(_clean_message(a.message, MSG_DONE)), source=source)
         if a.action == LlmKind.SCROLL:

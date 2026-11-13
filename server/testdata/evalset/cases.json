@@ -145,7 +145,7 @@
   "screen": "s01_dine",
   "goal": "비빔밥 주세요",
   "variant": "clean",
-  "expectAction": "UNKNOWN",
+  "expectAction": "ASK_USER",
   "answerText": null,
   "requiresLlm": true
  },
@@ -154,9 +154,48 @@
   "screen": "s05_payment",
   "goal": "아메리카노 주세요",
   "variant": "clean",
-  "expectAction": "UNKNOWN",
+  "expectAction": "ASK_USER",
   "answerText": null,
   "requiresLlm": true
+ },
+ {
+  "id": "q01",
+  "screen": "s02_menu",
+  "goal": "카페라떼가 뭐야",
+  "variant": "clean",
+  "expectAction": "ASK_USER",
+  "answerText": null,
+  "requiresLlm": true
+ },
+ {
+  "id": "q02",
+  "screen": "s02_menu",
+  "goal": "바닐라라떼는 무슨 맛이에요",
+  "variant": "clean",
+  "expectAction": "ASK_USER",
+  "answerText": null,
+  "requiresLlm": true,
+  "prevGoal": "아메리카노 주세요"
+ },
+ {
+  "id": "q03",
+  "screen": "s03_options",
+  "goal": "샷 추가가 뭔가요",
+  "variant": "clean",
+  "expectAction": "ASK_USER",
+  "answerText": null,
+  "requiresLlm": true,
+  "prevGoal": "아메리카노 주세요"
+ },
+ {
+  "id": "q04",
+  "screen": "s03_options",
+  "goal": "뭘 눌러야 돼요",
+  "variant": "clean",
+  "expectAction": "ASK_USER",
+  "answerText": null,
+  "requiresLlm": true,
+  "prevGoal": "아메리카노 주세요"
  },
  {
   "id": "h01",

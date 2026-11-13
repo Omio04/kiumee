@@ -1,7 +1,14 @@
 package kr.kiosklens.app.camera
 
 import android.content.Context
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CaptureRequest
+import android.util.Range
 import android.util.Size
+import androidx.camera.camera2.interop.Camera2CameraControl
+import androidx.camera.camera2.interop.Camera2CameraInfo
+import androidx.camera.camera2.interop.CaptureRequestOptions
+import androidx.camera.camera2.interop.ExperimentalCamera2Interop
 import androidx.camera.core.AspectRatio
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
@@ -34,6 +41,7 @@ import kr.kiosklens.overlay.tracking.CameraMotionTracker
  * - 프레임마다 화면 전체의 움직임을 [onMotion] 으로 알려 준다(흔들림 따라가기, P5 `CameraMotionTracker`).
  *   OCR은 같은 화면이면 2초에 한 번만 다시 읽어서, 그 사이 흔들리면 노란 테두리가 버튼에서 벗어나기 때문.
  */
+@OptIn(ExperimentalCamera2Interop::class)
 class CameraController(
     private val context: Context,
     private val sink: FrameSink,
@@ -46,6 +54,7 @@ class CameraController(
     private val ids = AtomicLong()
     private val motion = CameraMotionTracker()                             // 분석 스레드에서만 쓴다
     private var motionFailed = false
+    private val shakeGate = ShakeGate()                                    // 분석 스레드에서만 쓴다
     private var provider: ProcessCameraProvider? = null
     @Volatile private var reportedSize = ""
 
@@ -75,8 +84,14 @@ class CameraController(
                             logger.d("CameraController", "analysis size $key (rotation $rot)")
                         }
                         val id = ids.incrementAndGet()
-                        trackMotion(proxy, id, rot)                                   // sink에 넘기기 전에 (넘긴 뒤에는 닫혔을 수 있음)
-                        sink.submit(ImageProxyFrame(proxy, id, System.currentTimeMillis()))   // 닫는 책임은 sink
+                        val moved = trackMotion(proxy, id, rot)                       // sink에 넘기기 전에 (넘긴 뒤에는 닫혔을 수 있음)
+                        val now = System.currentTimeMillis()
+                        if (shakeGate.allow(moved, now)) {
+                            sink.submit(ImageProxyFrame(proxy, id, now))                  // 닫는 책임은 sink
+                        } else {
+                            proxy.close()                                                  // 흔들려 번진 프레임은 읽지 않는다 (ShakeGate)
+                            if (shakeGate.skipped % 30 == 1) logger.d("KL_PERF", "shake skipped=${shakeGate.skipped}")
+                        }
                     } catch (t: Throwable) {
                         proxy.close()
                     }
@@ -84,6 +99,7 @@ class CameraController(
                 p.unbindAll()
                 val camera = p.bindToLifecycle(owner, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
                 runCatching { tuneExposure(camera) }.onFailure { logger.w("CameraController", "exposure tuning skipped: $it") }
+                runCatching { tuneStabilization(camera) }.onFailure { logger.w("CameraController", "stabilization tuning skipped: $it") }
             } catch (t: Throwable) {
                 logger.e("CameraController", "camera start failed", t)
             }
@@ -112,18 +128,36 @@ class CameraController(
         logger.d("CameraController", "center metering ${if (supported) "on" else "unsupported"}")
     }
 
+    /**
+     * 흔들림에 강하게 ([StabilizationTuning]): 광학식 손떨림 보정이 있으면 켜고, 노출 시간이 길어지지 않게 fps를 30 근처로 고정.
+     * 기기가 안 받는 값은 건드리지 않는다.
+     */
+    private fun tuneStabilization(camera: Camera) {
+        val info = Camera2CameraInfo.from(camera.cameraInfo)
+        val options = CaptureRequestOptions.Builder()
+        val ois = info.getCameraCharacteristic(CameraCharacteristics.LENS_INFO_AVAILABLE_OPTICAL_STABILIZATION)
+        val oisOn = StabilizationTuning.canUseOis(ois, CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_ON)
+        if (oisOn) options.setCaptureRequestOption(CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE, CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_ON)
+        val ranges = info.getCameraCharacteristic(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES)
+        val fps = StabilizationTuning.pickFpsRange(ranges?.map { it.lower to it.upper }.orEmpty())
+        if (fps != null) options.setCaptureRequestOption(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, Range(fps.first, fps.second))
+        Camera2CameraControl.from(camera.cameraControl).addCaptureRequestOptions(options.build())
+        logger.d("CameraController", "stabilization ois=$oisOn fps=${fps ?: "default"}")
+    }
+
     fun stop() {
         provider?.unbindAll()
         executor.shutdown()
     }
 
     /** 밝기(Y) 평면만 읽어 직전 프레임과 비교한다. 실패해도 인식(sink)은 그대로 이어지게 삼킨다. */
-    private fun trackMotion(proxy: ImageProxy, id: Long, rot: Int) {
-        try {
+    private fun trackMotion(proxy: ImageProxy, id: Long, rot: Int): FrameMotion? {
+        return try {
             val y = proxy.planes[0]
-            motion.onLumaFrame(id, y.buffer, y.rowStride, y.pixelStride, proxy.width, proxy.height, rot)?.let(onMotion)
+            motion.onLumaFrame(id, y.buffer, y.rowStride, y.pixelStride, proxy.width, proxy.height, rot)?.also(onMotion)
         } catch (t: Throwable) {
             if (!motionFailed) { motionFailed = true; logger.w("CameraController", "motion tracking failed", t) }   // 한 번만 남긴다
+            null
         }
     }
 

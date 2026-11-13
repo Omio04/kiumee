@@ -22,7 +22,7 @@ ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
 #   Anthropic: 도구 하나(decide)를 tool_choice로 강제 → 입력이 항상 스키마를 따르는 JSON 객체
 #   Gemini   : responseSchema (constrained decoding)
 # 프롬프트에 "JSON만 출력하세요"라고 부탁하는 것보다 형식 오류(= 재요청 = 지연)가 크게 줄어듭니다.
-_ACTIONS = ["GUIDE", "ASK_USER", "DONE", "UNKNOWN", "SCROLL", "WAIT"]
+_ACTIONS = ["GUIDE", "ASK_USER", "DONE", "UNKNOWN", "SCROLL", "WAIT", "EXPLAIN"]
 _DIRECTIONS = ["UP", "DOWN", "LEFT", "RIGHT"]
 ACTION_SCHEMA = {
     "type": "object",
@@ -263,6 +263,8 @@ class HeuristicFakeLlmClient:
                 cands.append((cid, text))
         if goal == "(없음)":
             goal = ""
+        if "[질문]" in user:                                  # 가짜는 사전에 없는 메뉴를 설명하지 못한다
+            return '{"action":"EXPLAIN","targetId":null,"guideText":null,"message":"어떤 메뉴가 궁금하세요?"}'
         if chosen:                                           # 이미 고른 메뉴는 다시 고르지 않는다 (화면이 바뀜)
             cands = [c for c in cands if not any(same_item(c[1], p) for p in chosen)]
         if not goal:

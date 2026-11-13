@@ -25,6 +25,7 @@ from typing import Dict, List, Optional, Protocol
 from . import privacy
 from .cache import ResponseCache, request_key
 from .jamo import dice, normalize
+from . import menu_info, screen_guide
 from .llm import LlmClient, LlmRateLimited, LlmTimeout, LlmUpstream
 from .models import (MAX_GOAL, MAX_HISTORY, ActionType, ElementKind, GuideAction, GuideRequest, GuideResponse,
                      LlmKind, ScreenElement)
@@ -197,6 +198,21 @@ class LlmGuideAgent:
             meta.update(source="rule", candidates=0)
             return self._finish(GuideResponse(goal=goal, action=GuideAction.done(MSG_DONE), source="rule"), meta, t0)  # 규칙은 이미 즉시라 캐시 불필요
 
+        # 2-1) 질문: "라떼가 뭐야?" → 사전에 있으면 LLM 없이 설명 (goal은 그대로: 질문이 목표에 섞이면 안 된다)
+        prev_goal = (req.goal or "").strip()
+        asking = menu_info.is_info_question(req.utterance)
+        if asking:
+            text = menu_info.explain(req.utterance or "", req.history)
+            if text:
+                meta.update(source="rule", candidates=0, explained=True)
+                return self._finish(GuideResponse(goal=prev_goal, action=GuideAction.ask_user(text), source="rule"), meta, t0)
+        # 2-2) "뭘 눌러야 돼요?" → 지금 화면에서 고를 수 있는 것을 알려 준다
+        if menu_info.is_screen_question(req.utterance):
+            text = screen_guide.describe(els, changed=False)
+            if text:
+                meta.update(source="rule", candidates=0, described=True)
+                return self._finish(GuideResponse(goal=prev_goal, action=GuideAction.ask_user(text), source="rule"), meta, t0)
+
         ranked = self.ranker.rank(els, goal, req.utterance)          # 짧은 대답("네" 등)은 이번 발화로만 판단
         meta["candidates"] = len(ranked)
         if not ranked:
@@ -210,7 +226,7 @@ class LlmGuideAgent:
         #      "샷 추가하실래요?" → "아니요"를 '취소' 버튼으로 누르면 주문이 취소된다 (2026-11-12)
         pressed = _pressed_text(req)
         chosen = _chosen_items(req)
-        if self.s.fastpath and goal and answer_button(req.utterance) is None:
+        if self.s.fastpath and goal and not asking and answer_button(req.utterance) is None:
             top = ranked[0]
             second = ranked[1].match if len(ranked) > 1 else 0.0
             repeat = any(same_item(top.element.text, c) for c in chosen)
@@ -225,7 +241,9 @@ class LlmGuideAgent:
         # 화면 전체 글자를 위→아래로: 바뀐 화면이 원하는 메뉴의 옵션 창인지 · 다른 메뉴인지 · 다른 분류인지 LLM이 판단한다
         # (예전엔 일반 글자 6개만 보여서 판단할 근거가 없었다, 2026-11-12 시험)
         context = [e.text for e in sorted(els, key=lambda e: (round(e.rect.top, 2), e.rect.left))][:30]
-        user = build_user(goal, req.history, candidates, context, pressed=pressed, chosen=chosen)
+        new_screen = screen_guide.screen_changed(req)
+        user = build_user(goal, req.history, candidates, context, pressed=pressed, chosen=chosen,
+                          question=asking, new_screen=new_screen)
 
         action = None
         deadline = t0 + self.s.total_budget_s
@@ -250,6 +268,14 @@ class LlmGuideAgent:
 
         # 6) 검증 (+ LLM 형식 GUIDE… → 앱 계약 TAP…)
         resp = self.validator.validate(action, by_id, goal=goal)
+        if action.action == LlmKind.EXPLAIN:                      # 설명은 목표를 바꾸지 않는다
+            resp = resp.model_copy(update={"goal": prev_goal})
+        elif resp.action.type == ActionType.UNKNOWN and not asking:
+            # 새 화면인데 고를 버튼을 못 정함: "못 찾았어요"로 끝내지 않고 고를 수 있는 것을 알려 준다
+            text = screen_guide.describe(els, changed=new_screen)
+            if text:
+                meta["described"] = True
+                resp = GuideResponse(goal=goal, action=GuideAction.ask_user(text), source="rule")
         if action.action == LlmKind.GUIDE and resp.action.type == ActionType.UNKNOWN:
             meta["rejected"] = True                    # LLM이 후보에 없는 버튼을 말함
         # 7) 이른 '끝' 막기: 고른 것이 없는데 DONE이면 끝내지 않고 다시 묻는다 (앱은 묻고 나서 바로 듣는다)

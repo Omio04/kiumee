@@ -83,8 +83,14 @@ CASES = [
     case("n02", "s02_menu", "바닐라 라떼요", "TAP", "바닐라래떼", variant="ocr-noise", mutate={"바닐라라떼": "바닐라래떼"}),
     # 되묻기/모름
     case("a01", "s02_menu", "", "ASK_USER", requires_llm=True),
-    case("u01", "s01_dine", "비빔밥 주세요", "UNKNOWN", requires_llm=True),
-    case("u02", "s05_payment", "아메리카노 주세요", "UNKNOWN", requires_llm=True),
+    # 화면에 없는 것을 말하면 "못 찾았어요"로 끝내지 않고 지금 고를 수 있는 것을 알려 준다 (2026-11-13)
+    case("u01", "s01_dine", "비빔밥 주세요", "ASK_USER", requires_llm=True),
+    case("u02", "s05_payment", "아메리카노 주세요", "ASK_USER", requires_llm=True),
+    # 음식 질문: 고르지 않고 설명 (목표는 그대로)
+    case("q01", "s02_menu", "카페라떼가 뭐야", "ASK_USER", requires_llm=True),
+    case("q02", "s02_menu", "바닐라라떼는 무슨 맛이에요", "ASK_USER", requires_llm=True, prev_goal="아메리카노 주세요"),
+    case("q03", "s03_options", "샷 추가가 뭔가요", "ASK_USER", requires_llm=True, prev_goal="아메리카노 주세요"),
+    case("q04", "s03_options", "뭘 눌러야 돼요", "ASK_USER", requires_llm=True, prev_goal="아메리카노 주세요"),
     # 앱이 돌려준 목표로 이어 가기 (화면만 바뀜, 새 발화 없음)
     case("h01", "s03_options", "", "TAP", "ICE", True, prev_goal="아이스 아메리카노 주세요",
          history=[{"screenId": "s02_menu", "action": "TAP", "targetText": "아메리카노"}]),
