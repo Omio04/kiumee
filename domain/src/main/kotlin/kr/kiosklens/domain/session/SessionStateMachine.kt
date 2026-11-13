@@ -5,7 +5,10 @@ import kr.kiosklens.core.model.GuideAction
 import kr.kiosklens.core.model.GuideRequest
 import kr.kiosklens.core.model.GuideResponse
 import kr.kiosklens.core.model.HighlightTarget
+import kr.kiosklens.core.model.ElementKind
 import kr.kiosklens.core.model.HistoryItem
+import kr.kiosklens.core.model.NormRect
+import kr.kiosklens.core.model.UiElement
 import kr.kiosklens.core.model.ScreenSnapshot
 import kr.kiosklens.core.model.SttError
 import kr.kiosklens.domain.policy.GuideTextComposer
@@ -280,12 +283,15 @@ class SessionStateMachine(
         )
         return when (action) {
             is GuideAction.Tap -> {
+                val photoBox = response.box                                        // AI가 사진에서 직접 찾은 칸 (글자 목록에 없음)
                 val element = asked.findElement(action.targetId)
-                    ?: return speakAndWait(base, asked.screenId, texts.notFound(), retry = true)   // 계약 위반 방어
+                    ?: if (photoBox != null) UiElement(action.targetId, action.guideText, photoBox, 1f, ElementKind.BUTTON_LIKE)
+                    else return speakAndWait(base, asked.screenId, texts.notFound(), retry = true)   // 계약 위반 방어
                 // 응답을 기다리는 사이 같은 화면의 새 스냅샷이 왔으면 최신 위치를 쓴다. 메뉴 칸이면 칸 전체를 감싼다
                 val latest = base.snapshot?.takeIf { it.screenId == asked.screenId }
                 val now = latest?.findElement(element.id)
-                val rect = if (latest != null && now != null) HighlightArea.of(now, latest.elements) else HighlightArea.of(element, asked.elements)
+                val rect = if (photoBox != null && asked.findElement(action.targetId) == null) photoBox.padded(PHOTO_BOX_PAD)   // 사진 박스는 그대로(약간만 넉넉히)
+                           else if (latest != null && now != null) HighlightArea.of(now, latest.elements) else HighlightArea.of(element, asked.elements)
                 val pointer = texts.tap(rect, action.guideText)
                 val spoken = response.say?.trim()?.takeIf { it.isNotEmpty() }?.let { "$it $pointer" } ?: pointer   // 이유 · 방법 + 어느 칸을 누를지
                 val t = base.ticket + 1
@@ -404,6 +410,10 @@ class SessionStateMachine(
     private fun stay(state: SessionState) = Transition(state)
 
     private companion object {
+        /** AI가 사진에서 가리킨 박스를 사방으로 이만큼(0~1) 넓힌다: 모델 박스가 칸을 조금 못 덮어도 글자가 가려지지 않게 */
+        const val PHOTO_BOX_PAD = 0.012f
+
+        fun NormRect.padded(p: Float) = NormRect((left - p).coerceAtLeast(0f), (top - p).coerceAtLeast(0f), (right + p).coerceAtMost(1f), (bottom + p).coerceAtMost(1f))
         /** 앱이 말하거나 생각 중이라 "말하기"를 눌러도 소용없는 단계 (도움 모드 · 버튼 방식) */
         val BUSY_PHASES = setOf(Phase.ASKING, Phase.GUIDING, Phase.PLANNING, Phase.LOST, Phase.DONE, Phase.ERROR)
 

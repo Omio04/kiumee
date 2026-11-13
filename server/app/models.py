@@ -161,10 +161,19 @@ class GuideAction(BaseModel):
         return cls(type=ActionType.UNKNOWN, reason=reason)
 
 
+class Box(BaseModel):
+    """사진 안의 위치 (0~1, 왼쪽 위가 원점). 글자 읽기(OCR)에 없는 칸을 AI가 사진에서 직접 가리킬 때만 쓴다."""
+    left: float = Field(ge=0, le=1)
+    top: float = Field(ge=0, le=1)
+    right: float = Field(ge=0, le=1)
+    bottom: float = Field(ge=0, le=1)
+
+
 class GuideResponse(BaseModel):
     goal: str = Field(default="", max_length=MAX_GOAL)   # 앱은 다음 요청의 goal에 그대로 넣음
     action: GuideAction
     say: Optional[str] = Field(default=None, max_length=MAX_TEXT)   # 도움 모드: 버튼을 가리킬 때 앞에 읽어 줄 이유 · 해결 방법 한 문장 (없으면 생략, 모르는 앱은 무시)
+    box: Optional[Box] = None        # TAP인데 그 칸이 글자 목록에 없고 사진에서 찾은 경우의 위치 (targetId는 "photo"). 없으면 생략
     source: Optional[str] = None     # 진단용 (llm | fastpath | rule | fake | fallback). 내용이 아님. 앱은 무시
 
 
@@ -187,6 +196,8 @@ class LlmAction(BaseModel):
     guideText: Optional[str] = None
     message: Optional[str] = None
     direction: Optional[str] = None
+    box: Optional[List[int]] = None        # 도움 모드: 사진에서 누를 칸 [위, 왼쪽, 아래, 오른쪽] 0~1000 (후보에 없을 때만)
+    boxText: Optional[str] = None          # 그 칸에 적힌 글자
     screenAsks: Optional[str] = None       # 진단용: 모델이 적은 "이 화면이 묻는 것" (앱에는 나가지 않음)
 
     @field_validator("targetId", "guideText", "message", "direction", mode="before")

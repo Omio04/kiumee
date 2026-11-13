@@ -141,3 +141,26 @@ async def test_photo_is_dropped_when_a_card_number_was_read(snaps):
     d["snapshot"]["elements"].append({"id": "x9", "text": "1234 5678 9012 3456", "rect": {"left": 0.1, "top": 0.1, "right": 0.5, "bottom": 0.2}, "confidence": 0.9, "kind": "TEXT"})
     await agent(llm).next(GuideRequest.model_validate(d))
     assert llm.calls[0]["image"] is None                    # 글자는 걸렀어도 사진에는 번호가 남아 있을 수 있다
+
+
+# ---- 글자 목록에 없고 사진에서만 보이는 칸: AI가 준 박스로 가리킨다
+GUIDE_BOX = '{"screenAsks":"x","action":"GUIDE","targetId":null,"guideText":null,"message":"안 골라도 돼요.","box":[850,500,950,900],"boxText":"주문담기"}'
+
+
+async def test_photo_box_points_at_a_button_the_ocr_missed(snaps):
+    llm = ScriptedFakeLlmClient([GUIDE_BOX])
+    d = make_req(snaps, "s01_dine", "그냥 결제하고 싶어", history=[]); d["image"] = "QUJD"
+    r = (await agent(llm).next(GuideRequest.model_validate(d))).response
+    assert r.action.type.value == "TAP" and r.action.targetId == "photo" and r.action.guideText == "주문담기"
+    assert (r.box.left, r.box.top, r.box.right, r.box.bottom) == (0.5, 0.85, 0.9, 0.95)    # [위, 왼쪽, 아래, 오른쪽] 0~1000 → 0~1
+    assert r.say == "안 골라도 돼요."
+
+
+async def test_photo_box_is_ignored_without_a_photo_or_with_a_silly_box(snaps):
+    d = make_req(snaps, "s01_dine", "그냥 결제하고 싶어", history=[])
+    r = (await agent(ScriptedFakeLlmClient([GUIDE_BOX])).next(GuideRequest.model_validate(d))).response      # 사진 없음
+    assert r.box is None and r.action.type.value != "TAP"
+    d["image"] = "QUJD"
+    huge = GUIDE_BOX.replace("[850,500,950,900]", "[0,0,1000,1000]")                                         # 화면 전체를 덮는 박스
+    r = (await agent(ScriptedFakeLlmClient([huge])).next(GuideRequest.model_validate(d))).response
+    assert r.box is None

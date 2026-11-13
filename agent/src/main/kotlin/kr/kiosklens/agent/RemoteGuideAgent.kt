@@ -87,7 +87,7 @@ class RemoteGuideAgent(
     /** 모르는 버튼을 가리키면 안 된다: 요청 화면에 없는 targetId는 UNKNOWN으로. */
     private fun guard(resp: GuideResponse, sent: GuideRequest): GuideResponse {
         val a = resp.action
-        if (a is GuideAction.Tap && sent.snapshot.findElement(a.targetId) == null) {
+        if (a is GuideAction.Tap && resp.box == null && sent.snapshot.findElement(a.targetId) == null) {      // 사진 박스가 있으면 글자 목록에 없어도 된다
             return resp.copy(action = GuideAction.Unknown("버튼을 찾지 못했어요. 화면이 잘 보이게 비춰 주세요."))
         }
         return resp

@@ -4,6 +4,7 @@ import kr.kiosklens.core.model.ElementKind
 import kr.kiosklens.core.model.GuideAction
 import kr.kiosklens.core.model.GuideRequest
 import kr.kiosklens.core.model.GuideResponse
+import kr.kiosklens.core.model.NormRect
 import kr.kiosklens.core.model.ScreenSnapshot
 import kr.kiosklens.core.model.ScrollDir
 import kr.kiosklens.core.model.UiElement
@@ -87,7 +88,12 @@ object DtoMapper {
             else -> throw BadResponse("모르는 type: $type")
         }
         val say = (root["say"] as? String)?.trim()?.takeIf { it.isNotEmpty() }?.take(80)
-        return GuideResponse(goal = (root["goal"] as? String).orEmpty(), action = action, say = say)
+        val box = (root["box"] as? Map<*, *>)?.let { b ->
+            fun f(k: String): Float? = (b[k] as? Number)?.toFloat()
+            val l = f("left"); val t = f("top"); val r = f("right"); val bt = f("bottom")
+            if (l == null || t == null || r == null || bt == null) null else NormRect(l, t, r, bt).takeIf { it.isValid }
+        }
+        return GuideResponse(goal = (root["goal"] as? String).orEmpty(), action = action, say = say, box = box)
     }
 
     /** 오류 본문에서 code만 꺼낸다 (message는 개발자용이라 어르신께 읽지 않는다). */

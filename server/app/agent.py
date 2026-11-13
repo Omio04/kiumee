@@ -28,7 +28,7 @@ from .jamo import dice, normalize
 from . import elder, expectation, help_mode, hidden_button, kiosk, menu_info, progress, screen_guide, screen_type
 from .screen_memory import ScreenMemory
 from .llm import LlmClient, LlmRateLimited, LlmTimeout, LlmUpstream
-from .models import (MAX_GOAL, MAX_HISTORY, ActionType, ElementKind, GuideAction, GuideRequest, GuideResponse,
+from .models import (MAX_GOAL, MAX_HISTORY, ActionType, Box, ElementKind, GuideAction, GuideRequest, GuideResponse,
                      LlmKind, ScreenElement)
 from .parser import ActionParser, ParseError
 from .prompt import RETRY_NOTE, SYSTEM, build_user
@@ -168,6 +168,22 @@ def _generic_unknown(resp: GuideResponse) -> bool:
     # "버튼을 찾지 못했어요. 화면이 잘 보이게 비춰 주세요" 같은 상투적인 말은 어르신 질문에 대한 대답이 아니다.
     # "화면에 캐모마일 메뉴가 보이지 않아요"처럼 무엇이 없는지 말한 대답은 남긴다.
     return not reason or any(normalize(w) in reason for w in ("버튼을 찾", "화면이 잘 보이게", "정면에서 비춰", "찾지 못했"))
+
+
+def _photo_box(action, has_image: bool, candidates: dict) -> Optional[tuple]:
+    """AI가 사진에서 직접 가리킨 칸: (Box, 칸 글자). 글자 목록(후보)에 없는 칸일 때만, 사진이 있고 박스가 말이 될 때만."""
+    if not has_image:
+        return None
+    if action.targetId and action.targetId in candidates:
+        return None                                                          # 후보에 있으면 글자 목록의 칸을 쓴다 (더 정확)
+    b, text = action.box, (action.boxText or action.guideText or "").strip()
+    if not b or len(b) != 4 or not text:
+        return None
+    top, left, bottom, right = (max(0, min(1000, int(v))) / 1000.0 for v in b)
+    w, h = right - left, bottom - top
+    if w < 0.02 or h < 0.01 or w * h > 0.35:                                 # 점 같거나 화면 반을 덮는 박스는 믿지 않는다
+        return None
+    return Box(left=left, top=top, right=right, bottom=bottom), text[:40]
 
 
 def _waiting_talk_text(text: str) -> bool:
@@ -517,6 +533,16 @@ class LlmGuideAgent:
         if action is None:
             meta["source"] = "fallback"
             return self._finish(GuideResponse(goal=prev_goal, action=GuideAction.ask_user(fallback), source="fallback"), meta, t0)
+        photo = _photo_box(action, bool(req.image), by_id) if action.action == LlmKind.GUIDE else None
+        if photo is not None:                                                # 글자 목록에 없지만 사진에서 찾은 칸: 박스로 가리킨다
+            box, name = photo
+            say = _clean_message(action.message, "", 80)
+            if say and (_waiting_talk_text(say) or any(w in normalize(say) for w in _APP_CLAIMS)):
+                say = ""
+            resp = GuideResponse(goal=prev_goal, action=GuideAction.tap("photo", name), say=say or None, box=box, source="help")
+            meta["source"] = "help"
+            meta["photo_box"] = True
+            return self._finish(resp, meta, t0)
         resp = self.validator.validate(action, by_id, goal=prev_goal)       # 후보 밖 버튼은 안내하지 않는다 (화이트리스트)
         a = resp.action
         say = ""

@@ -125,4 +125,14 @@ class SessionClickModeTest {
         val spoken = tr.effects.filterIsInstance<Speak>().first().text
         assertTrue(spoken, spoken.startsWith("메뉴를 먼저 골라야 넘어가요. ") && spoken.contains("노란색 칸을 눌러 주세요"))
     }
+
+    @Test fun `글자 목록에 없는 칸도 AI가 사진에서 찾은 박스로 노란 칸을 친다`() {
+        val d = asked()
+        val box = kr.kiosklens.core.model.NormRect(0.5f, 0.85f, 0.9f, 0.95f)
+        val tr = d.send { GuideReceived(it, GuideResponse("", GuideAction.Tap("photo", "주문담기"), say = "안 골라도 돼요.", box = box)) }
+        val hl = tr.effects.filterIsInstance<SessionEffect.Highlight>().single().target
+        assertTrue(hl.rect.left <= box.left && hl.rect.right >= box.right && hl.rect.top <= box.top && hl.rect.bottom >= box.bottom)
+        assertTrue(hl.rect.width < box.width + 0.1f)                                // 박스를 거의 그대로 (두 배로 키우지 않는다)
+        assertTrue(tr.effects.filterIsInstance<Speak>().first().text.contains("주문담기"))
+    }
 }

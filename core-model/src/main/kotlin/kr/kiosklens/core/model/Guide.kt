@@ -102,4 +102,9 @@ data class GuideResponse(
      * 선택 필드라 모르는 쪽은 무시하면 된다 (계약 v1과 호환).
      */
     val say: String? = null,
+    /**
+     * TAP인데 그 칸이 글자 목록(snapshot)에 없고 AI가 사진에서 직접 찾은 경우의 위치(0~1, 분석 화면 기준). 이때 targetId는 "photo".
+     * 선택 필드라 모르는 쪽은 무시한다 (계약 v1과 호환).
+     */
+    val box: NormRect? = null,
 )
