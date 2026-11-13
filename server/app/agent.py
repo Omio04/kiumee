@@ -25,7 +25,7 @@ from typing import Dict, List, Optional, Protocol
 from . import privacy
 from .cache import ResponseCache, request_key
 from .jamo import dice, normalize
-from . import menu_info, screen_guide
+from . import elder, menu_info, screen_guide
 from .llm import LlmClient, LlmRateLimited, LlmTimeout, LlmUpstream
 from .models import (MAX_GOAL, MAX_HISTORY, ActionType, ElementKind, GuideAction, GuideRequest, GuideResponse,
                      LlmKind, ScreenElement)
@@ -62,6 +62,9 @@ def _goal_of(req: GuideRequest) -> str:
     - 되물음에 대답  goal + utterance       → "goal, utterance"
     길이는 계약 최대치(200자)에 맞춰 뒤쪽(최근 말)을 남깁니다.
     """
+    fix = elder.correction_of(req.utterance, req.goal)       # "아메리카노 말고 라떼로" → 이전 목표를 버리고 새 것만
+    if fix:
+        return fix[-MAX_GOAL:]
     parts = [p.strip() for p in (req.goal, req.utterance) if p and p.strip()]
     return ", ".join(parts)[-MAX_GOAL:]
 
@@ -180,6 +183,9 @@ class LlmGuideAgent:
 
         req, dropped = privacy.sanitize(req)
         meta["dropped"] = dropped
+        spoken = elder.clean_utterance(req.utterance)             # "어... 그... 아메리카노" → "아메리카노" (군말 제거)
+        if spoken != req.utterance:
+            req = req.model_copy(update={"utterance": spoken})
         els = req.snapshot.elements
         goal = _goal_of(req)
         if self.s.debug_prompts:                       # 개발용 진단 (개인정보 걸러낸 뒤의 내용 · 로컬 기록에만)
@@ -193,13 +199,19 @@ class LlmGuideAgent:
             meta.update(source="cache", candidates=0)
             return self._finish(cached, meta, t0)
 
+        # 1-1) 어르신 말투 (LLM 없이 즉시): 도움 요청 · 그만 · 다시 말해줘 · 화면에 없는 현금
+        prev_goal = (req.goal or "").strip()
+        early = self._elder_rule(req, els, prev_goal)
+        if early is not None:
+            meta.update(source="rule", candidates=0, elder=True)
+            return self._finish(early, meta, t0)
+
         # 2) 로컬 규칙: 결제 진행 화면
         if _is_done_screen(els):
             meta.update(source="rule", candidates=0)
             return self._finish(GuideResponse(goal=goal, action=GuideAction.done(MSG_DONE), source="rule"), meta, t0)  # 규칙은 이미 즉시라 캐시 불필요
 
         # 2-1) 질문: "라떼가 뭐야?" → 사전에 있으면 LLM 없이 설명 (goal은 그대로: 질문이 목표에 섞이면 안 된다)
-        prev_goal = (req.goal or "").strip()
         asking = menu_info.is_info_question(req.utterance)
         if asking:
             text = menu_info.explain(req.utterance or "", req.history)
@@ -290,6 +302,24 @@ class LlmGuideAgent:
         if resp.source == "llm":
             self.cache.put(key, resp)
         return self._finish(resp, meta, t0)
+
+    @staticmethod
+    def _elder_rule(req: GuideRequest, els: List[ScreenElement], prev_goal: str) -> Optional[GuideResponse]:
+        """목표를 바꾸지 않고 바로 답하는 말들. 해당 없으면 None."""
+        u = req.utterance
+        if elder.is_help(u):
+            return GuideResponse(goal=prev_goal, action=GuideAction.done(elder.MSG_HELP), source="rule")
+        if elder.is_stop(u):
+            return GuideResponse(goal=prev_goal, action=GuideAction.done(elder.MSG_STOP), source="rule")
+        if elder.is_repeat(u):
+            kind, el = elder.repeat_action(req.history, els)
+            if kind == "tap" and el is not None:
+                return GuideResponse(goal=prev_goal, action=GuideAction.tap(el.id, el.text), source="rule")
+            question = kind[4:] if kind.startswith("ask:") else elder.MSG_REPEAT_FIRST
+            return GuideResponse(goal=prev_goal, action=GuideAction.ask_user(question[:80]), source="rule")
+        if elder.cash_unavailable(u, els):
+            return GuideResponse(goal=prev_goal, action=GuideAction.ask_user(elder.MSG_CASH), source="rule")
+        return None
 
     async def _complete(self, user: str, timeout: float, ids: List[str], meta: Dict[str, object]) -> str:
         """LLM 한 번 부르기 (버튼 번호는 후보 안에서만 고르게 형식 강제).

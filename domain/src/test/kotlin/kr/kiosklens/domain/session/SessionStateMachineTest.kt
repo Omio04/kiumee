@@ -76,7 +76,7 @@ class SessionStateMachineTest {
 
         tr = d.send { SpeechRecognized(it, goal) }                         // 말 인식 → 화면이 있으니 바로 묻기
         assertEquals(Phase.PLANNING, d.phase)
-        assertEquals(listOf(CancelPending, RequestGuide(GuideRequest("sess-1", goal, null, menu, emptyList()), d.ticket)), tr.effects)
+        assertEquals(listOf(CancelPending, StartTimer(1_500, d.ticket), RequestGuide(GuideRequest("sess-1", goal, null, menu, emptyList()), d.ticket)), tr.effects)
 
         tr = d.send { GuideReceived(it, GuideResponse(goal, GuideAction.Tap("e4", "아메리카노"))) }
         assertEquals(Phase.GUIDING, d.phase)                               // 하이라이트 + 안내 문장
@@ -93,7 +93,7 @@ class SessionStateMachineTest {
         tr = d.send(SnapshotReceived(options))                             // 새 화면 → 다시 묻기 (목표 · 이력 이어감)
         assertEquals(Phase.PLANNING, d.phase)
         val expected = GuideRequest("sess-1", null, goal, options, listOf(HistoryItem("s02_menu", ActionType.TAP, "아메리카노")))
-        assertEquals(listOf(CancelPending, RequestGuide(expected, d.ticket)), tr.effects)
+        assertEquals(listOf(CancelPending, StartTimer(1_500, d.ticket), RequestGuide(expected, d.ticket)), tr.effects)
 
         val bye = "결제 수단을 고르셨어요. 직원 또는 화면 안내를 따라주세요."
         tr = d.send { GuideReceived(it, GuideResponse(goal, GuideAction.Done(bye))) }
@@ -259,7 +259,7 @@ class SessionStateMachineTest {
         val d = waitingOnMenu()
         val tr = d.send(SnapshotReceived(options))
         assertEquals(Phase.PLANNING, d.phase)
-        assertEquals(listOf(StopSpeaking, ClearHighlight, CancelPending), tr.effects.dropLast(1))
+        assertEquals(listOf(StopSpeaking, ClearHighlight, CancelPending, StartTimer(1_500, d.ticket)), tr.effects.dropLast(1))
         assertEquals(options, (tr.effects.last() as RequestGuide).request.snapshot)
     }
 
@@ -435,5 +435,36 @@ class SessionStateMachineTest {
         val f = waitingOnMenu().apply { send(SnapshotReceived(covered)) }
         f.send { TimedOut(it) }
         assertEquals(Phase.GUIDING, f.phase)
+    }
+
+    // ---------------------------------------------------------------- 서버 답을 기다리는 동안
+
+    @Test fun `서버 답이 1_5초 넘게 늦으면 잠시만요를 읽고 곧 올 답은 그대로 받는다`() {
+        val d = planningOnMenu()
+        val ticket = d.ticket
+        val wait = d.send { TimedOut(it) }
+        assertEquals(Phase.PLANNING, d.phase)
+        assertEquals(ticket, d.ticket)                                    // 번호표를 올리지 않는다 = 늦게 온 답도 유효
+        assertEquals(listOf(Speak("잠시만요. 찾고 있어요.", ticket)), wait.effects)
+        val tr = d.send { GuideReceived(it, GuideResponse("g", GuideAction.Tap("e4", "아메리카노"))) }
+        assertEquals(Phase.GUIDING, d.phase)
+        assertTrue(tr.effects.any { it is Highlight })
+    }
+
+    @Test fun `서버가 먼저 답하면 잠시만요 타이머는 지난 일로 무시된다`() {
+        val d = planningOnMenu()
+        val staleTicket = d.ticket
+        d.send { GuideReceived(it, GuideResponse("g", GuideAction.Tap("e4", "아메리카노"))) }
+        val late = d.send(TimedOut(staleTicket))
+        assertEquals(Phase.GUIDING, d.phase)
+        assertTrue(late.effects.isEmpty())
+    }
+
+    @Test fun `잠시만요를 다 읽어도 서버 기다림은 끝나지 않는다`() {
+        val d = planningOnMenu()
+        d.send { TimedOut(it) }
+        val tr = d.send { SpeechFinished(it) }
+        assertEquals(Phase.PLANNING, d.phase)
+        assertTrue(tr.effects.isEmpty())
     }
 }

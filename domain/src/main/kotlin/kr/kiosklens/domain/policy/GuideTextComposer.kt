@@ -51,6 +51,9 @@ class GuideTextComposer(private val phraser: PositionPhraser = PositionPhraser()
     /** 진행 중에 질문의 대답을 못 들었을 때 (세션은 이어가고 잠시 뒤 다시 묻는다) */
     fun notHeard(): String = "말씀을 잘 못 들었어요. 대답하시려면 '말하기'를 누르고 말씀해 주세요."
 
+    /** 서버 답을 기다리는 중 ([TimeoutPolicy.thinkingMs] 넘게) */
+    fun thinking(): String = "잠시만요. 찾고 있어요."
+
     /** 서버 요청이 실패해서 잠시 뒤 다시 물을 때 (세션은 이어간다) */
     fun retrying(): String = "답이 조금 늦어지고 있어요. 잠시만 기다려 주세요."
 

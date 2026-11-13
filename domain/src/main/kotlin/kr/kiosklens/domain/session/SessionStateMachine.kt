@@ -251,6 +251,8 @@ class SessionStateMachine(
     private fun onTimeout(state: SessionState): Transition {
         val t = state.ticket + 1
         return when (state.phase) {
+            // 서버 답이 늦다: 상태 · 번호표는 그대로 두고(그래야 곧 올 답이 유효하다) 기다린다는 말만 한다
+            Phase.PLANNING -> Transition(state, listOf(Speak(texts.thinking(), state.ticket)))
             Phase.LISTENING -> heardNothing(state)                                              // 무음 8초
             Phase.SCANNING -> Transition(state.copy(phase = Phase.LOST, ticket = t), listOf(Speak(texts.lost(), t)))   // 10초
             Phase.WAIT_CHANGE -> {                                                               // 15초
@@ -292,7 +294,7 @@ class SessionStateMachine(
             snapshot = snapshot,
             history = state.history.takeLast(GuideRequest.MAX_HISTORY),
         )
-        return Transition(state.copy(phase = Phase.PLANNING, ticket = t, requestedSnapshot = snapshot), before + RequestGuide(request, t))
+        return Transition(state.copy(phase = Phase.PLANNING, ticket = t, requestedSnapshot = snapshot), before + StartTimer(timeouts.thinkingMs, t) + RequestGuide(request, t))
     }
 
     /** 문장을 읽고 화면 전환을 기다린다 (SCROLL · WAIT · UNKNOWN). 하이라이트는 없다. */
