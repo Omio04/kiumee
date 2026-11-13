@@ -216,6 +216,10 @@ def _repeat_guard(req: GuideRequest, resp: GuideResponse) -> GuideResponse:
         "아직 잘 모르겠어요. 하고 싶은 것을 짧게 한 번 더 말씀해 주세요."))
 
 
+# 옵션 줄마다 반복되는 뜻 없는 버튼 글자: 빠른 길로 고르면 엉뚱한 줄의 버튼을 안내한다
+_GENERIC_LABELS = frozenset(normalize(w) for w in ("선택", "추가", "선택안함", "+", "-"))
+
+
 def _change_line(change) -> Optional[str]:
     """LLM에 줄 한 줄: "메뉴를 고르는 화면 → 옵션을 고르는 화면 (새로 보임: HOT, ICE / 사라짐: 커피)". 변화가 없으면 None."""
     if change is None or not (change.type_changed or change.appeared):
@@ -344,6 +348,9 @@ class LlmGuideAgent:
             # 방금 누른 옵션(HOT · ICE …)은 '고른 메뉴'에 안 들어가서(진행 · 옵션 버튼 제외) 선택이 바뀐 새 화면에서도
             # 같은 말("따뜻한 걸로")에 또 HOT을 고르는 무한 반복이 생겼다 (2026-11-13 시뮬레이션). 방금 누른 버튼이면 다음 단계는 LLM이.
             repeat = repeat or (pressed is not None and same_item(top.element.text, pressed))
+            # 같은 글자의 버튼이 여럿이면(옵션 줄마다 "선택" · "추가") 어느 것인지 서버가 정할 수 없다 (2026-11-13 실기기: "결제할래"에 "선택").
+            same_text = sum(1 for r in ranked if normalize(r.element.text) == normalize(top.element.text))
+            repeat = repeat or same_text > 1 or normalize(top.element.text) in _GENERIC_LABELS
             if not repeat and top.match >= self.s.fast_min_score and top.match - second >= self.s.fast_margin:
                 meta["source"] = "fastpath"
                 return self._finish(GuideResponse(goal=goal, action=GuideAction.tap(top.element.id, top.element.text),
@@ -357,13 +364,16 @@ class LlmGuideAgent:
         context = [e.text for e in sorted(els, key=lambda e: (round(e.rect.top, 2), e.rect.left))][:30]
         new_screen = screen_guide.screen_changed(req)
         unseen = expectation.pressed_but_not_visible(req) if self.s.expectation_check else None
+        lookalike = expectation.lookalike_menu(req) if self.s.expectation_check else None
+        if lookalike:
+            meta["lookalike"] = True
         if unseen:
             meta["unseen"] = True
         user = build_user(goal, req.history, candidates, context, pressed=pressed, chosen=chosen,
                           question=asking, new_screen=new_screen,
                           progress=progress.summarize(req.history) if self.s.progress_hint else None,
                           unseen=unseen, screen=screen_type.describe_probabilities(probs) or screen_type.label(stype),
-                          kiosk=kiosk_hint, change=_change_line(change))
+                          kiosk=kiosk_hint, change=_change_line(change), lookalike=lookalike)
 
         action = None
         deadline = t0 + self.s.total_budget_s

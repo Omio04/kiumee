@@ -12,7 +12,8 @@
 """
 from __future__ import annotations
 
-from typing import Optional
+import re
+from typing import Optional, Tuple
 
 from . import progress
 from .jamo import dice, normalize
@@ -46,3 +47,37 @@ SIMILAR_WORD = 0.6
 
 def _has_similar_word(text: str, name: str) -> bool:
     return any(len(normalize(tok)) >= 2 and dice(tok, name) >= SIMILAR_WORD for tok in text.split())
+
+
+_MARK = re.compile(r"[\(\[]\s*(?:ice|hot|아이스|핫|ce)\s*[\)\]]", re.I)     # "(ICE)" "(HOT)" 꾸밈 ("(CE)"는 ICE를 잘못 읽은 것)
+
+
+_LEADS = tuple(normalize(w) for w in ("선택하신", "선택한", "고르신", "주문하신", "주문", "담긴", "선택"))
+
+
+def lookalike_menu(req: GuideRequest) -> Optional[Tuple[str, str]]:
+    """눌렀다던 메뉴 이름을 품은 더 긴 다른 메뉴가 화면에 있고 정확히 그 메뉴는 없으면 (눌렀다던 이름, 보이는 이름).
+    예: "아메리카노"를 안내했는데 새 화면에는 "(ICE)헤이즐넛아메리카노"뿐 — 이름이 들어 있다고 같은 메뉴로 보면 안 된다
+    (2026-11-13 실기기: 헤이즐넛아메리카노 옵션 창이 떴는데 서버는 "눌렀다"고 믿고 "화면에 안 보여요"라고만 했다).
+    (ICE) · (HOT) 꾸밈은 떼고 비교한다. 메뉴 단계의 누르기 뒤 화면 번호가 바뀐 경우만."""
+    last = req.history[-1] if req.history else None
+    if not last or last.action != ActionType.TAP or not last.targetText or last.screenId == req.snapshot.screenId:
+        return None
+    if progress.stage_of(last.targetText) != progress.MENU:
+        return None
+    name = last.targetText.strip()
+    nn = normalize(_MARK.sub("", name))
+    if len(nn) < 3:
+        return None
+    other = None
+    for e in req.snapshot.elements:
+        nt = normalize(_MARK.sub("", e.text))
+        for lead in _LEADS:                                   # "선택하신 아메리카노"는 같은 메뉴 (설명하는 앞말일 뿐)
+            if nt.startswith(lead):
+                nt = nt[len(lead):]
+        if nt == nn:
+            return None                                       # 정확히 그 메뉴가 보인다
+        # 같은 말로 "끝나는" 더 긴 이름만 (헤이즐넛+아메리카노). "아메리카노 옵션 선택" · "아메리카노 1잔" 같은 제목 · 줄은 다른 메뉴가 아니다
+        if nt.endswith(nn) and len(nt) >= len(nn) + 2 and other is None:
+            other = e.text.strip()[:30]
+    return (name, other) if other else None
