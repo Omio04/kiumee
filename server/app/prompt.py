@@ -17,6 +17,8 @@ _ACTION_KO = {
 
 SYSTEM = """키오스크 안내 도우미의 판단기입니다. 화면 버튼 후보 중에서 어르신이 다음에 눌러야 할 버튼 하나를 고릅니다.
 규칙:
+- 키오스크 종류는 정해져 있지 않습니다(카페 · 햄버거 · 식당 · 표 예매 · 민원 …). [키오스크 추정]은 참고일 뿐이니 어떤 키오스크든 화면에 실제로 보이는 글자로만 판단하세요. 아래 "메뉴 → 옵션 → 장바구니 → 결제" 흐름은 주문형 키오스크의 예이고, 다른 종류는 화면의 단계(예: 목적지 → 시간 → 결제)를 그대로 따라 어르신 목표에 맞는 버튼을 안내하세요.
+- [화면 종류]의 %는 글자로 계산한 추정입니다. 헷갈리면 화면 글자를 직접 보고 판단하세요. [화면 변화]가 있으면 무엇에서 무엇으로 바뀌었는지 한 문장으로 알려 주고 이어서 할 일을 안내하세요.
 - 당신은 카메라로 키오스크 화면을 읽고 말로 안내만 합니다. 키오스크는 어르신이 직접 손으로 누릅니다. 앱이 화면을 바꾸거나 무언가 처리하는 것이 아니므로 "화면이 바뀌는 중이에요", "처리 중이에요", "잠시만 기다려 주세요" 같은 말은 절대 하지 마세요. 화면에서 읽은 것과 어르신이 할 일만 말하세요.
 - 어르신이 원하는 것이 화면에 안 보이면 UNKNOWN과 message로 그 사실을 먼저 대답하고 어르신이 할 일을 말하세요: "캐모마일은 지금 화면에 안 보여요. 화면을 아래로 밀거나 다른 분류를 눌러 보세요." "찾아볼게요", "내려 볼게요"처럼 앱이 직접 하는 말은 금지입니다(손으로 누르고 미는 사람은 어르신).
 - 어르신이 "○○ 있어요?"처럼 물으면 화면에서 확인해 있으면 그 버튼을 안내(GUIDE)하고, 없으면 없다고 대답하세요. 어르신이 한 말에는 반드시 그 말에 대한 대답을 하세요.
@@ -53,7 +55,7 @@ def build_user(goal: str, history: Sequence[HistoryItem], candidates: Sequence[S
                context_texts: Sequence[str], pressed: Optional[str] = None,
                chosen: Optional[Sequence[str]] = None, question: bool = False, new_screen: bool = False,
                progress: Optional[str] = None, unseen: Optional[str] = None,
-               screen: Optional[str] = None) -> str:
+               screen: Optional[str] = None, kiosk: Optional[str] = None, change: Optional[str] = None) -> str:
     """pressed: 직전 '누르기' 안내 뒤 화면이 바뀌었으면 그 버튼 글자 (어르신이 이미 눌렀음 → 다음 단계를 고를 것).
     chosen: 이번 세션에서 이미 고른 메뉴 (진행 · 옵션 버튼 제외). '다음' · '확인'은 화면마다 또 누를 수 있어 넣지 않는다."""
     lines: List[str] = [f"목표(어르신 말): {goal.strip() or '(없음)'}"]
@@ -67,6 +69,10 @@ def build_user(goal: str, history: Sequence[HistoryItem], candidates: Sequence[S
         lines.append(f"{PRESSED_PREFIX}{pressed[:40]} (그 뒤 화면이 바뀜 → [화면 글자]로 정말 그 버튼이 눌렸는지 확인)")
     if chosen:
         lines.append(f"{CHOSEN_PREFIX}{', '.join(c[:30] for c in list(chosen)[:5])} (장바구니·선택 목록에 있으면 다시 고르지 말 것)")
+    if kiosk:
+        lines.append("[키오스크 추정(참고)] " + kiosk)
+    if change:
+        lines.append("[화면 변화] " + change)
     if screen:
         lines.append("[화면 종류] " + screen)
     if progress:

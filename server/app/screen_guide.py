@@ -45,13 +45,15 @@ def choices(elements: Sequence[ScreenElement]) -> List[str]:
     return out
 
 
-def describe(elements: Sequence[ScreenElement], changed: bool, label: Optional[str] = None) -> Optional[str]:
+def describe(elements: Sequence[ScreenElement], changed: bool, label: Optional[str] = None, change=None) -> Optional[str]:
     """고를 수 있는 것을 알려 주는 한 문장 (ASK_USER 질문). 버튼이 하나도 없으면 None."""
+    # 종류가 바뀐 것을 알면 "메뉴 화면에서 옵션 화면으로"처럼 어떻게 바뀌었는지부터 말한다 (모든 이름이 "화면"으로 끝난다)
+    turned = bool(label and change is not None and getattr(change, "type_changed", False))
     if label == "메뉴를 고르는 화면":                    # 메뉴는 수십 개라 읽어 주지 않는다 — 원하는 것을 말하게 한다
-        return f"{label}이에요. 드시고 싶은 메뉴 이름을 말씀해 주세요."
+        return f"{label}{'으로 바뀌었어요' if turned else '이에요'}. 드시고 싶은 메뉴 이름을 말씀해 주세요."
     labels = choices(elements)
     # 종류를 알면 "옵션을 고르는 화면이에요."로 시작한다 (무슨 화면인지가 어르신께 가장 필요한 정보)
-    head = f"{label}이에요. " if label else ("화면이 바뀌었어요. " if changed else "지금 화면에서는 ")
+    head = (f"{label}으로 바뀌었어요. " if turned else f"{label}이에요. ") if label else ("화면이 바뀌었어요. " if changed else "지금 화면에서는 ")
     while labels:
         text = head + ", ".join(labels) + _TAIL
         if len(text) <= MAX_TEXT:

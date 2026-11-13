@@ -25,7 +25,8 @@ from typing import Dict, List, Optional, Protocol
 from . import privacy
 from .cache import ResponseCache, request_key
 from .jamo import dice, normalize
-from . import elder, expectation, menu_info, progress, screen_guide, screen_type
+from . import elder, expectation, kiosk, menu_info, progress, screen_guide, screen_type
+from .screen_memory import ScreenMemory
 from .llm import LlmClient, LlmRateLimited, LlmTimeout, LlmUpstream
 from .models import (MAX_GOAL, MAX_HISTORY, ActionType, ElementKind, GuideAction, GuideRequest, GuideResponse,
                      LlmKind, ScreenElement)
@@ -215,6 +216,20 @@ def _repeat_guard(req: GuideRequest, resp: GuideResponse) -> GuideResponse:
         "아직 잘 모르겠어요. 하고 싶은 것을 짧게 한 번 더 말씀해 주세요."))
 
 
+def _change_line(change) -> Optional[str]:
+    """LLM에 줄 한 줄: "메뉴를 고르는 화면 → 옵션을 고르는 화면 (새로 보임: HOT, ICE / 사라짐: 커피)". 변화가 없으면 None."""
+    if change is None or not (change.type_changed or change.appeared):
+        return None
+    name = lambda t: screen_type.label(t) or "알 수 없는 화면"
+    head = f"{name(change.from_type)} → {name(change.to_type)}"
+    bits = []
+    if change.appeared:
+        bits.append("새로 보임: " + ", ".join(change.appeared))
+    if change.vanished:
+        bits.append("사라짐: " + ", ".join(change.vanished))
+    return head + (f" ({' / '.join(bits)})" if bits else "")
+
+
 def _retryable(e: Optional[BaseException]) -> bool:
     """겹쳐 보내도 되는 실패인가: 시간 초과 · 혼잡 · 네트워크. 인증 오류와 사용량 제한(429)은 다시 보내 봐야 소용없다."""
     if isinstance(e, LlmRateLimited):
@@ -238,6 +253,7 @@ class LlmGuideAgent:
         self.parser = ActionParser()
         self.validator = ActionValidator()
         self.cache = ResponseCache(settings.cache_size, settings.cache_ttl_s)
+        self.memory = ScreenMemory()                 # 직전 화면 (무엇에서 무엇으로 바뀌었는지)
 
     async def next(self, req: GuideRequest) -> GuideResult:
         t0 = time.perf_counter()
@@ -248,6 +264,9 @@ class LlmGuideAgent:
         spoken = elder.clean_utterance(req.utterance)             # "어... 그... 아메리카노" → "아메리카노" (군말 제거)
         if spoken != req.utterance:
             req = req.model_copy(update={"utterance": spoken})
+        resolved = elder.resolve_referent(req.utterance, req.history)   # 설명 뒤 "그걸로 할게요" → "카페라떼 주세요"
+        if resolved:
+            req = req.model_copy(update={"utterance": resolved})
         els = req.snapshot.elements
         goal = _goal_of(req)
         if self.s.debug_prompts:                       # 개발용 진단 (개인정보 걸러낸 뒤의 내용 · 로컬 기록에만)
@@ -276,6 +295,12 @@ class LlmGuideAgent:
         # 2-0) 화면 종류: 글자로 이 화면이 무슨 화면인지 먼저 정한다 (LLM 추측에 맡기지 않는다)
         stype = screen_type.classify(els)
         meta["screen"] = stype.value
+        probs = screen_type.probabilities(els)                  # 이 종류일 확률 (글자 단서의 상대 비율)
+        meta["screen_p"] = probs[0][1] if probs else 0.0
+        kiosk_hint = kiosk.identify(els).text()                 # 참고만: 어떤 규칙도 가게 이름에 의존하지 않는다
+        change = self.memory.observe(req.sessionId, req.snapshot.screenId, stype, els)
+        if change is not None:
+            meta["changed_from"] = change.from_type.value
         if stype == screen_type.ScreenType.LOYALTY and "적립" not in (req.utterance or ""):
             # 적립은 건너뛴다 (P2 인수 문서: 어르신이 요청하지 않았으면). 실제로 보이는 닫기(×)가 있을 때만 안내하고,
             # 없으면 지어내지 않고 다시 비춰 달라고 한다.
@@ -294,7 +319,7 @@ class LlmGuideAgent:
                 return self._finish(GuideResponse(goal=prev_goal, action=GuideAction.ask_user(text), source="rule"), meta, t0)
         # 2-2) "뭘 눌러야 돼요?" → 지금 화면에서 고를 수 있는 것을 알려 준다
         if menu_info.is_screen_question(req.utterance):
-            text = screen_guide.describe(els, changed=False, label=screen_type.label(stype))
+            text = screen_guide.describe(els, changed=False, label=screen_type.label(stype), change=change)
             if text:
                 meta.update(source="rule", candidates=0, described=True)
                 return self._finish(GuideResponse(goal=prev_goal, action=GuideAction.ask_user(text), source="rule"), meta, t0)
@@ -337,7 +362,8 @@ class LlmGuideAgent:
         user = build_user(goal, req.history, candidates, context, pressed=pressed, chosen=chosen,
                           question=asking, new_screen=new_screen,
                           progress=progress.summarize(req.history) if self.s.progress_hint else None,
-                          unseen=unseen, screen=screen_type.label(stype))
+                          unseen=unseen, screen=screen_type.describe_probabilities(probs) or screen_type.label(stype),
+                          kiosk=kiosk_hint, change=_change_line(change))
 
         action = None
         deadline = t0 + self.s.total_budget_s
@@ -366,7 +392,7 @@ class LlmGuideAgent:
             resp = resp.model_copy(update={"goal": prev_goal})
         elif (resp.action.type == ActionType.WAIT or _waiting_talk(resp) or _generic_unknown(resp)) and not asking:
             # 새 화면인데 고를 버튼을 못 정함: "못 찾았어요"로 끝내지 않고 고를 수 있는 것을 알려 준다
-            text = screen_guide.describe(els, changed=new_screen, label=screen_type.label(stype))
+            text = screen_guide.describe(els, changed=new_screen, label=screen_type.label(stype), change=change)
             if text:
                 meta["described"] = True
                 resp = GuideResponse(goal=goal, action=GuideAction.ask_user(text), source="rule")

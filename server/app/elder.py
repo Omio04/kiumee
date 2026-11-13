@@ -85,6 +85,35 @@ def correction_of(utterance: Optional[str], prev_goal: Optional[str]) -> Optiona
     return after if any(len(t) >= 2 and t in goal for t in tokens) else None
 
 
+_AGREE = re.compile(r"(?<![가-힣])(?:(?:그|이)\s*(?:걸|거|것)(?:로|으로)?(?:\s*(?:요|할게|할래|주세요|줘|해))?|그렇게\s*해|좋아요?|그래요?|맞아요?|네|예|응)(?![가-힣])")
+_EXPLAINED = re.compile(r"^(?P<name>.{1,14}?)(?:은|는)\s.+이걸로 하실래요\?$")
+
+
+def resolve_referent(utterance: Optional[str], history: Sequence[HistoryItem]) -> Optional[str]:
+    """메뉴 설명을 들은 뒤 "그걸로 할게요" · "네"라고 하면 설명한 메뉴 이름으로 풀어서 "카페라떼 주세요"로 돌려준다.
+    설명 단계에서는 주문 목표를 바꾸지 않으므로(질문이 목표에 섞이면 안 된다) 이 대답이 올 때 서버가 "그걸로"가 무엇인지 잊는다
+    (2026-11-13 시뮬레이션: "카페라떼가 뭐예요" → "그럼 그걸로 할게요" → 엉뚱한 바닐라라떼). 해당 없으면 None."""
+    if not utterance or not history:
+        return None
+    last = history[-1]
+    if last.action != ActionType.ASK_USER or not last.targetText:
+        return None
+    m = _EXPLAINED.match(last.targetText.strip())
+    if not m:
+        return None
+    name = m.group("name").strip()
+    from . import menu_info
+    if menu_info._lookup(name) is None:                          # 사전에 있는 메뉴 · 옵션 설명일 때만
+        return None
+    said = utterance.strip()
+    if menu_info._lookup(said) is not None:                      # 다른 메뉴를 직접 말했으면 그 말을 따른다
+        return None
+    core = re.sub(r"[\s.!,?]+", " ", said).strip()
+    if not _AGREE.search(core) or any(w in core for w in ("아니", "싫", "말고", "다른")):
+        return None
+    return f"{name} 주세요"
+
+
 def repeat_action(history: Sequence[HistoryItem], elements: Sequence[ScreenElement]) -> Tuple[str, Optional[ScreenElement]]:
     """방금 한 안내를 다시: ("ask", None, 질문) · ("tap", 요소) 중 하나를 (종류, 요소)로 돌려준다.
     종류 "tap"이면 요소를 다시 가리키고, "ask:질문"이면 같은 질문을 다시 한다, "first"면 처음 인사."""

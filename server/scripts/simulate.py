@@ -115,7 +115,7 @@ async def run_one(agent, sc, max_turns, pace):
         snap = dict(SNAPS[screen], screenId=sid)
         if picked and screen in (S3, S4):                  # 실제 키오스크처럼 고른 메뉴 이름이 옵션 창 제목 · 장바구니에 보인다
             snap["elements"] = [dict(e, text=e["text"].replace("아메리카노", picked)) for e in snap["elements"]]
-        req = GuideRequest.model_validate({"sessionId": "sim", "utterance": utter, "goal": goal, "snapshot": snap,
+        req = GuideRequest.model_validate({"sessionId": f"sim-{sc['id'][:2]}", "utterance": utter, "goal": goal, "snapshot": snap,
                                            "history": [h.model_dump(mode="json") for h in hist[-5:]]})
         if pace:
             await asyncio.sleep(pace)

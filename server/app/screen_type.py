@@ -112,3 +112,50 @@ def skip_button(elements: Sequence[ScreenElement]) -> Optional[ScreenElement]:
             if normalize(e.text) == word:
                 return e
     return None
+
+
+# ---------------------------------------------------------------- 확률
+def _evidence(elements: Sequence[ScreenElement]) -> dict:
+    """종류마다 글자가 얼마나 그 종류답게 보이는가 (서로 다른 단서의 개수 × 가중치). 점수일 뿐 확률이 아니다."""
+    texts = [normalize(e.text) for e in elements]
+
+    def hits(words) -> int:
+        return sum(1 for w in words if w and any(w in t for t in texts))
+
+    prices = sum(1 for e in elements if e.kind == ElementKind.PRICE)
+    tabs = sum(1 for w in _TABS if any(t == w for t in texts))
+    pay = hits(_PAY_WORDS)
+    score = {
+        ScreenType.CARD: 3.0 * hits(_CARD),
+        ScreenType.COMPLETE: 3.0 * hits(_COMPLETE),
+        ScreenType.LOYALTY: (3.0 if hits(_LOYALTY) else 0.0) * (1.0 if prices <= 1 else 0.3),
+        ScreenType.DISPOSABLE: 3.0 * hits(_DISPOSABLE),
+        ScreenType.PAYMENT: 3.0 * hits(_k("결제수단")) + 1.0 * pay,
+        ScreenType.DINE: 1.5 * hits(_k("매장")) + 1.5 * hits(_k("포장")) + 2.0 * hits(_k("먹고가기")),
+        ScreenType.OPTIONS: (1.5 * hits(_OPTION_TITLE)) + min(3, hits(_OPTION_WORDS)) * 1.0 if hits(_OPTION_TITLE) or hits(_OPTION_WORDS) >= 2 else 0.0,
+        ScreenType.ORDER_REVIEW: 1.5 * (1 if hits(_REVIEW) else 0) + 1.5 * (1 if hits(_REVIEW_ACTION) else 0),
+        ScreenType.MENU: (1.0 + 0.5 * min(prices, 4) if prices >= 2 else 0.0) + 1.0 * min(tabs, 3),
+        ScreenType.START: 2.0 * hits(_START),
+    }
+    return score
+
+
+UNKNOWN_PRIOR = 0.7      # 단서가 약하면 "모름"에 확률을 남긴다
+
+
+def probabilities(elements: Sequence[ScreenElement]):
+    """[(종류, 확률)] 확률 높은 순. 단서들의 점수를 정규화한 것이다 (보정된 확률이 아니라 '이 종류답게 보이는 정도'의 상대 비율).
+    단서가 하나뿐이면 UNKNOWN에도 확률이 남아 확신이 낮게 나온다."""
+    ev = _evidence(elements)
+    ev[ScreenType.UNKNOWN] = UNKNOWN_PRIOR
+    total = sum(ev.values())
+    ranked = sorted(((t, s / total) for t, s in ev.items() if s > 0), key=lambda x: -x[1])
+    return [(t, round(p, 2)) for t, p in ranked]
+
+
+def describe_probabilities(probs) -> Optional[str]:
+    """LLM에 줄 한 줄: "옵션을 고르는 화면 85%" 또는 헷갈릴 때 "옵션을 고르는 화면 55% · 주문 내역을 확인하는 화면 40%". 모르면 None."""
+    shown = [(t, p) for t, p in probs if t != ScreenType.UNKNOWN and p >= 0.15][:2]
+    if not shown:
+        return None
+    return " · ".join(f"{LABEL[t]} {int(round(p * 100))}%" for t, p in shown)
