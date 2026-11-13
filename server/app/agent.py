@@ -182,7 +182,24 @@ def _pressed_candidate(message: str, candidates: dict):
     flat = m.replace(" ", "")
     hits = [c for c in candidates.values()
             if c.text.strip() and re.search(re.escape(c.text.strip().replace(" ", "")) + r"['\"‘’“”]?[을를이가는은]?(?:버튼|칸|메뉴)?[을를]?(?:눌|누르|터치)", flat)]
-    return hits[0] if len(hits) == 1 else None
+    if len(hits) == 1:
+        return hits[0]
+    if hits:
+        return None                                                       # 둘 이상이 직접 눌러라는 말을 받았다 → 모호
+    # "'푸드' 탭에 있을 것 같아요. 그곳을 눌러 볼까요?"처럼 칸 이름과 "누르" 사이에 다른 말이 있는 경우:
+    # 누르라는 말 바로 앞에서 가장 가까이 말한 칸(2글자 이상)을 가리킨다. 40자보다 멀면 믿지 않는다.
+    verb = re.search(r"눌러|누르|누를|터치|선택해", m)
+    if not verb:
+        return None
+    best, best_end = None, -1
+    for c in candidates.values():
+        t = c.text.strip()
+        if len(t) < 2:
+            continue
+        for mt in re.finditer(re.escape(t), m[:verb.start()]):
+            if mt.end() > best_end:
+                best, best_end = c, mt.end()
+    return best if best is not None and verb.start() - best_end <= 40 else None
 
 
 def _photo_box(action, has_image: bool, candidates: dict) -> Optional[tuple]:

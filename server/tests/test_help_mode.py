@@ -176,6 +176,10 @@ async def test_pressing_words_without_a_pointer_get_a_pointer(snaps):
     assert _pressed_candidate("카드를 대세요. 준비되면 승인 요청을 누르세요.", cands) is None        # 순서 말 → 지금 누를 칸이 아니다
     assert _pressed_candidate("승인 요청을 누르거나 취소를 누르세요.", cands) is None               # 둘 다 → 모호
     assert _pressed_candidate("지금은 결제 화면이에요.", cands) is None
+    cands["f"], cands["g"] = mk("f", "푸드"), mk("g", "커피")
+    ask = "이 화면은 커피 메뉴만 있어요. 케이크는 위쪽 '푸드' 탭에 있을 것 같아요. 그곳을 눌러 볼까요?"
+    assert _pressed_candidate(ask, cands).id == "f"                                              # 눌러라는 말 가장 가까이의 칸 (2026-11-13 실기기: 푸드 탭)
+    assert _pressed_candidate("커피 메뉴가 있어요." + " 가" * 30 + " 눌러 보세요", cands) is None   # 멀면 믿지 않는다
     cands["d"] = mk("d", "티")
     assert _pressed_candidate("지금 음료 화면에는 아이스티가 안 보여요. 위쪽 '티' 메뉴를 눌러 보세요.", cands).id == "d"      # 따옴표가 붙어도
 
