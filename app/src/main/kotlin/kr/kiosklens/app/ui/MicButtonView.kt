@@ -46,9 +46,9 @@ class MicButtonView(context: Context) : View(context) {
     private var elapsed = 0L
     private var stateSince = 0L
     /** 지금 보이는 구슬 색 · 바뀌기 전 색 · 바뀔 색 */
-    private var shade = OrbColors.SKY
-    private var fadeFrom = OrbColors.SKY
-    private var fadeTo = OrbColors.SKY
+    private var shade = OrbColors.of(OrbState.IDLE)                              // 처음 켰을 때부터 대기 색(빨강)
+    private var fadeFrom = shade
+    private var fadeTo = shade
     private val painter = OrbPainter()
     private val halo = Paint(Paint.ANTI_ALIAS_FLAG)
     private val arc = Paint(Paint.ANTI_ALIAS_FLAG).apply {

@@ -76,6 +76,8 @@ data class Guidance(
     val targetId: String? = null,
     /** 하이라이트에 마지막으로 보낸 위치 */
     val rect: NormRect? = null,
+    /** 하이라이트 중인 칸의 글자: 카메라가 흔들려 화면 번호나 요소 id가 바뀌어도 이 글자로 다시 찾아 따라간다 (도움 모드) */
+    val targetText: String? = null,
     /** 15초 동안 화면이 안 바뀌면 다시 읽을 문장 */
     val spokenText: String,
     /** true면 15초 뒤 다시 읽는 대신 서버에 다시 묻는다 (UNKNOWN 응답 뒤) */

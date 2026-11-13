@@ -2,8 +2,11 @@ package kr.kiosklens.domain.policy
 
 /** 시간 규칙 (설계서 6장). 수치 튜닝은 여기 한 곳에서. */
 data class TimeoutPolicy(
-    /** LISTENING: 이 시간 안에 말이 끝나지 않으면 IDLE (안내 음성) */
-    val listenSilenceMs: Long = 8_000,
+    /**
+     * LISTENING: 이 시간 안에 말이 끝나지 않으면 IDLE (안내 음성).
+     * 인식기의 녹음 상한(말 시작 후 15초 + 마무리 1.5초)보다 길어야 한다. 짧으면 말하는 도중에 취소돼 "듣지 못했다"가 된다 (2026-11-13 실기기 로그).
+     */
+    val listenSilenceMs: Long = 20_000,
     /** SCANNING: 이 시간 동안 화면을 못 찾으면 LOST */
     val scanningMs: Long = 10_000,
     /** WAIT_CHANGE: 이 시간 동안 화면이 안 바뀌면 안내를 다시 읽는다 */

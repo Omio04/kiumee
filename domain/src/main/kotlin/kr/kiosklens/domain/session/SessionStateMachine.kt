@@ -1,5 +1,6 @@
 package kr.kiosklens.domain.session
 
+import kotlin.math.abs
 import kr.kiosklens.core.model.GuideAction
 import kr.kiosklens.core.model.GuideRequest
 import kr.kiosklens.core.model.GuideResponse
@@ -114,7 +115,7 @@ class SessionStateMachine(
             Phase.GUIDING, Phase.WAIT_CHANGE, Phase.LISTENING -> {
                 if (phaseIsListening(state) && !helpMode) return stay(updated)             // 예전 방식: 듣는 중에는 화면을 보지 않는다
                 val g = state.guide ?: return stay(updated)
-                if (s.screenId != g.screenId) { if (helpMode) helpScreenChanged(updated) else screenChanged(updated) }
+                if (s.screenId != g.screenId) { if (helpMode) helpScreenChanged(updated, g, s) else screenChanged(updated) }
                 else follow(updated, g, state.snapshot, s)
             }
             else -> stay(updated)
@@ -129,7 +130,7 @@ class SessionStateMachine(
                 if (!helpMode && screenId != state.requestedSnapshot?.screenId) requestOrScan(updated, listOf(CancelPending)) else stay(updated)
             Phase.GUIDING, Phase.WAIT_CHANGE, Phase.LISTENING ->
                 if (state.guide != null && screenId != state.guide.screenId && (helpMode || !phaseIsListening(state))) {
-                    if (helpMode) helpScreenChanged(updated) else screenChanged(updated)
+                    if (helpMode) helpScreenChanged(updated, state.guide, updated.snapshot) else screenChanged(updated)
                 } else stay(updated)
             else -> stay(updated)
         }
@@ -137,9 +138,22 @@ class SessionStateMachine(
 
     private fun phaseIsListening(state: SessionState) = state.phase == Phase.LISTENING
 
-    /** 도움 모드: 안내하던 화면이 바뀌었다 = 어르신이 눌렀다. 먼저 묻지 않고 낡은 테두리만 지운 채 계속 듣는다. */
-    private fun helpScreenChanged(state: SessionState): Transition =
-        Transition(state.copy(guide = null), listOf(ClearHighlight))
+    /**
+     * 도움 모드: 안내하던 화면 번호가 바뀌어도(카메라가 흔들려 다시 읽었거나 어르신이 눌렀거나) 노란 칸을 지우지 않는다.
+     * 새 스냅샷에서 같은 글자의 칸이 보이면 그 칸을 따라가고, 안 보이면 마지막 위치에 그대로 둔다.
+     * 다음에 "말하기"를 눌러 새로 물을 때(onStart)까지 유지한다 (2026-11-13 실기기: 바로 사라진다는 지적).
+     */
+    private fun helpScreenChanged(state: SessionState, g: Guidance?, s: ScreenSnapshot?): Transition {
+        val text = g?.targetText?.trim().orEmpty()
+        if (g == null || s == null || text.isEmpty()) return stay(state)
+        val key = text.replace(" ", "")
+        val same = s.elements.filter { it.text.trim().replace(" ", "") == key }
+        val found = (g.rect?.let { r -> same.minByOrNull { abs(it.rect.centerX - r.centerX) + abs(it.rect.centerY - r.centerY) } } ?: same.firstOrNull())
+            ?: return stay(state)
+        val rect = HighlightArea.of(found, s.elements)
+        if (rect == g.rect && g.screenId == s.screenId) return stay(state)
+        return Transition(state.copy(guide = g.copy(screenId = s.screenId, targetId = found.id, rect = rect)), listOf(Highlight(HighlightTarget(found.id, rect))))
+    }
 
     /** 안내하던 화면이 바뀌었다 = 어르신이 눌렀다. 안내를 멈추고 새 화면으로 다시 묻는다. */
     private fun screenChanged(state: SessionState): Transition =
@@ -155,6 +169,7 @@ class SessionStateMachine(
         val element = s.findElement(id)
         val rect = if (element != null) HighlightArea.of(element, s.elements) else HighlightArea.shift(g.rect, prev, s, id)
         if (rect == null) {
+            if (helpMode) return stay(state)                                  // 도움 모드: 잠깐 안 읽혀도 마지막 위치에 둔다
             return if (g.rect == null) stay(state) else Transition(state.copy(guide = g.copy(rect = null)), listOf(ClearHighlight))
         }
         if (rect == g.rect) return stay(state)
@@ -275,7 +290,7 @@ class SessionStateMachine(
                 val spoken = response.say?.trim()?.takeIf { it.isNotEmpty() }?.let { "$it $pointer" } ?: pointer   // 이유 · 방법 + 어느 칸을 누를지
                 val t = base.ticket + 1
                 Transition(
-                    base.copy(phase = Phase.GUIDING, ticket = t, guide = Guidance(asked.screenId, element.id, rect, spoken)),
+                    base.copy(phase = Phase.GUIDING, ticket = t, guide = Guidance(asked.screenId, element.id, rect, spokenText = spoken, targetText = element.text)),
                     listOf(Highlight(HighlightTarget(element.id, rect)), Speak(spoken, t)),
                 )
             }

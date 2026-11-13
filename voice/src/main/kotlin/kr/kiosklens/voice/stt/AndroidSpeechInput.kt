@@ -49,7 +49,7 @@ class AndroidSpeechInput(
     private val logger: Logger,
     private val silenceMs: Long = 1200,
     /** 말이 시작된 뒤 이 시간이 지나면 녹음을 끊고 지금까지 들은 것으로 답한다 (시끄러운 곳에서 끝없이 듣는 것 방지) */
-    private val maxSpeechMs: Long = 8000,
+    private val maxSpeechMs: Long = 15000,
 ) : SpeechInput {
     private val main = Handler(Looper.getMainLooper())
     @Volatile private var current: SpeechRecognizer? = null
@@ -84,6 +84,7 @@ class AndroidSpeechInput(
         var usingOffline = true
         var usingOnDevice = false
         var lastPartial = ""
+        var maxRms = -100f
         var capRunnable = Runnable {}
 
         fun finish(event: SttEvent) {
@@ -105,29 +106,31 @@ class AndroidSpeechInput(
 
         fun begin() {                                                        // 항상 메인 스레드에서 호출
             recognizer?.let { runCatching { it.cancel(); it.destroy() } }
-            usingOffline = !offlineUnavailable
-            usingOnDevice = usingOffline && canUseOnDevice()
+            usingOffline = false                                              // 온라인 일반 인식기: 실기기(S22)에서 온디바이스 한국어는 말을 못 알아들었다 (2026-11-13 로그). 서버도 인터넷이 필요하다
+            usingOnDevice = false
             val r = createRecognizer(usingOnDevice)
             recognizer = r; current = r
             r.setRecognitionListener(object : RecognitionListener {
                 override fun onReadyForSpeech(params: Bundle?) {}
                 override fun onBeginningOfSpeech() { main.removeCallbacks(capRunnable); main.postDelayed(capRunnable, maxSpeechMs) }
-                override fun onRmsChanged(rmsdB: Float) { if (!finished) _level.value = SttMapping.level(rmsdB) }
+                override fun onRmsChanged(rmsdB: Float) { if (rmsdB > maxRms) maxRms = rmsdB; if (!finished) _level.value = SttMapping.level(rmsdB) }
                 override fun onBufferReceived(buffer: ByteArray?) {}
                 override fun onEndOfSpeech() {}
                 override fun onEvent(eventType: Int, params: Bundle?) {}
                 override fun onPartialResults(partialResults: Bundle?) {
                     val t = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
+                    logger.w(TAG, "stt partial='${t}' maxRms=$maxRms")
                     if (!finished && !t.isNullOrBlank()) { lastPartial = t; trySend(SttEvent.Partial(t)) }
                 }
                 override fun onResults(results: Bundle?) {
                     val texts = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION).orEmpty()
+                    logger.w(TAG, "stt results=$texts maxRms=$maxRms")
                     val best = SttMapping.best(texts, results?.getFloatArray(SpeechRecognizer.CONFIDENCE_SCORES))
                     if (best == null) onError(SpeechRecognizer.ERROR_NO_MATCH) else finish(SttEvent.Final(best))
                 }
                 override fun onError(error: Int) {
                     val e = SttMapping.toSttError(error)
-                    logger.w(TAG, "stt error=$error mapped=$e onDevice=$usingOnDevice offline=$usingOffline retried=$retried")
+                    logger.w(TAG, "stt error=$error maxRms=$maxRms mapped=$e onDevice=$usingOnDevice offline=$usingOffline retried=$retried")
                     if (finished) return
                     when (SttMapping.next(error, usingOffline, retried)) {
                         SttNext.FALL_BACK_TO_STANDARD -> {

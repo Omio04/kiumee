@@ -72,7 +72,7 @@ class SessionStateMachineTest {
 
         var tr = d.send(StartPressed("sess-1"))
         assertEquals(Phase.LISTENING, d.phase)
-        assertEquals(listOf(StopSpeaking, ClearHighlight, StartListening(d.ticket), StartTimer(8_000, d.ticket)), tr.effects)
+        assertEquals(listOf(StopSpeaking, ClearHighlight, StartListening(d.ticket), StartTimer(20_000, d.ticket)), tr.effects)
 
         tr = d.send { SpeechRecognized(it, goal) }                         // 말 인식 → 화면이 있으니 바로 묻기
         assertEquals(Phase.PLANNING, d.phase)
@@ -166,7 +166,7 @@ class SessionStateMachineTest {
 
         tr = d.send { SpeechFinished(it) }
         assertEquals(Phase.LISTENING, d.phase)
-        assertEquals(listOf(StartListening(d.ticket), StartTimer(8_000, d.ticket)), tr.effects)
+        assertEquals(listOf(StartListening(d.ticket), StartTimer(20_000, d.ticket)), tr.effects)
 
         tr = d.send { SpeechRecognized(it, "따뜻한 거요") }
         val request = (tr.effects.last() as RequestGuide).request
@@ -343,7 +343,7 @@ class SessionStateMachineTest {
         val before = d.state
         val tr = d.send(StartPressed("sess-2"))
         assertEquals(Phase.LISTENING, d.phase)
-        assertEquals(listOf(StopSpeaking, CancelPending, ClearHighlight, StartListening(d.ticket), StartTimer(8_000, d.ticket)), tr.effects)
+        assertEquals(listOf(StopSpeaking, CancelPending, ClearHighlight, StartListening(d.ticket), StartTimer(20_000, d.ticket)), tr.effects)
         assertEquals("같은 세션", "sess-1", d.state.sessionId)
         assertEquals(before.goal, d.state.goal)
         assertEquals(before.history, d.state.history)

@@ -95,14 +95,16 @@ class SessionClickModeTest {
         assertEquals(Phase.ERROR, d.phase)
     }
 
-    @Test fun `화면이 바뀌어도 서버에 먼저 묻지 않고 낡은 테두리만 지운다`() {
+    @Test fun `화면이 바뀌어도 서버에 먼저 묻지 않고 노란 칸은 다음 질문까지 그대로 둔다`() {
         val d = asked()
         d.send { GuideReceived(it, GuideResponse("", GuideAction.Tap("e4", "아메리카노"))) }
         d.send { SpeechFinished(it) }
         val tr = d.send(SnapshotReceived(options))
         assertEquals(Phase.WAIT_CHANGE, d.phase)
-        assertEquals(listOf(ClearHighlight), tr.effects)
-        assertNull(d.state.guide)
+        assertTrue(tr.effects.none { it is ClearHighlight || it is RequestGuide })
+        assertTrue(d.state.guide != null)
+        val press = d.send(StartPressed("s2"))                                     // 다음 질문을 누르면 그때 지운다
+        assertTrue(press.effects.any { it is ClearHighlight })
     }
 
     @Test fun `앱이 말하는 중에는 말하기를 눌러도 끼어들 수 없다`() {

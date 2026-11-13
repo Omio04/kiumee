@@ -75,18 +75,29 @@ class SessionHelpModeTest {
         val tr = d.send { SpeechFinished(it) }
         assertEquals(Phase.LISTENING, d.phase)                                  // 예전에는 WAIT_CHANGE
         assertTrue(tr.effects.any { it is StartListening })
-        assertTrue(tr.effects.any { it is StartTimer && it.delayMs == 8_000L })
+        assertTrue(tr.effects.any { it is StartTimer && it.delayMs == 20_000L })
     }
 
-    @Test fun `화면이 바뀌어도 서버에 먼저 묻지 않고 낡은 테두리만 지운다`() {
+    @Test fun `카메라가 흔들려 화면 번호가 바뀌어도 같은 글자의 칸을 따라가고 지우지 않는다`() {
         val d = asked()
         d.send { GuideReceived(it, GuideResponse("", GuideAction.Tap("e4", "아메리카노"))) }
         d.send { SpeechFinished(it) }
-        val tr = d.send(SnapshotReceived(options))                              // 어르신이 눌러서 새 화면
-        assertEquals(Phase.LISTENING, d.phase)
-        assertTrue(tr.effects.none { it is RequestGuide })
-        assertEquals(listOf(ClearHighlight), tr.effects)
-        assertNull(d.state.guide)
+        val shaken = Screens.menu.copy(screenId = "s02_menu_b", frameId = 11, elements = listOf(
+            Screens.el("n1", "커피", 0.05f, 0.14f, 0.23f, 0.20f),
+            Screens.el("n4", "아메리카노", 0.10f, 0.30f, 0.35f, 0.45f)))
+        val tr = d.send(SnapshotReceived(shaken))
+        assertTrue(tr.effects.none { it is ClearHighlight || it is RequestGuide })
+        assertEquals("n4", d.state.guide?.targetId)                              // 새 id로 갈아타고 위치를 따라간다
+        assertTrue(tr.effects.any { it is SessionEffect.Highlight })
+    }
+
+    @Test fun `안내한 칸이 안 보여도 노란 칸은 마지막 자리에 그대로 두고 다음 질문 때 지운다`() {
+        val d = asked()
+        d.send { GuideReceived(it, GuideResponse("", GuideAction.Tap("e4", "아메리카노"))) }
+        d.send { SpeechFinished(it) }
+        val tr = d.send(SnapshotReceived(options))                              // 글자가 전혀 다른 화면
+        assertTrue(tr.effects.none { it is ClearHighlight || it is RequestGuide })
+        assertTrue(d.state.guide != null)
         assertEquals(options, d.state.snapshot)                                  // 다음 질문은 이 새 화면으로
     }
 
