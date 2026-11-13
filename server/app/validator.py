@@ -17,6 +17,10 @@ from .models import GuideAction, GuideResponse, LlmAction, LlmKind, ScreenElemen
 MSG_UNKNOWN = "버튼을 찾지 못했어요. 화면이 잘 보이게 정면에서 비춰주세요."
 MSG_ASK = "무엇을 드시고 싶으세요?"
 MSG_DONE = "결제 수단을 고르셨어요. 직원 또는 화면 안내를 따라주세요."
+# 아직 아무것도 고르지 않았는데 LLM이 '끝'이라고 할 때 대신 되묻는 말 (잘못 알아들은 말이 흔한 원인, 2026-11-12)
+MSG_NOT_DONE = "잘 못 알아들었어요. 무엇을 도와드릴지 다시 말씀해 주세요."
+# 고른 것 없이 결제 버튼을 안내하려 할 때 대신 하는 말 (원하는 메뉴가 화면에 안 보임, 2026-11-13)
+MSG_NOT_SEEN = "찾으시는 것이 화면에서 안 보여요. 화면이 잘 보이게 비춰 주세요."
 SCROLL_TARGET_DEFAULT = "원하시는 메뉴"    # 찾는 대상을 모를 때. 앱: "화면을 아래로 밀어서 원하시는 메뉴 찾아 주세요"
 MSG_WAIT = "화면이 바뀔 때까지 잠시 기다려 주세요."
 MAX_MESSAGE = 60
