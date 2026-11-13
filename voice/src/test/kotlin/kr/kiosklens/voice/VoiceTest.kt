@@ -50,6 +50,23 @@ class VoiceMappingTest {
         assertEquals(SttNext.FINISH, SttMapping.next(SttMapping.ERROR_INSUFFICIENT_PERMISSIONS, offline = true, retried = false))
     }
 
+    @Test fun `오프라인 한국어 모델이 없다는 기억은 정해진 기간만 쓴다 (첫 말 앞부분이 잘리지 않게)`() {
+        val now = 1_000_000L
+        assertTrue(!SttMapping.offlineMissingRemembered(0, now))                                  // 기록 없음
+        assertTrue(SttMapping.offlineMissingRemembered(now + SttMapping.OFFLINE_MISSING_REMEMBER_MS, now))
+        assertTrue(!SttMapping.offlineMissingRemembered(now - 1, now))                            // 기간 지남 → 다시 오프라인 시도
+        assertEquals(7L * 24 * 60 * 60 * 1000, SttMapping.OFFLINE_MISSING_REMEMBER_MS)
+    }
+
+    @Test fun `인식기 언어 목록에서 한국어를 알아본다`() {
+        assertTrue(SttMapping.hasKorean(listOf("en-US", "ko-KR")))
+        assertTrue(SttMapping.hasKorean(listOf("ko_KR")))
+        assertTrue(SttMapping.hasKorean(listOf(" KO ")))
+        assertTrue(!SttMapping.hasKorean(listOf("en-US", "ja-JP", "kok-IN")))                     // 콘칸어(kok)는 한국어가 아님
+        assertTrue(!SttMapping.hasKorean(emptyList()))
+        assertTrue(!SttMapping.hasKorean(null))
+    }
+
     @Test fun `재시도는 1회만 하고 권한 문제는 하지 않는다`() {
         assertTrue(SttMapping.shouldRetry(SttError.NETWORK, false))
         assertTrue(!SttMapping.shouldRetry(SttError.NETWORK, true))
@@ -72,6 +89,15 @@ class VoiceMappingTest {
         now = 2000; g.speakingEnded()
         now = 2100; assertEquals(200, g.waitMs())
         now = 2300; assertEquals(0, g.waitMs())
+    }
+
+    @Test fun `읽고 있지 않을 때 소리를 멈추면 마이크를 기다리게 하지 않는다 (버튼 누르자마자 한 말이 잘리지 않게)`() {
+        var now = 1000L
+        val g = EchoGuard({ now }, 300)
+        g.speakingStopped(); assertEquals(0, g.waitMs())                  // 조용할 때 멈춤 → 바로 듣기
+        g.speakingStarted(); now = 1500; g.speakingStopped()              // 읽다가 멈춤 → 울림이 사라질 때까지
+        now = 1600; assertEquals(200, g.waitMs())
+        now = 1800; assertEquals(0, g.waitMs())
     }
 
     @Test fun `긴 안내를 문장 단위로 나눈다`() {

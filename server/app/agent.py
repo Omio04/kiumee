@@ -17,21 +17,22 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import time
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Protocol
 
 from . import privacy
 from .cache import ResponseCache, request_key
-from .jamo import normalize
+from .jamo import dice, normalize
 from .llm import LlmClient, LlmRateLimited, LlmTimeout, LlmUpstream
-from .models import (MAX_GOAL, ActionType, ElementKind, GuideAction, GuideRequest, GuideResponse, LlmKind,
-                     ScreenElement)
+from .models import (MAX_GOAL, MAX_HISTORY, ActionType, ElementKind, GuideAction, GuideRequest, GuideResponse,
+                     LlmKind, ScreenElement)
 from .parser import ActionParser, ParseError
 from .prompt import RETRY_NOTE, SYSTEM, build_user
 from .ranker import JamoNgramRanker, answer_button, is_flow_button, same_item
 from .settings import Settings
-from .validator import MSG_ASK, MSG_DONE, MSG_UNKNOWN, ActionValidator
+from .validator import MSG_ASK, MSG_DONE, MSG_NOT_DONE, MSG_NOT_SEEN, MSG_UNKNOWN, ActionValidator
 
 log = logging.getLogger("kl")
 
@@ -88,6 +89,64 @@ def _chosen_items(req: GuideRequest) -> List[str]:
                 and not any(same_item(t, o) for o in out)):
             out.append(t)
     return out
+
+
+def _premature_done(req: GuideRequest, chosen: List[str]) -> bool:
+    """LLM의 DONE이 너무 이른가 (2026-11-12 시험: 잘못 알아들은 말 "회 기간"에 "결제가 완료되었습니다"라고 답하고 세션이 끝났다).
+
+    결제 진행 화면이면 앞의 규칙이 이미 DONE을 냈으니, 여기 오는 DONE은 LLM의 판단뿐이다. 이럴 때 이르다고 본다:
+    · 고른 것(메뉴 · 표 등)이 하나도 없고
+    · 세션 이력이 다 보인다 (앱은 최근 MAX_HISTORY개만 보내서, 꽉 차면 메뉴가 밀려났을 수 있다 → LLM을 믿음)
+    · 아직 이 일로 되물은 적이 없다 (한 세션에 한 번만: 또 DONE이면 그대로 둬서 되묻기가 되풀이되지 않게)"""
+    if chosen or len(req.history) >= MAX_HISTORY:
+        return False
+    return not any(h.action == ActionType.ASK_USER and h.targetText == MSG_NOT_DONE for h in req.history)
+
+
+# 결제로 넘어가는 버튼 (결제하기 · 카드결제 · 계산하기 …)
+_CHECKOUT_WORDS = tuple(normalize(w) for w in ("결제", "계산"))
+# 목표 자체가 결제 · 마무리면(어르신이 직접 담아 둔 것을 결제, "다 됐어요") 막지 않는다
+_PAY_WORDS = tuple(normalize(w) for w in (
+    "결제", "계산", "카드", "현금", "페이", "지불", "됐어", "됐습니다", "됐네", "끝", "다했", "완료"))
+# 메뉴 이름이 아닌 말 ("아메리카노 한잔 주세요"에서 "한잔" · "주세요")
+_FILLER = frozenset(normalize(w) for w in (
+    "주세요", "줘요", "줘", "한잔", "두잔", "세잔", "하나", "두개", "주문", "할게요", "할래요", "먹을게요", "마실게요",
+    "부탁해요", "그리고", "이랑", "하고", "좀", "더"))
+# 화면 글자가 원하는 메뉴와 이만큼 비슷하면 "보인다" (글자 인식 오타 "CE에리카노" 0.65 · "0CE계리카노" 0.50,
+# 다른 메뉴 · 버튼은 0.31 이하, 2026-11-13 측정)
+ITEM_SEEN_DICE = 0.45
+
+
+def _goal_words(goal: str) -> List[str]:
+    """목표에서 메뉴 이름일 수 있는 낱말 ("아메리카노 한잔 주세요" → ["아메리카노"])"""
+    return [w for w in (normalize(t) for t in re.split(r"[\s,]+", goal or "")) if len(w) >= 2 and w not in _FILLER]
+
+
+def _item_seen(elements: List[ScreenElement], goal: str) -> bool:
+    """어르신이 말한 메뉴 이름이 화면 어딘가(메뉴판 · 장바구니 · 옵션 창 제목)에 보이는가. 오타를 너그럽게 본다."""
+    words = _goal_words(goal)
+    for e in elements:
+        t = normalize(e.text)
+        if not t or is_flow_button(e.text):
+            continue
+        if any(w in t or dice(e.text, w) >= ITEM_SEEN_DICE for w in words):
+            return True
+    return False
+
+
+def _premature_checkout(req: GuideRequest, goal: str, chosen: List[str], target_text: Optional[str]) -> bool:
+    """고른 것 없이 결제로 가려 하는가 (2026-11-12 시험: 메뉴 이름을 못 읽은 화면에서 "아메리카노 한 잔"에 '결제하기'를
+    안내했고, 이어서 "주문이 완료되었습니다"로 끝났다). 이럴 때만 막는다:
+    · 안내할 버튼이 결제 버튼이고 · 고른 것이 없고 · 세션 이력이 다 보이고(MAX_HISTORY개 미만, 꽉 차면 메뉴가 밀려났을 수 있음)
+    · 짧은 대답("다 됐어요" · "네")이 아니고 목표가 결제 · 마무리 자체도 아니며
+    · 목표에 메뉴 이름이 있는데 화면 어디에도 안 보인다 (장바구니에 이미 담겨 있으면 결제가 맞다)"""
+    if not any(w in normalize(target_text or "") for w in _CHECKOUT_WORDS):
+        return False
+    if chosen or len(req.history) >= MAX_HISTORY:
+        return False
+    if answer_button(req.utterance) is not None or any(w in normalize(goal or "") for w in _PAY_WORDS):
+        return False
+    return bool(_goal_words(goal)) and not _item_seen(req.snapshot.elements, goal)
 
 
 def _retryable(e: Optional[BaseException]) -> bool:
@@ -193,6 +252,14 @@ class LlmGuideAgent:
         resp = self.validator.validate(action, by_id, goal=goal)
         if action.action == LlmKind.GUIDE and resp.action.type == ActionType.UNKNOWN:
             meta["rejected"] = True                    # LLM이 후보에 없는 버튼을 말함
+        # 7) 이른 '끝' 막기: 고른 것이 없는데 DONE이면 끝내지 않고 다시 묻는다 (앱은 묻고 나서 바로 듣는다)
+        if resp.action.type == ActionType.DONE and _premature_done(req, chosen):
+            meta["rejected"] = True
+            resp = GuideResponse(goal=goal, action=GuideAction.ask_user(MSG_NOT_DONE), source="rule")
+        # 8) 고른 것 없이 결제로 가지 않기: 원하는 메뉴가 안 보이면 '모름' → 앱이 말하고 화면을 다시 보며 기다렸다가 다시 묻는다
+        if resp.action.type == ActionType.TAP and _premature_checkout(req, goal, chosen, resp.action.guideText):
+            meta["rejected"] = True
+            resp = GuideResponse(goal=goal, action=GuideAction.unknown(MSG_NOT_SEEN), source="rule")
         meta["source"] = resp.source
         if resp.source == "llm":
             self.cache.put(key, resp)

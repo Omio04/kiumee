@@ -14,6 +14,13 @@ class EchoGuard(private val nowMs: () -> Long = System::currentTimeMillis, val q
     fun speakingStarted() { speaking = true }
     fun speakingEnded() { lastEnd.set(nowMs()); speaking = false }
 
+    /**
+     * 소리를 (중간에) 멈췄다: 실제로 읽던 중이었을 때만 "방금 끝남"으로 적는다.
+     * 마이크 버튼을 누르면 늘 '소리 멈춤' 뒤에 '듣기'가 오는데, 조용할 때도 끝남으로 적으면 누를 때마다 [quietMs]를 괜히
+     * 기다려 그동안 한 말 앞부분이 잘린다 (2026-11-13 에뮬레이터: 버튼 → 마이크 열림 0.36초 → 0.15초).
+     */
+    fun speakingStopped() { if (speaking) speakingEnded() }
+
     /** 지금부터 마이크를 켜도 되기까지 더 기다려야 하는 시간(ms). 0이면 바로 켜도 됨. */
     fun waitMs(): Long {
         if (speaking) return quietMs                                    // 아직 읽는 중이면 짧게 다시 확인하게 한다

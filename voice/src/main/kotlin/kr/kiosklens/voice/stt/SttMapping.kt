@@ -51,6 +51,21 @@ object SttMapping {
         code == ERROR_LANGUAGE_NOT_SUPPORTED || code == ERROR_LANGUAGE_UNAVAILABLE
 
     /**
+     * "오프라인 한국어 모델 없음"을 기억하는 기간 (2026-11-12). 앱을 다시 켤 때마다 오프라인부터 시도하면
+     * 실패 + 다시 시작(0.25초 기다림 포함, 약 0.35초) 동안 한 말이 버려져 **첫 말 앞부분이 잘렸다**
+     * ("아메리카노" → "카노" · "메리카노").
+     * 기간이 지나면 한 번 다시 오프라인을 시도한다 (그사이 모델을 내려받았을 수 있음).
+     */
+    const val OFFLINE_MISSING_REMEMBER_MS = 7L * 24 * 60 * 60 * 1000
+
+    /** 저장해 둔 "오프라인 한국어 모델 없음"이 아직 유효한가. [savedUntil]이 0이면 기록 없음 */
+    fun offlineMissingRemembered(savedUntil: Long, now: Long): Boolean = savedUntil > now
+
+    /** 인식기가 알려 준 언어 목록(예: "ko-KR", "en-US")에 한국어가 있는가. 표기가 조금 달라도("ko_KR", "KO") 알아본다 */
+    fun hasKorean(languages: List<String>?): Boolean =
+        languages.orEmpty().any { it.trim().lowercase().replace('_', '-').substringBefore('-') == "ko" }
+
+    /**
      * 인식 오류 뒤에 할 일 (결정 #3: 온디바이스 우선, 한국어 모델이 없으면 일반 인식기).
      * - [offline] = 이번 시도가 오프라인이었는가 (온디바이스 인식기, 또는 일반 인식기 + `EXTRA_PREFER_OFFLINE`).
      * - 오프라인 시도에서 12 · 13 → 일반 인식기 + 온라인으로 바꿔 다시 듣는다. 듣기 전에 바로 나는 오류라

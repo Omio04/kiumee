@@ -64,9 +64,12 @@ class ViewfinderView(context: Context) : View(context) {
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
-        val fw = w * 0.82f                                                       // 키오스크 화면을 담을 자리: 가로 82%
-        val fh = min(h * 0.52f, fw * 1.2f)
-        val cy = h * 0.43f                                                       // 아래 구슬을 피해 가운데보다 살짝 위
+        // 키오스크 화면을 담을 자리: 가로 90% · 세로 74% (2026-11-12 "가로 90%, 세로를 더 길게", 예전 82% · 52%).
+        // 위는 왼쪽 위 키우미 표시 바로 아래(9%), 아래는 83%까지. 아래 모서리는 화면 양끝에만 그려져
+        // 가운데 마이크 구슬 · 파동(가로 29~71%)과 겹치지 않는다
+        val fw = w * 0.90f
+        val fh = h * 0.74f
+        val cy = h * 0.46f
         frame.set((w - fw) / 2f, cy - fh / 2f, (w + fw) / 2f, cy + fh / 2f)
     }
 
