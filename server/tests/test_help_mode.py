@@ -190,3 +190,44 @@ async def test_saying_press_x_also_points_at_x(snaps):
     r = await agent(llm).next(req(snaps, "s07_loyalty", "이거 꼭 해야 하는 거야?"))
     assert r.response.action.type.value == "TAP" and r.response.action.guideText.strip() == "×"
     assert r.response.say and "×" in r.response.say
+
+
+# ---- 방금 안내한 칸을 또 가리키지 않는다 / 같은 지시를 두 번 읽지 않는다 (2026-11-13 실기기: 푸드를 누른 뒤에도 푸드)
+def _food_req(snaps, said, history):
+    d = make_req(snaps, "s01_dine", said, history=history)
+    d["snapshot"]["elements"] = [
+        {"id": "e1", "text": "푸드", "rect": {"left": 0.4, "top": 0.1, "right": 0.5, "bottom": 0.14}, "confidence": 0.9, "kind": "BUTTON_LIKE"},
+        {"id": "e2", "text": "치즈케이크", "rect": {"left": 0.1, "top": 0.4, "right": 0.4, "bottom": 0.5}, "confidence": 0.9, "kind": "BUTTON_LIKE"},
+        {"id": "e3", "text": "마카롱", "rect": {"left": 0.5, "top": 0.4, "right": 0.9, "bottom": 0.5}, "confidence": 0.9, "kind": "BUTTON_LIKE"}]
+    return GuideRequest.model_validate(d)
+
+
+def _guide(tid, text, msg):
+    return '{"screenAsks":"x","action":"GUIDE","targetId":"%s","guideText":"%s","message":"%s"}' % (tid, text, msg)
+
+
+async def test_does_not_point_again_at_the_tab_just_pressed(snaps):
+    hist = [HistoryItem(screenId="s1", action="TAP", targetText="푸드")]
+    llm = ScriptedFakeLlmClient([_guide("e1", "푸드", "케이크는 푸드 탭에 있어요."), _guide("e2", "치즈케이크", "치즈케이크가 보여요.")])
+    r = (await agent(llm).next(_food_req(snaps, "케이크를 먹고 싶어", hist))).response
+    assert r.action.type.value == "TAP" and r.action.guideText == "치즈케이크"            # 같은 칸이면 다시 묻고 다음 칸을 고른다
+    assert len(llm.calls) == 2 and "이미 눌렀을 가능성" in llm.calls[1]["user"]
+
+
+async def test_repeat_that_stays_the_same_gets_no_highlight(snaps):
+    hist = [HistoryItem(screenId="s1", action="TAP", targetText="푸드")]
+    llm = ScriptedFakeLlmClient([_guide("e1", "푸드", "푸드 탭이에요.")])
+    r = (await agent(llm).next(_food_req(snaps, "케이크를 먹고 싶어", hist))).response
+    assert r.action.type.value == "ASK_USER"                                           # 이미 누른 칸을 또 칠하지 않는다
+
+
+async def test_first_time_pointing_is_not_blocked(snaps):
+    llm = ScriptedFakeLlmClient([_guide("e1", "푸드", "케이크는 푸드 탭에 있어요.")])
+    r = (await agent(llm).next(_food_req(snaps, "케이크를 먹고 싶어", []))).response
+    assert r.action.type.value == "TAP" and r.action.guideText == "푸드" and len(llm.calls) == 1
+
+
+async def test_say_keeps_the_reason_but_drops_the_press_sentence(snaps):
+    llm = ScriptedFakeLlmClient([_guide("e1", "푸드", "케이크는 푸드 탭에 있어요. 위쪽 노란 칸 푸드를 눌러 주세요. 치즈케이크가 보여요.")])
+    r = (await agent(llm).next(_food_req(snaps, "케이크를 먹고 싶어", []))).response
+    assert r.say == "케이크는 푸드 탭에 있어요. 치즈케이크가 보여요."                  # 눌러 주세요는 앱이 따로 읽는다

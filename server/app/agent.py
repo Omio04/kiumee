@@ -202,6 +202,29 @@ def _pressed_candidate(message: str, candidates: dict):
     return best if best is not None and verb.start() - best_end <= 40 else None
 
 
+_PRESS_SENTENCE = re.compile(r"눌러|누르|누를|터치")
+_REPEAT_NOTE = ("\n[주의] 어르신이 방금 안내받은 '{t}' 칸은 이미 눌렀을 가능성이 큽니다(화면이 바뀌었을 수 있음). "
+                "같은 칸을 또 가리키지 마세요. 사진과 글자를 다시 보고 **지금 화면에서** 어르신 질문에 맞는 다음 칸을 고르세요.")
+
+
+def _repeated_target(action, candidates: dict, history) -> Optional[str]:
+    """방금 안내한 칸(최근 두 이력 안의 마지막 TAP)을 또 가리키려는가. 그렇다면 그 칸의 글자를 돌려준다 (어르신이 이미 눌렀을 가능성)."""
+    if action.action != LlmKind.GUIDE or not action.targetId or action.targetId not in candidates:
+        return None
+    cur = candidates[action.targetId].text.replace(" ", "").strip().lower()
+    for h in reversed(list(history)[-2:]):
+        if h.action == ActionType.TAP and (h.targetText or "").replace(" ", "").strip().lower() == cur and cur:
+            return candidates[action.targetId].text.strip()
+    return None
+
+
+def _reason_only(say: str) -> str:
+    """앱이 "노란색 칸을 눌러 주세요. 적힌 글자는 ○○"를 따로 읽으므로, AI가 한 말에서 "~을 눌러 주세요" 문장은 뺀다 (같은 지시를 두 번 읽지 않게)."""
+    parts = re.split(r"(?<=[.!?])\s+", (say or "").strip())
+    kept = [p for p in parts if p and not _PRESS_SENTENCE.search(p)]
+    return " ".join(kept).strip()
+
+
 def _photo_box(action, has_image: bool, candidates: dict) -> Optional[tuple]:
     """AI가 사진에서 직접 가리킨 칸: (Box, 칸 글자). 글자 목록(후보)에 없는 칸일 때만, 사진이 있고 박스가 말이 될 때만."""
     if not has_image:
@@ -546,20 +569,31 @@ class LlmGuideAgent:
             log.info("KL_DEBUG 사진=%s", f"{len(req.image) // 1024}KB" if req.image else "없음")        # 크기만 (내용은 남기지 않는다)
         action = None
         deadline = t0 + self.s.total_budget_s
+        repeat_retry = False
         for attempt in range(2):
             remaining = deadline - time.perf_counter()
             if attempt > 0 and remaining < self.s.min_retry_s:
                 break
-            raw = await self._complete(user if attempt == 0 else user + RETRY_NOTE, max(0.5, min(self.s.llm_timeout_s, remaining)),
+            raw = await self._complete(user + (RETRY_NOTE if attempt > 0 and not repeat_retry else ""), max(0.5, min(self.s.llm_timeout_s, remaining)),
                                        list(by_id), meta, system=help_mode.HELP_SYSTEM, image=req.image)
             meta["llm_calls"] = int(meta["llm_calls"]) + 1
             if self.s.debug_prompts:
                 log.info("KL_DEBUG 도움 원답=%s", raw)
             try:
                 action = self.parser.parse(raw)
-                break
             except ParseError:
                 meta["retry"] = True
+                continue
+            again = _repeated_target(action, by_id, req.history)
+            if again and attempt == 0 and deadline - time.perf_counter() >= self.s.min_retry_s:
+                meta["retry"] = True                                           # 방금 안내한 칸을 또 가리킴 → 한 번 더 묻는다 (2026-11-13 실기기: 푸드를 누른 뒤에도 푸드)
+                user = user + _REPEAT_NOTE.format(t=again)
+                repeat_retry = True
+                action = None
+                continue
+            if again:                                                          # 다시 물어도 같다 → 칸 없이 말로만 (이미 누른 칸을 또 칠하지 않는다)
+                action = action.model_copy(update={"action": LlmKind.ASK_USER, "targetId": None})
+            break
         label = screen_type.label(stype)
         fallback = f"{label}이에요. 어떤 점이 궁금하세요?" if label else "무엇이 궁금하세요?"
         if action is None:
@@ -579,7 +613,7 @@ class LlmGuideAgent:
         a = resp.action
         say = ""
         if a.type == ActionType.TAP:                                          # 버튼을 가리킨다 + 앞에 읽을 이유 · 방법 한 문장(say)
-            say = _clean_message(action.message, "", 80)
+            say = _reason_only(_clean_message(action.message, "", 80))          # 이유만 (누르라는 문장은 앱이 따로 읽는다)
             if say and (_waiting_talk_text(say) or any(w in normalize(say) for w in _APP_CLAIMS)):
                 say = ""                                                      # 앱이 뭔가 하는 듯한 말은 읽지 않는다
         if a.type == ActionType.TAP:
