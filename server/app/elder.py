@@ -63,8 +63,19 @@ def is_help(utterance: Optional[str]) -> bool:
     return bool(utterance) and bool(_HELP.search(utterance))
 
 
+_STOP_FILLERS = {"이제", "그냥", "나", "난", "저", "전", "좀", "아", "어", "음", "에이", "됐어", "됐고", "그래", "아니", "아냐", "그럼", "다", "그거", "이거", "됐어요"}
+
+
 def is_stop(utterance: Optional[str]) -> bool:
-    return bool(utterance) and bool(_STOP.search(utterance))
+    """앱 안내를 그만두겠다는 말인가. "안 할래 · 이제 그만할래"는 그만이지만, 앞에 할 일이 붙은 "옵션 안 할래 · 적립 안 할래"는
+    그 단계를 건너뛰겠다는 뜻이라 그만이 아니다 (2026-11-13 비교 실험: 건너뛰려는 어르신께 "안내를 마칠게요"라고 끝내 버렸다)."""
+    if not utterance:
+        return False
+    m = _STOP.search(utterance)
+    if not m:
+        return False
+    before = [w for w in re.findall(r"[가-힣A-Za-z]+", utterance[:m.start()]) if w not in _STOP_FILLERS]
+    return not before
 
 
 def correction_of(utterance: Optional[str], prev_goal: Optional[str]) -> Optional[str]:

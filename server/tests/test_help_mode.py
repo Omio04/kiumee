@@ -447,3 +447,10 @@ async def test_the_llm_sees_the_bottom_button_on_a_long_screen(snaps):
     pay = [line for line in user.splitlines() if line.endswith("|결제하기")]
     assert pay and pay[0].split("|")[0] in llm.calls[0]["target_ids"]       # 후보 번호로도 고를 수 있다
     assert "결제하기" in user.split("[후보]")[0]                              # 화면 글자에도 보인다
+
+
+async def test_one_letter_button_is_trusted_when_the_name_matches(snaps):
+    texts = ["커피", "음료", "티", "푸드", "아메리카노"]
+    llm = ScriptedFakeLlmClient([_guide_raw('"e2"', "티", "아이스티는 '티' 분류에 있을 것 같아요. 위쪽 노란 칸 '티'를 눌러 보세요.")])
+    r = await agent(llm).next(_req_with(snaps, texts, "아이스티 마시고 싶어"))
+    assert r.response.action.type.value == "TAP" and r.response.action.guideText == "티" and not r.meta.get("target_mismatch")

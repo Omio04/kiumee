@@ -60,6 +60,8 @@ class Settings:
     candidate_k: int = 8                      # 설계: 후보 K=8
     progress_hint: bool = True                # 진행 상황(지금까지 · 다음 단계) 요약을 LLM에 준다 (app/progress.py)
     expectation_check: bool = True            # 눌렀다던 메뉴가 새 화면에 안 보이면 LLM에 알린다 (app/expectation.py)
+    som_marks: bool = False                   # 도움 모드: 사진 위 후보 칸마다 번호를 그려 AI가 번호를 고르게 한다 (app/som.py)
+    lexicon_fix: bool = False                 # 도움 모드: 키오스크 공통 낱말로 OCR 오타를 바로잡아 AI에게 보인다 (app/lexicon.py)
     help_mode: bool = False                   # 도움 모드: 어르신이 물어보면 그 순간의 화면을 보고 답한다 (app/help_mode.py)
     cache_size: int = 256                     # 같은 요청 재처리 방지 (0이면 끔)
     cache_ttl_s: float = 30.0
@@ -91,6 +93,8 @@ class Settings:
             progress_hint=_env_bool(env, "PROGRESS_HINT", True),
             expectation_check=_env_bool(env, "EXPECTATION_CHECK", True),
             help_mode=_env_bool(env, "HELP_MODE", False),
+            som_marks=_env_bool(env, "SOM_MARKS", False),
+            lexicon_fix=_env_bool(env, "LEXICON_FIX", False),
             cache_size=int(e("CACHE_SIZE", "256")),
             cache_ttl_s=float(e("CACHE_TTL_S", "30")),
             fastpath=_env_bool(env, "FASTPATH", True),

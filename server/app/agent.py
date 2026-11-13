@@ -22,7 +22,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Protocol
 
-from . import privacy
+from . import lexicon, som, privacy
 from .cache import ResponseCache, request_key
 from .jamo import dice, normalize
 from . import elder, expectation, help_mode, hidden_button, kiosk, menu_info, progress, screen_guide, screen_type
@@ -311,10 +311,10 @@ def _clean_name(text: str) -> str:
 def _name_score(name: str, text: str) -> float:
     """이름과 칸 글자가 얼마나 같은가 (앱 NameMatcher.score 와 같은 규칙): 같음 1.0 · 품음 0.95 · 그 밖은 자모 유사도."""
     n, t = normalize(_clean_name(name)), normalize(text)
+    if n and n == t:
+        return 1.0                                      # 한 글자 버튼(티 · 예 · 네)도 같으면 같은 칸이다 (2026-11-13: '티'를 0점으로 버렸다)
     if len(n) < 2 or len(t) < 2:
         return 0.0
-    if n == t:
-        return 1.0
     if len(n) >= 3 and n in t:
         return 0.95
     return dice(n, t)
@@ -687,6 +687,16 @@ class LlmGuideAgent:
     async def _answer_question(self, req, els, goal, prev_goal, stype, probs, kiosk_hint, change, meta, t0):
         """도움 모드: 어르신 말을 질문으로 보고, 그 순간의 화면 전체를 보여 주고 AI가 답하게 한다. 답 뒤에 "또 도움이 필요하세요?"를 붙인다."""
         candidates = help_mode.candidates_for_help(els, utterance=req.utterance or "")
+        image = req.image
+        if self.s.lexicon_fix:                                              # OCR 오타(읍션 · 주문달기)를 공통 낱말로 바로잡아 보인다
+            els = [e.model_copy(update={"text": lexicon.correct(e.text)}) for e in els]
+            candidates = [c.model_copy(update={"text": lexicon.correct(c.text)}) for c in candidates]
+        if self.s.som_marks and candidates:                                 # 번호를 그린 사진: AI는 번호만 고르고 칸은 OCR 칸을 쓴다
+            alias = som.short_labels([c.id for c in candidates])
+            candidates = [c.model_copy(update={"id": a}) for a, c in zip(alias, candidates)]
+            meta["_alias"] = alias
+            if image:
+                image = som.draw_marks(image, {c.id: c for c in candidates}) or image
         by_id = {c.id: c for c in candidates}
         user = help_mode.build_user(req.utterance or "", req.history, els, candidates,
                                     screen=screen_type.describe_probabilities(probs) or screen_type.label(stype),
@@ -703,7 +713,7 @@ class LlmGuideAgent:
             if attempt > 0 and remaining < self.s.min_retry_s:
                 break
             raw = await self._complete(user + (RETRY_NOTE if attempt > 0 and not repeat_retry else ""), max(0.5, min(self.s.llm_timeout_s, remaining)),
-                                       list(by_id) + [MISSING_ID], meta, system=help_mode.HELP_SYSTEM, image=req.image)
+                                       list(by_id) + [MISSING_ID], meta, system=help_mode.HELP_SYSTEM, image=image)
             meta["llm_calls"] = int(meta["llm_calls"]) + 1
             if self.s.debug_prompts:
                 log.info("KL_DEBUG 도움 원답=%s", raw)
@@ -842,6 +852,9 @@ class LlmGuideAgent:
                     t.cancel()
 
     def _finish(self, resp: GuideResponse, meta: Dict[str, object], t0: float) -> GuideResult:
+        alias = meta.pop("_alias", None)                                     # 사진에 그린 짧은 번호 → 앱이 아는 원래 칸 번호
+        if alias and resp.action.targetId in alias:
+            resp = resp.model_copy(update={"action": resp.action.model_copy(update={"targetId": alias[resp.action.targetId]})})
         meta["total_ms"] = round((time.perf_counter() - t0) * 1000, 1)
         if self.s.debug_prompts:
             a = resp.action

@@ -122,3 +122,11 @@ async def test_cash_is_explained_when_the_screen_has_no_cash_button(snaps):
     a = r.response.action
     assert a.type.value == "ASK_USER" and "현금" in a.question and len(a.question) <= 80
     assert len(llm.calls) == 0 and "현금" not in r.response.goal       # 현금이 목표에 섞이지 않는다
+
+
+def test_skipping_a_step_is_not_stopping_the_app():
+    from app import elder
+    for said in ("안 할래", "이제 그만할래", "그냥 안 할래요", "종료", "나 그만 할래"):
+        assert elder.is_stop(said), said
+    for said in ("옵션 안 할래", "적립 안 할래", "포인트 적립 안 하고 싶어", "샷 추가 안 할게"):
+        assert not elder.is_stop(said), said                    # 그 단계만 건너뛰는 말 → AI가 건너뛰는 칸을 안내
