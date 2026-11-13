@@ -247,6 +247,37 @@ class GeminiLlmClient:
         await self._http.aclose()
 
 
+class FallbackLlmClient:
+    """먼저 쓸 LLM이 일시 오류(키 검증 503 · 시간 초과 · 5xx)로 실패하면 대신할 LLM으로 같은 요청을 보낸다.
+    2026-11-13: 팀 Claude 키가 몇 분씩 503 "credential validation failed"를 내서 시험이 계속 끊겼다.
+    인증 오류(401)와 사용량 제한(429)은 넘기지 않는다 (키를 고쳐야 하는 문제이거나 곧 풀린다)."""
+
+    def __init__(self, primary: "LlmClient", secondary: "LlmClient", logger=None):
+        self.primary, self.secondary, self.log = primary, secondary, logger
+        self.fallbacks = 0
+
+    async def complete(self, system: str, user: str, timeout_s: float,
+                       target_ids: Optional[Sequence[str]] = None, image: Optional[str] = None) -> str:
+        try:
+            return await self.primary.complete(system, user, timeout_s, target_ids=target_ids, image=image)
+        except LlmUpstream as e:
+            if e.kind == "auth":
+                raise
+            reason = e.kind
+        except LlmTimeout:
+            reason = "timeout"
+        self.fallbacks += 1
+        if self.log:
+            self.log.warning("KL_PERF llm fallback reason=%s count=%d", reason, self.fallbacks)
+        return await self.secondary.complete(system, user, timeout_s, target_ids=target_ids, image=image)
+
+    async def aclose(self) -> None:
+        for c in (self.primary, self.secondary):
+            close = getattr(c, "aclose", None)
+            if close:
+                await close()
+
+
 # ---------------- Fake들 ----------------
 Step = Union[str, Exception, Callable[[str, str], str]]
 

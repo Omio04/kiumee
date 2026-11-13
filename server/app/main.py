@@ -7,6 +7,7 @@ from __future__ import annotations
 import hmac
 import json
 import logging
+import os
 import time
 import uuid
 from typing import Optional
@@ -17,7 +18,8 @@ from fastapi.responses import JSONResponse
 
 from .agent import FakeGuideAgent, GuideAgent, LlmGuideAgent
 from .errors import ApiError, body
-from .llm import (AnthropicLlmClient, GeminiLlmClient, HeuristicFakeLlmClient, LlmRateLimited, LlmTimeout, LlmUpstream)
+from .llm import (AnthropicLlmClient, FallbackLlmClient, GeminiLlmClient, HeuristicFakeLlmClient, LlmRateLimited, LlmTimeout,
+                  LlmUpstream)
 from .models import GuideRequest
 from .ratelimit import RateLimiter
 from .settings import VERSION, Settings
@@ -36,7 +38,10 @@ def build_agent(s: Settings) -> GuideAgent:
         return LlmGuideAgent(HeuristicFakeLlmClient(), s)
     if s.llm_provider == "gemini":
         return LlmGuideAgent(GeminiLlmClient(s.gemini_api_key, s.llm_model), s)
-    return LlmGuideAgent(AnthropicLlmClient(s.anthropic_api_key, s.llm_model), s)
+    primary = AnthropicLlmClient(s.anthropic_api_key, s.llm_model)
+    if s.gemini_api_key:                                   # Gemini 키도 있으면 Claude 일시 오류 때 대신 답한다
+        primary = FallbackLlmClient(primary, GeminiLlmClient(s.gemini_api_key, os.environ.get("FALLBACK_MODEL", "gemini-3.5-flash-lite")), log)
+    return LlmGuideAgent(primary, s)
 
 
 def create_app(settings: Optional[Settings] = None, agent: Optional[GuideAgent] = None) -> FastAPI:

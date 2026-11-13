@@ -206,3 +206,19 @@ async def test_bigger_claude_models_get_auto_tool_choice_and_no_disabled_thinkin
         await c.complete("s", "u", 4)
         assert seen["b"]["tool_choice"] == {"type": "auto"} and "decide 도구" in seen["b"]["system"]
         assert seen["b"].get("thinking") == thinking
+
+
+async def test_fallback_llm_takes_over_on_transient_errors_but_not_on_auth():
+    """Claude 키가 몇 분씩 503(credential validation failed)을 내서 시험이 끊겼다 (2026-11-13) → 일시 오류는 Gemini가 대신한다."""
+    from app.llm import FallbackLlmClient, LlmUpstream, LlmTimeout, ScriptedFakeLlmClient
+    ok = '{"screenAsks":"x","action":"ASK_USER","message":"대신 답했어요"}'
+    for err in (LlmUpstream("http_503"), LlmTimeout("t")):
+        second = ScriptedFakeLlmClient([ok])
+        c = FallbackLlmClient(ScriptedFakeLlmClient([err]), second)
+        assert "대신 답했어요" in await c.complete("s", "u", 4, image="QUJD")
+        assert second.calls[0]["image"] == "QUJD" and c.fallbacks == 1            # 사진도 그대로 넘긴다
+    second = ScriptedFakeLlmClient([ok])
+    c = FallbackLlmClient(ScriptedFakeLlmClient([LlmUpstream("auth")]), second)
+    with pytest.raises(LlmUpstream):
+        await c.complete("s", "u", 4)                                              # 키 문제는 숨기지 않는다
+    assert second.calls == []
