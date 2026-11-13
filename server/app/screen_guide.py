@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import List, Optional, Sequence
 
 from .models import MAX_TEXT, ActionType, ElementKind, GuideRequest, ScreenElement
-from .ranker import is_flow_button, same_item
+from .ranker import candidate_pool, is_flow_button, same_item
 
 MAX_LABELS = 4
 MAX_LABEL_LEN = 10
@@ -23,7 +23,7 @@ def screen_changed(req: GuideRequest) -> bool:
 
 def choices(elements: Sequence[ScreenElement]) -> List[str]:
     """고를 수 있는 버튼 글자 (읽는 순서, 중복 제거). 옵션 · 메뉴를 먼저, 취소 · 다음 같은 진행 버튼은 고를 게 없을 때만."""
-    buttons = sorted((e for e in elements if e.kind == ElementKind.BUTTON_LIKE), key=lambda e: (round(e.rect.top, 2), e.rect.left))
+    buttons = sorted(candidate_pool(elements), key=lambda e: (round(e.rect.top, 2), e.rect.left))
     out: List[str] = []
     for pool in ([b for b in buttons if not is_flow_button(b.text)], buttons):
         for b in pool:

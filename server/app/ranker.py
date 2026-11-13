@@ -106,6 +106,28 @@ def match_score(text: str, query: str) -> float:
     return min(1.0, s)
 
 
+MAX_LABEL = 12      # 버튼 글자로 볼 수 있는 최대 길이 (문장은 제외)
+# 제목 · 안내 문구의 끝말 ("아메리카노 옵션 선택", "결제 수단을 선택해주세요", "주문 내역"). 글자가 4자 이하면 버튼일 수 있어 남긴다
+_TITLE_END = tuple(normalize(w) for w in ("선택", "주세요", "하세요", "내역", "입니다", "안내", "확인해"))
+
+
+def candidate_pool(elements: Sequence[ScreenElement]) -> List[ScreenElement]:
+    """후보가 될 수 있는 요소. 보통은 BUTTON_LIKE만.
+
+    ⚠️ 화면 앞에 창(옵션 창 · 팝업)이 뜨면 글자 인식이 읽은 글자를 전부 일반 글자(TEXT)로 낮추는 일이 있다
+    (vision: "An incomplete foreground dialog demotes every observed label"). 그러면 BUTTON_LIKE가 0개라
+    서버가 "버튼을 찾지 못했어요"로 끝나 버려서 아메리카노를 누른 다음 옵션 화면에서 앱이 막혔다 (2026-11-13 실기기).
+    그런 화면에서는 짧은 글자 줄(HOT · ICE · 담기 …)을 후보로 쓴다. 가격(PRICE)과 긴 문장은 뺀다.
+    LLM이 고르는 것은 여전히 이 후보 안으로 제한된다(화이트리스트)."""
+    buttons = [e for e in elements if e.kind == ElementKind.BUTTON_LIKE]
+    if buttons:
+        return buttons
+    def label(e: ScreenElement) -> bool:
+        n = normalize(e.text)
+        return 1 <= len(n) <= MAX_LABEL and sum(c.isdigit() for c in e.text) < 3 and not (len(n) > 4 and n.endswith(_TITLE_END))
+    return [e for e in elements if e.kind == ElementKind.TEXT and label(e)]
+
+
 def _reading_order(e: ScreenElement):
     return (round(e.rect.top, 2), e.rect.left)
 
@@ -117,9 +139,7 @@ class JamoNgramRanker:
     def rank(self, elements: Sequence[ScreenElement], query: str, utterance: Optional[str] = None) -> List[Scored]:
         q = expand_query(query, utterance)
         scored: List[Scored] = []
-        for e in elements:
-            if e.kind != ElementKind.BUTTON_LIKE:
-                continue                               # 가격·일반 글자는 후보가 아님
+        for e in candidate_pool(elements):             # 가격·일반 글자는 후보가 아님 (버튼이 하나도 없을 때만 짧은 글자로 대체)
             m = match_score(e.text, q) if q.strip() else 0.0
             nt = normalize(e.text)
             boost = 0.0
