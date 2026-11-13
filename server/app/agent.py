@@ -581,6 +581,8 @@ class LlmGuideAgent:
             if 0 < hedge < timeout:
                 done, _ = await asyncio.wait(tasks, timeout=hedge)
                 first_failed = bool(done) and _retryable(tasks[0].exception())
+                if first_failed:
+                    await asyncio.sleep(0.6)                      # 일시 오류(키 검증 503 등)는 몇 초씩 연달아 나서, 바로 다시 보내면 같은 오류에 또 걸린다 (2026-11-13)
                 left = timeout - (time.perf_counter() - t0)
                 if (not done or first_failed) and left > 0.5:
                     tasks.append(call(left))
