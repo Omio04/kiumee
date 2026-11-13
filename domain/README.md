@@ -11,7 +11,7 @@
 |---|---|---|
 | `session/` | `SessionStateMachine` | (지금 상태, 일어난 일) → (다음 상태, 할 일 목록). **순수 함수** — 직접 말하거나 서버를 부르지 않는다 |
 | `session/` | `SessionState` · `Phase` · `Guidance` | 상태: 단계 10개 + 세션이 기억할 것 (목표 · 이력 · 최신 화면 · 안내 중인 버튼 · 번호표) |
-| `session/` | `SessionEvent` | 일어난 일 10가지 (버튼 · 화면 · 음성 · 서버 · 시간 초과) |
+| `session/` | `SessionEvent` | 일어난 일 11가지 (버튼 · 화면 · 비추기 문제 · 음성 · 서버 · 시간 초과) |
 | `session/` | `SessionEffect` · `Transition` | 할 일 9가지 (듣기 · 말하기 · 서버 요청 · 하이라이트 · 타이머) |
 | `policy/` | `PositionPhraser` | 버튼 좌표 → "화면 오른쪽 아래" (가로 · 세로 3등분, 둘 다 가운데면 "화면 가운데") |
 | `policy/` | `GuideTextComposer` | 어르신께 읽는 문장 전부. 예: "화면 왼쪽 위 깜빡이는 아메리카노 버튼을 누르세요" |
@@ -25,9 +25,9 @@
 | `IDLE` | 시작 대기 | "말하기" 버튼 → LISTENING |
 | `LISTENING` | 음성 인식 중 | 인식 → PLANNING (화면이 없으면 SCANNING) / 무음 8초 · 말 없음 → IDLE (안내) / 그 밖의 인식 오류 → ERROR |
 | `PLANNING` | 서버에 묻는 중 | TAP · SCROLL · WAIT · UNKNOWN → GUIDING / ASK_USER → ASKING / DONE → DONE / 실패 → ERROR / 그 사이 화면이 바뀜 → 다시 묻기 |
-| `SCANNING` | 화면을 찾는 중 | 스냅샷 → PLANNING / 10초간 없음 → LOST |
+| `SCANNING` | 화면을 찾는 중 | 스냅샷 → PLANNING / 10초간 없음 → LOST / 글자를 3초째 못 읽음(`AimTrouble`) → LOST ("화면 전체가 보이게") |
 | `GUIDING` | 하이라이트 + 안내 문장 읽는 중 | 다 읽음 → WAIT_CHANGE / 화면 바뀜 → 다시 묻기 |
-| `WAIT_CHANGE` | 어르신이 누르길 기다림 | 화면 바뀜 → 다시 묻기 / 15초 → 다시 읽기 (UNKNOWN 뒤에는 최신 화면으로 다시 묻기) |
+| `WAIT_CHANGE` | 어르신이 누르길 기다림 | 화면 바뀜 → 다시 묻기 / 15초 → 다시 읽기 (UNKNOWN 뒤에는 최신 화면으로 다시 묻기) / 비추기 문제(`AimTrouble`: 글자 못 읽음 · 버튼 안 보임) → 한 문장 읽고(GUIDING) 다시 기다림 |
 | `ASKING` | 되묻는 질문 읽는 중 | 다 읽음 → LISTENING (**다 읽은 뒤에야 듣기 시작 — 에코 방지**) |
 | `DONE` | 마무리 안내 읽는 중 | 다 읽음 → IDLE |
 | `LOST` | "화면이 잘 보이게 비춰 주세요" 읽는 중 | 다 읽음 → SCANNING / 그 사이 화면 보임 → 바로 묻기 |

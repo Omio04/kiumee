@@ -30,6 +30,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kr.kiosklens.app.camera.CameraController
 import kr.kiosklens.app.di.AndroidLogger
@@ -47,7 +48,9 @@ import kr.kiosklens.app.ui.VignetteView
 import kr.kiosklens.app.ui.MiniMascotView
 import kr.kiosklens.app.ui.UiTexts
 import kr.kiosklens.core.model.ScreenSnapshot
+import kr.kiosklens.domain.policy.AimWatch
 import kr.kiosklens.domain.session.Phase
+import kr.kiosklens.domain.session.SessionEvent
 import kr.kiosklens.overlay.RecognitionView
 import kr.kiosklens.overlay.ViewOverlay
 import kr.kiosklens.vision.ScanStatus
@@ -76,6 +79,9 @@ class MainActivity : AppCompatActivity() {
     private var camera: CameraController? = null
 
     private lateinit var viewfinder: ViewfinderView
+
+    /** 비추는 문제(글자를 못 읽음 · 안내 버튼이 안 보임)가 몇 초째인지 지켜보다 안내를 부탁한다 (메인 스레드에서만) */
+    private val aim = AimWatch()
 
     // 개발자 확인용: 카메라가 인식한 글자 · 버튼을 미리보기 위에 그리고, 위쪽 줄에 인식 상태를 보여 준다.
     // 평소 화면을 어지럽혀서 (2026-11-12) local.properties 에 kl.showRecognition=true 를 넣은 디버그 빌드에서만 켠다
@@ -185,14 +191,45 @@ class MainActivity : AppCompatActivity() {
         if (devOverlay) ui.launch { g.snapshots.collect { s -> lastSnapshot = s; recognition?.show(s); renderDebug() } }
         ui.launch { g.scanStatus.collect { st ->                                   // 키오스크 글자를 읽었는지 → 조준 모서리
             lastScan = st
+            aim.textFound(st != ScanStatus.REPOSITION, SystemClock.elapsedRealtime())   // 글자 3개 미만이 이어지면 "화면 전체가 보이게"
             if (st != ScanStatus.READY) recognition?.clear()                        // 카메라를 돌리면 옛 테두리를 바로 지운다
             renderDebug()
             render()
         } }
         g.runner.start()
+        watchAim(g)
         ui.launch { g.runner.state.collect { render() } }
         ui.launch { g.voiceLevel.collect { micButton.level = it } }                // 목소리 크기 → 파동 크기
         render()
+    }
+
+    /**
+     * 다시 비추기 안내 (2026-11-13 P5, 팀 결정 "안 보임 신호 → 음성"): 비추는 문제가 몇 초째 이어지면 상태머신에 알린다.
+     * 무엇을 언제 말할지는 :domain이 정한다 (안내를 기다리거나 화면을 찾는 중일 때만, 8초에 한 번까지).
+     * - 글자를 못 읽음: 위 scanStatus (REPOSITION = 글자 3개 미만)
+     * - 안내 버튼이 안 보임: 오버레이가 알린다. 마이크 구슬 높이부터 아래를 가려진 곳으로 알려 준다
+     */
+    private fun watchAim(g: Graph) {
+        overlay.onTargetVisibilityChanged = { visible -> aim.targetVisible(visible, SystemClock.elapsedRealtime()) }
+        micButton.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> markMicObstruction() }
+        overlay.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> markMicObstruction() }
+        ui.launch {
+            while (true) {
+                delay(AIM_TICK_MS)
+                val issue = aim.due(SystemClock.elapsedRealtime()) ?: continue
+                logger.d("Aim", "aim trouble $issue")
+                g.runner.send(SessionEvent.AimTrouble(issue))
+            }
+        }
+    }
+
+    /** 노란 테두리의 가운데가 마이크 구슬 높이보다 아래면 구슬 · 그림자에 가려 안 보인다고 본다 */
+    private fun markMicObstruction() {
+        if (overlay.height == 0 || micButton.height == 0) return
+        val o = IntArray(2).also { overlay.getLocationInWindow(it) }
+        val m = IntArray(2).also { micButton.getLocationInWindow(it) }
+        val orbTop = m[1] + (micButton.height - dp(MIC_DP)) / 2                 // 뷰는 파동 자리까지 커서, 구슬 위쪽 끝을 쓴다
+        overlay.setObstructedInsets(0, 0, 0, (o[1] + overlay.height - orbTop).coerceAtLeast(0))
     }
 
     private fun render() {
@@ -313,6 +350,8 @@ class MainActivity : AppCompatActivity() {
         const val REQ_LOCAL = 101
         /** 마이크 버튼(원) 지름. 어르신이 누르기 쉽게 크게 (핵심 버튼 72dp 이상) */
         const val MIC_DP = 96
+        /** 비추기 문제를 확인하는 간격 (알릴지는 AimWatch가 정한다) */
+        const val AIM_TICK_MS = 500L
         /** 로딩 화면 최소 시간: 캐릭터 아래 글자가 떠오르는 것까지 보여 준다 */
         const val MIN_LOADING_MS = 1500L
         /** 이만큼 지나도 카메라가 안 켜지면 "조금만 기다려 주세요" */

@@ -37,6 +37,12 @@ class GuideTextComposer(private val phraser: PositionPhraser = PositionPhraser()
     /** LOST: 10초 동안 키오스크 화면을 못 찾았을 때 */
     fun lost(): String = "키오스크 화면이 잘 보이게 비춰 주세요."
 
+    /** 키오스크 글자를 몇 초째 거의 못 읽을 때 (다른 곳을 비추거나, 너무 가깝거나 멀 때 모두 이렇게 하면 된다) */
+    fun aimAtKiosk(): String = "키오스크 화면 전체가 보이게 비춰 주세요."
+
+    /** 안내 중인 버튼이 휴대폰 화면 밖이나 마이크 버튼 뒤에 있을 때 (팀 결정: overlay/README, decisions.md "P1이 정할 것") */
+    fun moveBack(): String = "깜빡이는 버튼이 잘 안 보여요. 휴대폰을 조금 뒤로 빼 주세요."
+
     /** LISTENING에서 말을 듣지 못했을 때 (무음 8초 · NO_SPEECH) */
     fun silence(): String = "말씀을 듣지 못했어요. 다시 말하기 버튼을 눌러 주세요."
 

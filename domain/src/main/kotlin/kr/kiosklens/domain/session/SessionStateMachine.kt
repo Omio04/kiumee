@@ -44,6 +44,7 @@ class SessionStateMachine(
             is SessionEvent.StartPressed -> onStart(state, event.sessionId)
             is SessionEvent.SnapshotReceived -> onSnapshot(state, event.snapshot)
             is SessionEvent.ScreenChanged -> onScreenChanged(state, event.screenId)
+            is SessionEvent.AimTrouble -> onAimTrouble(state, event.issue)
             is SessionEvent.SpeechRecognized -> onSpeech(state, event.text)
             is SessionEvent.SpeechFailed -> onSpeechFailed(state, event.error)
             is SessionEvent.SpeechFinished -> onSpeechFinished(state)
@@ -135,6 +136,36 @@ class SessionStateMachine(
         }
         if (rect == g.rect) return stay(state)
         return Transition(state.copy(guide = g.copy(rect = rect)), listOf(Highlight(HighlightTarget(id, rect))))
+    }
+
+    // ---------------- 비추기 ----------------
+
+    /**
+     * 비추는 데 문제가 몇 초째 이어진다 ([AimIssue], 앱이 지켜보다 보냄). 어떻게 비추면 되는지 한 문장 읽는다 (2026-11-13 P5).
+     * 지금까지는 10초 뒤 "잘 보이게 비춰 주세요" 한 문장뿐이었고, 버튼이 화면 밖에 있다는 신호는 받는 쪽이 없었다.
+     * - 화면을 찾는 중(SCANNING) · 글자를 못 읽음: 10초를 기다리지 않고 바로 알려 준다 (LOST처럼 읽고 다시 찾기)
+     * - 누르기를 기다리는 중(WAIT_CHANGE): 읽고 다시 기다린다. 하던 안내 · 하이라이트 · 다시 읽을 문장은 그대로
+     *   - 글자를 못 읽음 → "화면 전체가 보이게" (다음 화면으로 바뀐 것을 알아채려면 키오스크가 보여야 한다)
+     *   - 버튼이 안 보임 → "조금 뒤로" (누를 버튼을 하이라이트 중일 때만)
+     * - 그 밖(듣는 중 · 안내를 읽는 중 · 서버에 묻는 중 · 대기 등)은 말을 끊지 않게 무시한다. 문제가 이어지면 앱이 잠시 뒤 다시 보낸다.
+     */
+    private fun onAimTrouble(state: SessionState, issue: AimIssue): Transition {
+        val t = state.ticket + 1
+        return when (state.phase) {
+            Phase.SCANNING ->
+                if (issue == AimIssue.NO_TEXT) Transition(state.copy(phase = Phase.LOST, ticket = t), listOf(Speak(texts.aimAtKiosk(), t)))
+                else stay(state)
+            Phase.WAIT_CHANGE -> {
+                val g = state.guide ?: return stay(state)
+                val text = when {
+                    issue == AimIssue.NO_TEXT -> texts.aimAtKiosk()
+                    g.targetId != null -> texts.moveBack()
+                    else -> return stay(state)
+                }
+                Transition(state.copy(phase = Phase.GUIDING, ticket = t), listOf(Speak(text, t)))   // 다 읽으면 다시 WAIT_CHANGE
+            }
+            else -> stay(state)
+        }
     }
 
     // ---------------- 음성 ----------------

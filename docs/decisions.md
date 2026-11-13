@@ -138,7 +138,7 @@ P5 PR #6(`feat/p5-overlay-poc`)과 P4 브랜치(`feat/p4-agent-server`)를 계�
 | 항목 | 지금 상황 | 추천 |
 |---|---|---|
 | 채우기 / 맞추기 | 채우기(FILL) + 4:3이면 세로로 긴 폰(1080×2400)에서 분석 프레임 좌우 20%씩이 화면 밖, 아래 버튼판이 화면 아래 15~20%를 가림 (P5 계산) | 실기기에서 어르신이 비추는 모습을 보고 결정. 그 전까지 FILL 유지 |
-| 안 보임 신호 → 음성 | `ViewOverlay.onTargetVisibilityChanged`가 있지만 받는 쪽이 없음 | `:domain`에 이벤트를 더해 안내 중(GUIDING · WAIT_CHANGE)일 때만 "휴대폰을 조금 뒤로 빼 주세요" (5~10초 간격 제한). 포트 변경 없음 (P5 제안, overlay/README) |
+| 안 보임 신호 → 음성 | ~~`ViewOverlay.onTargetVisibilityChanged`가 있지만 받는 쪽이 없음~~ → **연결함 (P5, 2026-11-13, P1 검토 요청)** | 추천대로: `SessionEvent.AimTrouble` + `AimWatch`(2초 이어지면 · 8초에 한 번까지), 누르기를 기다리는 중(WAIT_CHANGE)에만 "깜빡이는 버튼이 잘 안 보여요. 휴대폰을 조금 뒤로 빼 주세요". 마이크 구슬 높이부터 아래를 가려진 곳으로. 같은 길로 **글자 3개 미만이 3초 이어지면** "키오스크 화면 전체가 보이게 비춰 주세요" (화면 찾는 중 · 기다리는 중). 포트 변경 없음 |
 | 실패 종류 → 안내 문구 | 위 V7 | `:core-model`에 실패 종류를 두고(전원 승인) `:agent`가 분류, `:domain`이 문장을 만든다 |
 | 추적 1초 실패 → 반투명 | 같은 화면에서 버튼이 안 보여도 마지막 위치에 그대로 둠 (`SessionStateMachine`, S5) | `:domain`이 판단하고 오버레이는 흐리게만. `HighlightTarget`에 흐림 여부를 더하는 계약 변경 필요 |
 

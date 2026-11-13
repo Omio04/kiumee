@@ -109,7 +109,7 @@ OCR은 1초에 몇 번만 돈다(같은 화면이면 2초에 한 번). 그 사�
 
 - 화면 구성: `:app`의 `MainActivity`가 `PreviewView`(`FILL_CENTER`)와 `ViewOverlay`를 같은 크기(`match_parent`)로 겹쳐 둔다. 둘의 크기 · 위치가 달라지면 좌표가 어긋난다
 - 분석 프레임 크기는 포트가 아니라 `ViewOverlay.setAnalysisSize()`로 직접 넘긴다 (계약 변경 없음)
-- **안 보임 신호 연결**: `MainActivity`에서 버튼판 높이를 `setObstructedInsets(0, 0, 0, panel.height)`로 넣고, `onTargetVisibilityChanged`가 `false`면 runner에 이벤트를 넘겨 `:domain`이 안내 중(GUIDING · WAIT_CHANGE)일 때만 "휴대폰을 조금 뒤로 빼 주세요"를 읽게 (5~10초 간격 제한 권장)
+- ~~**안 보임 신호 연결**~~ → 연결함 (P5, 2026-11-13: `MainActivity.watchAim` · `:domain` `AimWatch` · `SessionEvent.AimTrouble`, 가려진 곳 = 마이크 구슬 높이부터 아래). 원래 계획: `MainActivity`에서 버튼판 높이를 `setObstructedInsets(0, 0, 0, panel.height)`로 넣고, `onTargetVisibilityChanged`가 `false`면 runner에 이벤트를 넘겨 `:domain`이 안내 중(GUIDING · WAIT_CHANGE)일 때만 "휴대폰을 조금 뒤로 빼 주세요"를 읽게 (5~10초 간격 제한 권장)
 - **채우기 / 맞추기 결정**: 실기기에서 어르신이 자연스럽게 비출 때 가장자리 · 아래쪽 버튼이 실제로 가려지는지 보고, 채우기 유지 또는 맞추기(`FIT_CENTER` + 버튼판 위쪽에만 미리보기, 오버레이는 `FitCenterMapper`)를 정한다
 - **흔들림 따라가기 연결** (`:app`, 몇 줄): `CameraController` 분석 콜백에서 `sink.submit(...)` **전에** 밝기 평면을 읽어 넘긴다 (넘긴 뒤에는 ImageProxy가 닫혔을 수 있음)
   ```kotlin

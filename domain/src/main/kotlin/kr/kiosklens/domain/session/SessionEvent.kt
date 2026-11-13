@@ -21,6 +21,12 @@ sealed interface SessionEvent {
     /** SnapshotSource.screenChanges에서 새 screenId가 왔다 */
     data class ScreenChanged(val screenId: String) : SessionEvent
 
+    /**
+     * 비추는 데 문제가 몇 초째 이어지고 있다 (앱이 지켜보다 [kr.kiosklens.domain.policy.AimWatch] 규칙대로 보낸다).
+     * 상태머신은 안내를 기다리거나 화면을 찾는 중일 때만 어떻게 비추면 되는지 한 문장 읽는다. 포트 변경 없음.
+     */
+    data class AimTrouble(val issue: AimIssue) : SessionEvent
+
     // ---- 아래는 상태머신이 시킨 일의 결과. 시킬 때 받은 번호표(ticket)를 그대로 달고 온다 ----
 
     /** 번호표가 붙은 결과 이벤트. 번호가 지금 상태의 번호와 다르면 무시된다 */
@@ -45,4 +51,13 @@ sealed interface SessionEvent {
 
     /** StartTimer로 건 시간이 지났다 */
     data class TimedOut(override val ticket: Int) : Ticketed
+}
+
+/** 비추는 데 생긴 문제 ([SessionEvent.AimTrouble]) */
+enum class AimIssue {
+    /** 키오스크 글자를 거의 못 읽는다 (글자 3개 미만: 다른 곳을 비춤 · 너무 가깝거나 멂 · 반사 · 흔들림) */
+    NO_TEXT,
+
+    /** 안내 중인 버튼(노란 테두리)이 휴대폰 화면 밖이나 마이크 버튼 뒤에 있어 안 보인다 (P5 오버레이가 알림) */
+    TARGET_HIDDEN,
 }
