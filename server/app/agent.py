@@ -355,6 +355,10 @@ class LlmGuideAgent:
             # 같은 말("따뜻한 걸로")에 또 HOT을 고르는 무한 반복이 생겼다 (2026-11-13 시뮬레이션). 방금 누른 버튼이면 다음 단계는 LLM이.
             repeat = repeat or (pressed is not None and same_item(top.element.text, pressed))
             # 같은 글자의 버튼이 여럿이면(옵션 줄마다 "선택" · "추가") 어느 것인지 서버가 정할 수 없다 (2026-11-13 실기기: "결제할래"에 "선택").
+            # 이번 세션에서 이미 안내한 버튼은 빠른 길로 다시 고르지 않는다: 목표에 "따뜻한 걸로"가 남아 있어서, 샷 추가를 묻는
+            # 질문에 "아니요 괜찮아요"라고 해도 HOT을 또 안내하던 반복 (2026-11-13 시뮬레이션 15). 다음 단계는 LLM이 이력을 보고 정한다.
+            repeat = repeat or any(h.action == ActionType.TAP and h.targetText and same_item(top.element.text, h.targetText)
+                                   for h in req.history)
             same_text = sum(1 for r in ranked if normalize(r.element.text) == normalize(top.element.text))
             repeat = repeat or same_text > 1 or normalize(top.element.text) in _GENERIC_LABELS
             if not repeat and top.match >= self.s.fast_min_score and top.match - second >= self.s.fast_margin:

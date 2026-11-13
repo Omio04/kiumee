@@ -32,3 +32,14 @@ async def test_fast_path_still_works_for_the_first_time(snaps):
     r = await agent(llm).next(GuideRequest.model_validate(body))
     assert r.response.action.type.value == "TAP" and r.response.action.guideText == "HOT"
     assert len(llm.calls) == 0
+
+
+async def test_a_button_already_guided_in_this_session_is_not_fast_pathed_again(snaps):
+    """샷 추가를 묻는 질문에 "아니요 괜찮아요"라고 해도 목표에 남은 "따뜻한 걸로"가 HOT을 또 고르게 하면 안 된다."""
+    body = make_req(snaps, "s03_options", "아니요 괜찮아요", goal="아메리카노, 따뜻한 걸로요",
+                    history=[{"screenId": "s03_options#1", "action": "TAP", "targetText": "HOT"},
+                             {"screenId": "s03_options#2", "action": "ASK_USER", "targetText": "샷이나 시럽을 추가하실래요?"}])
+    body["snapshot"]["screenId"] = "s03_options#2"
+    llm = ScriptedFakeLlmClient(['{"action":"GUIDE","targetId":"%s","guideText":"담기"}' % button_id(snaps, "s03_options", "담기")])
+    r = await agent(llm).next(GuideRequest.model_validate(body))
+    assert len(llm.calls) == 1 and r.response.action.guideText == "담기"
