@@ -21,7 +21,9 @@ from .ranker import same_item
 _FILLER = re.compile(r"(?:(?<=\s)|^)(?:어+|음+|으음+|흠+|아+|에+|그+|저+|저기|있잖아|있잖아요|뭐더라|뭐지|그니까|그러니까|막|좀)(?:\.+|,|…)*(?=\s|$)")
 _DOTS = re.compile(r"(?:\.{2,}|…)+")
 
-_REPEAT = re.compile(r"다시\s*(한\s*번\s*)?(말|해|얘기|이야기)|뭐라(고|구)|못\s*들었|한\s*번\s*더(\s*(말|해))?|다시\s*한\s*번|잘\s*안\s*들")
+_REPEAT = re.compile(r"다시\s*(한\s*번\s*)?(말|해|얘기|이야기)(?!씀?\s*(?:할|드릴|볼|줄)[게께])|뭐라(고|구)|못\s*들었|한\s*번\s*더(\s*(말|해))?|다시\s*한\s*번|잘\s*안\s*들")
+# "자 다시 말할게" · "잠깐만요 말씀드릴게요": 이제 말하겠다는 알림. 요청이 아니므로 목표에 붙이지 않고 "네, 말씀해 주세요"만 한다
+_PREFACE = re.compile(r"^[\s,.]*(?:자|잠깐만?요?|잠시만요?|어디\s*보자|그러니까)?[\s,.]*(?:다시\s*)?(?:말|말씀|얘기|이야기)\s*(?:할|드릴|해\s*볼|해볼)\s*[게께]요?[\s.!]*$")
 _HELP = re.compile(r"직원|도와\s*(줘|주세요|달라|줄래)|도움이?\s*필요|못\s*하겠|어려워서|너무\s*어려")
 _STOP = re.compile(r"그만\s*(할래|하고\s*싶|할게|둘래)|안\s*(할래|하고\s*싶|할게)|종료|끝낼래|나갈래")
 _CORRECTION = re.compile(r"(?P<before>.+?)\s*(?:말고|아니고|아니라|대신에?)\s*(?P<after>.+)")
@@ -29,6 +31,7 @@ _CORRECTION = re.compile(r"(?P<before>.+?)\s*(?:말고|아니고|아니라|대�
 MSG_HELP = "알겠어요. 가까운 직원에게 도움을 요청해 주세요."
 MSG_STOP = "알겠어요. 안내를 마칠게요."
 MSG_CASH = "현금은 이 화면에서 고를 수 없어요. 카드로 하실래요, 직원에게 물어볼까요?"
+MSG_LISTENING = "네, 말씀해 주세요."
 MSG_REPEAT_FIRST = "무엇을 도와드릴까요?"
 
 
@@ -49,6 +52,11 @@ def clean_utterance(text: Optional[str]) -> Optional[str]:
 def is_repeat(utterance: Optional[str]) -> bool:
     """방금 안내를 다시 해 달라는 말 ("뭐라고요?", "다시 말해줘")."""
     return bool(utterance) and bool(_REPEAT.search(utterance))
+
+
+def is_preface(utterance: Optional[str]) -> bool:
+    """이제 말하겠다는 알림 ("자 다시 말할게")."""
+    return bool(utterance) and bool(_PREFACE.match(utterance))
 
 
 def is_help(utterance: Optional[str]) -> bool:

@@ -159,10 +159,60 @@ def _premature_checkout(req: GuideRequest, goal: str, chosen: List[str], target_
 _WAITING_TALK = tuple(normalize(w) for w in ("바뀌는 중", "바뀌고 있", "바꾸는 중", "처리 중", "로딩", "기다려", "기다리", "기다릴"))
 
 
+def _generic_unknown(resp: GuideResponse) -> bool:
+    """LLM이 이유를 말하지 않은(또는 후보 밖 버튼을 말해 서버가 바꾼) 기본 문구의 UNKNOWN. 구체적인 대답은 해당 없음."""
+    if resp.action.type != ActionType.UNKNOWN:
+        return False
+    reason = normalize(resp.action.reason or "")
+    # "버튼을 찾지 못했어요. 화면이 잘 보이게 비춰 주세요" 같은 상투적인 말은 어르신 질문에 대한 대답이 아니다.
+    # "화면에 캐모마일 메뉴가 보이지 않아요"처럼 무엇이 없는지 말한 대답은 남긴다.
+    return not reason or any(normalize(w) in reason for w in ("버튼을 찾", "화면이 잘 보이게", "정면에서 비춰", "찾지 못했"))
+
+
 def _waiting_talk(resp: GuideResponse) -> bool:
     a = resp.action
     text = normalize(" ".join(t for t in (a.question, a.reason, a.guideText) if t))
     return any(w in text for w in _WAITING_TALK)
+
+
+_APP_CLAIMS = tuple(normalize(w) for w in ("찾아볼게", "내려 찾", "내려볼게", "밀어볼게", "눌러드릴게", "눌러 드릴게", "넘어갈게"))
+
+
+def _scrub_claims(resp: GuideResponse) -> GuideResponse:
+    """UNKNOWN 문장에서 앱이 직접 하는 듯한 부분만 뺀다 ("…안 보여요. 아래로 더 내려 찾아볼게요" → "…안 보여요. 화면을 밀어서 찾아 보시겠어요?").
+    구체적인 앞 문장(어르신 질문에 대한 대답)은 남긴다 (2026-11-13: 이걸 통째로 지워 질문에 답을 못 했다)."""
+    a = resp.action
+    if a.type != ActionType.UNKNOWN or not a.reason:
+        return resp
+    sentences = [s for s in re.split(r"(?<=[.?!])\s+", a.reason) if s.strip()]
+    clean = [s for s in sentences if not any(w in normalize(s) for w in _APP_CLAIMS)]
+    if len(clean) == len(sentences) or not clean:
+        return resp
+    text = (" ".join(clean) + " 화면을 밀어서 찾아 보시겠어요?")[:80]
+    return GuideResponse(goal=resp.goal, action=GuideAction.unknown(text[:60]), source=resp.source)
+
+
+MSG_STUCK = "같은 말씀을 계속 못 알아듣고 있어요. 직원에게 도움을 요청해 보세요."
+
+
+def _repeat_guard(req: GuideRequest, resp: GuideResponse) -> GuideResponse:
+    """같은 말을 또 하지 않는다 (2026-11-13: 어르신이 말해도 똑같은 안내만 되풀이했다).
+    직전과 같은 질문이면 한 번은 다른 말로, 두 번째부터는 직원 도움을 안내하고 끝낸다."""
+    a = resp.action
+    if a.type != ActionType.ASK_USER or not req.history:
+        return resp
+    same = 0
+    for h in reversed(req.history):
+        if h.action == ActionType.ASK_USER and h.targetText == a.question:
+            same += 1
+        else:
+            break
+    if same == 0:
+        return resp
+    if same >= 2:
+        return GuideResponse(goal=resp.goal, action=GuideAction.done(MSG_STUCK), source="rule")
+    return GuideResponse(goal=resp.goal, source="rule", action=GuideAction.ask_user(
+        "아직 잘 모르겠어요. 하고 싶은 것을 짧게 한 번 더 말씀해 주세요."))
 
 
 def _retryable(e: Optional[BaseException]) -> bool:
@@ -314,7 +364,7 @@ class LlmGuideAgent:
         resp = self.validator.validate(action, by_id, goal=goal)
         if action.action == LlmKind.EXPLAIN:                      # 설명은 목표를 바꾸지 않는다
             resp = resp.model_copy(update={"goal": prev_goal})
-        elif (resp.action.type in (ActionType.UNKNOWN, ActionType.WAIT) or _waiting_talk(resp)) and not asking:
+        elif (resp.action.type == ActionType.WAIT or _waiting_talk(resp) or _generic_unknown(resp)) and not asking:
             # 새 화면인데 고를 버튼을 못 정함: "못 찾았어요"로 끝내지 않고 고를 수 있는 것을 알려 준다
             text = screen_guide.describe(els, changed=new_screen, label=screen_type.label(stype))
             if text:
@@ -332,6 +382,7 @@ class LlmGuideAgent:
         if resp.action.type == ActionType.TAP and _premature_checkout(req, goal, chosen, resp.action.guideText):
             meta["rejected"] = True
             resp = GuideResponse(goal=goal, action=GuideAction.unknown(MSG_NOT_SEEN), source="rule")
+        resp = _repeat_guard(req, _scrub_claims(resp))
         meta["source"] = resp.source
         if resp.source == "llm":
             self.cache.put(key, resp)
@@ -345,6 +396,8 @@ class LlmGuideAgent:
             return GuideResponse(goal=prev_goal, action=GuideAction.done(elder.MSG_HELP), source="rule")
         if elder.is_stop(u):
             return GuideResponse(goal=prev_goal, action=GuideAction.done(elder.MSG_STOP), source="rule")
+        if elder.is_preface(u):
+            return GuideResponse(goal=prev_goal, action=GuideAction.ask_user(elder.MSG_LISTENING), source="rule")
         if elder.is_repeat(u):
             kind, el = elder.repeat_action(req.history, els)
             if kind == "tap" and el is not None:

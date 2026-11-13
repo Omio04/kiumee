@@ -103,7 +103,7 @@ async def test_person_who_asks_for_points_is_not_skipped(snaps):
 
 
 async def test_llm_prompt_names_the_screen_and_new_screen_description_leads_with_it(snaps):
-    llm = ScriptedFakeLlmClient(['{"action":"UNKNOWN","message":"x"}'])
+    llm = ScriptedFakeLlmClient(['{"action":"UNKNOWN","message":"버튼을 찾지 못했어요."}'])
     hist = [{"screenId": "s02_menu", "action": "TAP", "targetText": "아메리카노"}]
     body = make_req(snaps, "s03_options", None, goal="모르는것", history=hist)
     body["snapshot"]["screenId"] = "s03_options#1"

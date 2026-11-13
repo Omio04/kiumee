@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import List, Optional, Sequence
 
+from .jamo import normalize
 from .models import MAX_TEXT, ActionType, ElementKind, GuideRequest, ScreenElement
 from .ranker import candidate_pool, is_flow_button, same_item
 
@@ -21,6 +22,13 @@ def screen_changed(req: GuideRequest) -> bool:
     return bool(last) and last.screenId != req.snapshot.screenId
 
 
+def _plausible(text: str) -> bool:
+    """읽어 줄 만한 글자인가. 한글이 없는 영문 조각("Micros", "Branch")은 다른 창 글자를 읽은 쓰레기일 때가 많아 뺀다.
+    (HOT · ICE · × 같은 기호 · 옵션 이름은 예외)"""
+    n = normalize(text)
+    return any("가" <= c <= "힣" for c in n) or n in ("hot", "ice", "x") or text.strip() in ("×", "✕", "✖")
+
+
 def choices(elements: Sequence[ScreenElement]) -> List[str]:
     """고를 수 있는 버튼 글자 (읽는 순서, 중복 제거). 옵션 · 메뉴를 먼저, 취소 · 다음 같은 진행 버튼은 고를 게 없을 때만."""
     buttons = sorted(candidate_pool(elements), key=lambda e: (round(e.rect.top, 2), e.rect.left))
@@ -28,7 +36,7 @@ def choices(elements: Sequence[ScreenElement]) -> List[str]:
     for pool in ([b for b in buttons if not is_flow_button(b.text)], buttons):
         for b in pool:
             t = b.text.strip()
-            if t and len(t) <= 20 and not any(same_item(t, o) for o in out):
+            if t and len(t) <= 20 and _plausible(t) and not any(same_item(t, o) for o in out):
                 out.append(t[:MAX_LABEL_LEN])
             if len(out) >= MAX_LABELS:
                 break
@@ -39,6 +47,8 @@ def choices(elements: Sequence[ScreenElement]) -> List[str]:
 
 def describe(elements: Sequence[ScreenElement], changed: bool, label: Optional[str] = None) -> Optional[str]:
     """고를 수 있는 것을 알려 주는 한 문장 (ASK_USER 질문). 버튼이 하나도 없으면 None."""
+    if label == "메뉴를 고르는 화면":                    # 메뉴는 수십 개라 읽어 주지 않는다 — 원하는 것을 말하게 한다
+        return f"{label}이에요. 드시고 싶은 메뉴 이름을 말씀해 주세요."
     labels = choices(elements)
     # 종류를 알면 "옵션을 고르는 화면이에요."로 시작한다 (무슨 화면인지가 어르신께 가장 필요한 정보)
     head = f"{label}이에요. " if label else ("화면이 바뀌었어요. " if changed else "지금 화면에서는 ")
