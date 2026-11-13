@@ -176,7 +176,7 @@ class MainActivity : AppCompatActivity() {
         // 오버레이 측정 · 상태 (P5): 그리기 속도는 KL_PERF로, 추적 실패(1초 넘게 흔들림을 못 따라감 → 테두리 흐려짐)는 기록만.
         // 추적 실패 때 :vision에 바로 다시 읽기를 요청할지는 P2와 정한다.
         overlay.onRenderStats = { s -> logger.d("KL_PERF", "overlay fps=%.1f worst=%dms".format(s.fps, s.worstMs)) }
-        overlay.onTrackingLost = { logger.d("Overlay", "tracking lost: highlight dimmed until motion or a new position arrives") }
+        overlay.onTrackingLost = { logger.d("Overlay", "tracking lost: highlight hidden until a new position arrives") }
         preview.previewStreamState.observe(this) { if (it == PreviewView.StreamState.STREAMING) finishLoading() }
         loading.postDelayed({ if (!loadingDone) loading.slow() }, SLOW_LOADING_MS)
         loading.postDelayed({ finishLoading() }, MAX_LOADING_MS)

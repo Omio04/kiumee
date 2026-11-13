@@ -29,8 +29,9 @@ import kr.kiosklens.overlay.transform.VisibleArea
  * - 하이라이트가 화면 밖이나 가려진 곳(아래 버튼판 등)에 걸려 어르신 눈에 안 보이게 되면 [onTargetVisibilityChanged]로 알린다.
  *   가려진 영역은 [setObstructedInsets]로 알려 준다. 음성 안내("휴대폰을 조금 뒤로 빼 주세요")는 이 신호를 받은 쪽(:app → :domain)이 한다.
  * - 흔들림 따라가기: [onFrameMotion](MotionSink)에 카메라 움직임을 넣으면 다음 OCR 결과가 올 때까지 테두리가 흔들림만큼 따라간다
- *   (움직임은 tracking.CameraMotionTracker가 만든다). 믿을 만한 움직임이 1초 넘게 없으면 테두리를 흐리게 그리고
- *   [onTrackingLost]를 한 번 부른다 (재인식 요청용). 움직임을 넣지 않으면 이 동작은 꺼진 것과 같다.
+ *   (움직임은 tracking.CameraMotionTracker가 만든다). 크게 움직여 **못 따라간 순간 위치를 놓친 것으로 보고 테두리를 숨긴다.**
+ *   새 위치(OCR)가 오면 그 자리에 다시 짚으며 나타난다. 놓친 순간 [onTrackingLost]를 한 번 부른다 (재인식 요청용).
+ *   엉뚱한 자리를 계속 가리키는 것보다 잠깐 안 보이는 편이 안전하다 (2026-11-13 팀 시험). 움직임을 넣지 않으면 이 동작은 꺼진 것과 같다.
  * - 그리기 속도: [renderStats] · [onRenderStats] (합격 기준 30fps 이상).
  */
 class ViewOverlay(context: Context) : View(context), HighlightSurface, MotionSink {
@@ -48,11 +49,11 @@ class ViewOverlay(context: Context) : View(context), HighlightSurface, MotionSin
     private var lastDraw = 0L
     private var lastStatsReport = 0L
 
-    /** 지금 테두리를 흐리게 그리는 중인지 (추적 실패). 메인 스레드에서 읽는다. */
+    /** 지금 위치를 놓쳐 테두리를 숨긴 상태인지. 메인 스레드에서 읽는다. */
     var isTrackingLost = false
         private set
 
-    /** 추적 실패(믿을 만한 움직임이 1초 넘게 없음)로 바뀐 순간 메인 스레드에서 한 번 불린다. 재인식 요청 등에 쓴다. */
+    /** 위치를 놓친 순간(크게 움직여 못 따라감) 메인 스레드에서 한 번 불린다. 재인식 요청 등에 쓴다. */
     var onTrackingLost: (() -> Unit)? = null
 
     /** 하이라이트를 그리는 동안 약 1초마다 메인 스레드에서 불린다. 예: KL_PERF 로그. */
@@ -80,7 +81,23 @@ class ViewOverlay(context: Context) : View(context), HighlightSurface, MotionSin
         refresh()
     }
 
-    override fun setTarget(target: HighlightTarget?) = holder.setTarget(target)
+    override fun setTarget(target: HighlightTarget?) {
+        if (target != null && target == holder.target) {
+            // 같은 값: HighlightHolder가 걸러서 다시 그리지 않는다(깜빡임 유지). 다만 위치를 놓친 상태였다면 그 자리로 다시 맞춘다
+            val reanchored = synchronized(lock) { health.isLost.also { if (it) reanchor(target.rect) } }
+            if (reanchored) refresh()
+            return
+        }
+        holder.setTarget(target)
+    }
+
+    /** 새 위치로 다시 맞춘다: 놓친 상태를 풀고, 이어서 옮기지 않고 바로 그 자리에, 다시 짚으며 나타나게. lock 안에서 부른다. */
+    private fun reanchor(rect: NormRect) {
+        health.onAnchor()
+        smoother.setTarget(null)
+        smoother.setTarget(rect)
+        shownSince = SystemClock.uptimeMillis()
+    }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
@@ -101,26 +118,32 @@ class ViewOverlay(context: Context) : View(context), HighlightSurface, MotionSin
         visibility.update(t?.elementId, visible)?.let { onTargetVisibilityChanged?.invoke(it) }
     }
 
-    /** 카메라 움직임 (분석 스레드 등 어느 스레드에서 불러도 된다). 믿을 만하면 테두리를 그만큼 옮긴다. */
+    /**
+     * 카메라 움직임 (분석 스레드 등 어느 스레드에서 불러도 된다). 믿을 만하면 테두리를 그만큼 옮긴다.
+     * 테두리가 떠 있는데 믿을 수 없는 움직임이 오면 위치를 놓친 것으로 보고 새 위치가 올 때까지 숨긴다 ([TrackingHealth]).
+     */
     override fun onFrameMotion(motion: FrameMotion) {
-        val now = SystemClock.uptimeMillis()
-        val moved = synchronized(lock) {
-            health.onMotion(motion.confidence, now)
-            val ok = motion.confidence >= MIN_MOTION_CONFIDENCE && (motion.dx != 0f || motion.dy != 0f)
-            if (ok) smoother.nudge(motion.dx, motion.dy)
-            ok
+        var moved = false
+        var lostNow = false
+        synchronized(lock) {
+            val wasLost = health.isLost
+            val ok = health.onMotion(motion.confidence, showing = smoother.current != null)
+            if (ok && (motion.dx != 0f || motion.dy != 0f)) { smoother.nudge(motion.dx, motion.dy); moved = true }
+            lostNow = !wasLost && health.isLost
         }
         if (holder.target == null) return
-        if (moved) refresh() else postInvalidateOnAnimation()        // 옮겼으면 보이는지도 다시 판단
+        if (moved || lostNow) refresh()                              // 옮겼거나 숨겼으면 다시 그리고 보이는지도 다시 판단
     }
 
     private fun onTargetChanged(t: HighlightTarget?) {
         synchronized(lock) {
-            val firstShow = smoother.current == null
-            smoother.setTarget(t?.rect)
-            val now = SystemClock.uptimeMillis()
-            if (t != null && firstShow) shownSince = now
-            health.onTargetUpdated(now)                              // 새 위치가 왔으니 믿을 수 있다
+            if (t != null && health.isLost) reanchor(t.rect)         // 놓친 뒤 새 위치: 이어서 옮기지 않고 그 자리에 다시 짚기
+            else {
+                val firstShow = smoother.current == null
+                smoother.setTarget(t?.rect)
+                if (t != null && firstShow) shownSince = SystemClock.uptimeMillis()
+                health.onAnchor()                                    // 새 위치가 왔으니 믿을 수 있다
+            }
         }
         refresh()                                                    // 어느 스레드든 안전
     }
@@ -136,18 +159,17 @@ class ViewOverlay(context: Context) : View(context), HighlightSurface, MotionSin
         synchronized(lock) {
             smoother.step(dt)
             rect = smoother.current
-            lost = health.isLost(now)
-            lostEvent = health.takeLostEvent(now)
+            lost = health.isLost
+            lostEvent = health.takeLostEvent()
         }
         val r = rect
-        if (r == null) { lastDraw = 0L; stats.pause(); isTrackingLost = false; return }
-        isTrackingLost = lost
+        isTrackingLost = r != null && lost
         if (lostEvent) post { onTrackingLost?.invoke() }
+        if (r == null || lost) { lastDraw = 0L; stats.pause(); return }   // 없음 · 위치를 놓침: 그리지 않는다 (새 위치가 오면 다시 그림)
         if (m != null) {
             val since = now - shownSince
-            val traced = if (ValueAnimator.areAnimatorsEnabled()) PulseCurve.trace(since) else 1f   // 처음 나타날 때 그려지며 짚기 (P1)
-            painter.draw(canvas, m.map(r, width.toFloat(), height.toFloat()), PulseCurve.level(since),
-                if (lost) DIM_ALPHA else 1f, traced)                 // 추적 실패면 흐리게 (P5)
+            val traced = if (ValueAnimator.areAnimatorsEnabled()) PulseCurve.trace(since) else 1f   // 나타날 때 그려지며 짚기 (P1)
+            painter.draw(canvas, m.map(r, width.toFloat(), height.toFloat()), PulseCurve.level(since), 1f, traced)
         }
         stats.onFrame(now)
         if (now - lastStatsReport >= 1_000L) {
@@ -157,10 +179,4 @@ class ViewOverlay(context: Context) : View(context), HighlightSurface, MotionSin
         postInvalidateOnAnimation()                                  // 보이는 동안 계속 깜빡임
     }
 
-    private companion object {
-        /** 이보다 믿기 어려운 움직임으로는 테두리를 옮기지 않는다 */
-        const val MIN_MOTION_CONFIDENCE = 0.5f
-        /** 추적 실패 때 테두리 진하기 (1 = 원래대로) */
-        const val DIM_ALPHA = 0.35f
-    }
 }

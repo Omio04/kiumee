@@ -32,6 +32,10 @@ class GridMotionEstimator(
         val c0 = Level(centered(cur, cols * rows), cols, rows)
         val texture = meanAbs(p0.g)
         if (texture < minTexture) return Result.NONE                              // 무늬가 거의 없음 (흰 벽 · 손가락으로 가림)
+        // 앞 프레임과 거의 같다 = 움직이지 않았다 (흐리거나 잡음만 다름). 이때는 '움직임 없음'을 믿을 만하게 낸다.
+        // 그러지 않으면 가만히 있는데 초점이 잠깐 흐려진 것만으로 위치를 놓친 것으로 보게 된다 (TrackingHealth)
+        val zero = cost(p0, c0, 0, 0)
+        val still = zero < STILL_RATIO * texture
 
         val p1 = half(p0); val c1 = half(c0)
         val p2 = half(p1); val c2 = half(c1)
@@ -48,7 +52,8 @@ class GridMotionEstimator(
             val cost = raw + PENALTY * (abs(sx) + abs(sy))
             if (cost < best) { best = cost; bestRaw = raw; bx = sx; by = sy }
         }
-        if (n == 0 || abs(bx) == coarseRadius || abs(by) == coarseRadius) return Result.NONE  // 찾는 범위 끝: 너무 크게 움직임
+        if (n == 0 || abs(bx) == coarseRadius || abs(by) == coarseRadius)                // 찾는 범위 끝: 너무 크게 움직임
+            return if (still) STILL else Result.NONE
         val mean = sum / n
         val distinct = if (mean <= 1e-6f) 0f else 1f - bestRaw / mean            // 1에 가까울수록 한 자리만 뚜렷하게 맞음
 
@@ -67,6 +72,10 @@ class GridMotionEstimator(
         val fx = parabola(cost(p0, c0, bx - 1, by), center, cost(p0, c0, bx + 1, by))
         val fy = parabola(cost(p0, c0, bx, by - 1), center, cost(p0, c0, bx, by + 1))
         val confidence = if (center > texture * 1.2f) 0f else (distinct * 1.6f).coerceIn(0f, 1f)
+        if (still && confidence < STILL.confidence) {                             // 거의 그대로인데 어디로 갔는지 뚜렷하지 않음
+            return if (center < zero * 0.7f) Result((bx + fx) / cols, (by + fy) / rows, 0.6f)   // 조금 움직인 게 확실하면 그만큼
+            else STILL
+        }
         return Result((bx + fx) / cols, (by + fy) / rows, confidence)
     }
 
@@ -118,5 +127,9 @@ class GridMotionEstimator(
         /** 같은 모양이 반복될 때 덜 움직인 쪽을 고르게 하는 아주 작은 벌점 (밝기 차이 단위) */
         const val PENALTY = 0.05f
         const val TOO_LITTLE_OVERLAP = 1e9f
+        /** 제자리 차이가 무늬 세기의 이 비율보다 작으면 "거의 그대로" */
+        const val STILL_RATIO = 0.35f
+        /** 거의 그대로일 때 내는 값: 움직임 없음, 믿을 만함 */
+        val STILL = Result(0f, 0f, 0.75f)
     }
 }

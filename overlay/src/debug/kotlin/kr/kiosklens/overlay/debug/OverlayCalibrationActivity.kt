@@ -49,7 +49,8 @@ import kr.kiosklens.overlay.transform.FitCenterMapper
  * - 가운데 테두리가 화면 밖이나 가려진 곳에 걸리면 "안 보임"으로 바뀐다 (ViewOverlay.onTargetVisibilityChanged)
  * - 버튼: 채우기(FILL)/맞추기(FIT) 전환 · 같은 값 · 숨김/보임 · 흔들기 · 가운데 테두리를 왼쪽 끝/맨 아래/가운데로
  * - 따라가기: 켜면 카메라 움직임(CameraMotionTracker)을 테두리에 넣어, 휴대폰을 흔들어도 테두리가 처음 겹쳐 있던 물건에 붙어 다닌다.
- *   카메라를 손으로 가리거나 아주 빨리 흔들어 1초 넘게 움직임을 믿을 수 없으면 테두리가 흐려진다 (추적 실패)
+ *   카메라를 손으로 가리거나 아주 빨리 흔들어 못 따라가면 위치를 놓친 것으로 보고 테두리를 숨긴다.
+ *   이 화면에는 새 위치(OCR)가 오지 않으니, 다시 보려면 따라가기를 껐다 켠다
  * - 위쪽 넷째 줄: 그리기 속도(fps · 가장 느린 간격, 합격 기준 30fps 이상) · 움직임 · 추적 상태
  *
  * 카메라 설정은 앱의 CameraController와 같다 (미리보기 · 분석 모두 4:3).
@@ -197,7 +198,7 @@ class OverlayCalibrationActivity : AppCompatActivity() {
         val move = if (m == null) "움직임 -" else String.format("움직임 %+.3f,%+.3f 신뢰 %.2f", m.dx, m.dy, m.confidence)
         val track = when {
             !follow -> "따라가기 끔"
-            boxes[CENTER].isTrackingLost -> "추적 실패 → 흐리게"
+            boxes[CENTER].isTrackingLost -> "위치 놓침 → 숨김 (껐다 켜면 다시)"
             else -> "따라가는 중"
         }
         return "$draw · $move · $track"
