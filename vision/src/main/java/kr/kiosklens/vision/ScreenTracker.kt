@@ -84,7 +84,8 @@ internal class ScreenTracker(
         // An incomplete foreground dialog demotes every observed label. Do not revive old buttons.
         val canVote = lines.any { it.kindHint != ElementKind.TEXT }
         val voted = (lines + previous.filter { old -> canVote &&
-            lines.none { current -> Elements.distance(current.rect, old.rect) < 0.04f }
+            lines.none { current -> Elements.distance(current.rect, old.rect) < 0.04f ||
+                Elements.similar(Elements.key(current.text), Elements.key(old.text)) }
         }).take(ScreenSnapshot.MAX_ELEMENTS)
         previous = lines
         val screenId = "s$screenNumber"
