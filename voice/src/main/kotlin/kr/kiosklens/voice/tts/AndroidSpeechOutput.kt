@@ -75,7 +75,7 @@ class AndroidSpeechOutput(
         tts.stop()
         waiting.values.toList().forEach { it() }
         waiting.clear()
-        echo.speakingEnded()
+        echo.speakingStopped()                                                 // 읽던 중이었을 때만 울림 대기
     }
 
     fun shutdown() { tts.stop(); tts.shutdown() }
