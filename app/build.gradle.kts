@@ -27,6 +27,8 @@ android {
         buildConfigField("String", "APP_KEY", "\"${prop("kl.appKey")}\"")
         // 개발자 확인용 인식 표시 (글자 네모 · 위쪽 상태 줄). 평소엔 끔: local.properties 에 kl.showRecognition=true
         // 말 끊기(안내를 읽는 중 사람이 말하면 멈추고 듣기). 기기에서 오작동하면 local.properties 에 kl.bargeIn=false
+        // 도움 모드(기본): 어르신이 물어볼 때만 그 순간의 화면을 보고 답하고, 버튼 없이 계속 듣는다. 예전 방식은 local.properties 에 kl.helpMode=false
+        buildConfigField("boolean", "HELP_MODE", (prop("kl.helpMode") != "false").toString())
         buildConfigField("boolean", "BARGE_IN", (prop("kl.bargeIn") != "false").toString())
         buildConfigField("boolean", "SHOW_RECOGNITION", (prop("kl.showRecognition") == "true").toString())
     }

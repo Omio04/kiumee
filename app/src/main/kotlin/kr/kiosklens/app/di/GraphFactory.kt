@@ -35,7 +35,7 @@ object GraphFactory {
         val speechIn = AndroidSpeechInput(app, echo, logger)
         val agent = RemoteGuideAgent(AgentConfig(BuildConfig.SERVER_URL, BuildConfig.APP_KEY), logger)
 
-        val runner = SessionRunner(scope, SessionStateMachine(), vision, speechIn, speechOut, agent, overlay, clock, logger)
+        val runner = SessionRunner(scope, SessionStateMachine(helpMode = BuildConfig.HELP_MODE), vision, speechIn, speechOut, agent, overlay, clock, logger)
         // 읽는 중 사람이 말하면 "말하기" 버튼을 누른 것과 같게: 읽던 안내를 끊고 듣는다 (상태머신은 그대로)
         scope.launch { tts.bargeIns.collect { runner.pressStart() } }
         return object : Graph {

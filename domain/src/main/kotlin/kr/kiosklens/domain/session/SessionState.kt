@@ -64,6 +64,8 @@ data class SessionState(
     val listeningToAdd: Boolean = false,
     /** 서버 요청이 연달아 실패한 횟수. 답을 받으면 0 */
     val guideFailures: Int = 0,
+    /** 도움 모드: 말이 없어서 조용히 다시 듣기 시작한 횟수. 말을 들으면 0 (너무 길어지면 쉰다) */
+    val silentRounds: Int = 0,
 )
 
 /** 지금 안내 중인 내용. 화면 전환 판단 · 하이라이트 따라가기 · 다시 읽기에 쓴다. */

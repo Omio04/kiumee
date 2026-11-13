@@ -54,6 +54,7 @@ class SessionRunner(
     private var planJob: Job? = null
     private var timerJob: Job? = null
     private var loopJob: Job? = null
+    private var lastListenStartMs = Long.MIN_VALUE / 2
     private val sources = mutableListOf<Job>()
 
     /** 이벤트 처리와 화면 수신을 시작한다. 한 번만 부른다. */
@@ -101,7 +102,7 @@ class SessionRunner(
         when (effect) {
             is SessionEffect.StartListening -> {
                 listenJob?.cancel()
-                listenJob = scope.launch { listen(effect.ticket) }
+                listenJob = scope.launch { throttleListening(); listen(effect.ticket) }
             }
             SessionEffect.StopListening -> {
                 listenJob?.cancel(); listenJob = null
@@ -130,6 +131,15 @@ class SessionRunner(
                 planJob?.cancel(); planJob = null
             }
         }
+    }
+
+    /**
+     * 계속 듣기(도움 모드)에서 인식기가 바로 실패하면 시작 → 실패 → 시작이 빠르게 반복된다. 시작 사이를 최소 [MIN_LISTEN_GAP_MS] 벌린다.
+     */
+    private suspend fun throttleListening() {
+        val wait = lastListenStartMs + MIN_LISTEN_GAP_MS - clock.nowMs()
+        if (wait > 0) delay(wait)
+        lastListenStartMs = clock.nowMs()
     }
 
     private suspend fun listen(ticket: Int) {
@@ -189,5 +199,8 @@ class SessionRunner(
         }
     }
 
-    private companion object { const val TAG = "SessionRunner" }
+    private companion object {
+        const val TAG = "SessionRunner"
+        const val MIN_LISTEN_GAP_MS = 700L
+    }
 }
