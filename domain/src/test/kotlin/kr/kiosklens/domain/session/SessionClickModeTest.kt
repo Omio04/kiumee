@@ -175,4 +175,14 @@ class SessionClickModeTest {
         val tr = d.send(SnapshotReceived(menuWithGarbled))                              // 그 뒤에 읽혀도 갑자기 말하지 않는다
         assertTrue(tr.effects.none { it is Speak })
     }
+
+    @Test fun `사진 격자로 대략 친 노란 칸이 글자가 읽히면 그 글자 칸으로 옮겨 붙는다`() {
+        val d = asked()
+        val box = kr.kiosklens.core.model.NormRect(0.5f, 0.85f, 0.95f, 0.99f)
+        d.send { GuideReceived(it, GuideResponse("", GuideAction.Tap("photo", "주문담기"), box = box)) }
+        d.send { SpeechFinished(it) }
+        val tr = d.send(SnapshotReceived(menuWithGarbled))                              // 주문달기가 읽혔다
+        assertEquals("n9", tr.effects.filterIsInstance<SessionEffect.Highlight>().single().target.elementId)
+        assertEquals("n9", d.state.guide?.targetId)
+    }
 }

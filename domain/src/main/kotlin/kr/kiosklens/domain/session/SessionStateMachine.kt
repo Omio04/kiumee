@@ -12,6 +12,7 @@ import kr.kiosklens.core.model.UiElement
 import kr.kiosklens.core.model.ScreenSnapshot
 import kr.kiosklens.core.model.SttError
 import kr.kiosklens.domain.policy.GuideTextComposer
+import kr.kiosklens.domain.policy.HelpTracker
 import kr.kiosklens.domain.policy.HighlightArea
 import kr.kiosklens.domain.policy.NameMatcher
 import kr.kiosklens.domain.policy.TimeoutPolicy
@@ -124,7 +125,8 @@ class SessionStateMachine(
             Phase.GUIDING, Phase.WAIT_CHANGE, Phase.LISTENING -> {
                 if (phaseIsListening(state) && !helpMode) return stay(updated)             // 예전 방식: 듣는 중에는 화면을 보지 않는다
                 val g = state.guide ?: return stay(updated)
-                if (s.screenId != g.screenId) { if (helpMode) helpScreenChanged(updated, g, s) else screenChanged(updated) }
+                if (helpMode) helpFollow(updated, g, state.snapshot, s)                     // 도움 모드: 흔들려도 · 화면 번호가 바뀌어도 · 글자가 깨져도 따라간다
+                else if (s.screenId != g.screenId) screenChanged(updated)
                 else follow(updated, g, state.snapshot, s)
             }
             else -> stay(updated)
@@ -164,6 +166,15 @@ class SessionStateMachine(
             ),
             listOf(Highlight(HighlightTarget(el.id, rect)), Speak("이제 보여요. $spoken", t)),
         )
+    }
+
+    /** 도움 모드의 노란 칸 따라가기 ([HelpTracker]): 이름으로 다시 찾아 글자에 붙고, 못 찾으면 주변 글자가 움직인 만큼 옮긴다. 그래도 모르면 그대로 둔다 */
+    private fun helpFollow(state: SessionState, g: Guidance, prev: ScreenSnapshot?, s: ScreenSnapshot): Transition {
+        if (g.targetId == null && g.rect == null) return stay(state)                    // 칸을 가리키던 안내가 아니다
+        val r = HelpTracker.track(g.targetText, g.rect, prev, s) ?: return stay(state)
+        val id = r.element?.id ?: g.targetId ?: "photo"
+        if (r.rect == g.rect && id == g.targetId) return stay(state)
+        return Transition(state.copy(guide = g.copy(screenId = s.screenId, targetId = id, rect = r.rect)), listOf(Highlight(HighlightTarget(id, r.rect))))
     }
 
     private fun phaseIsListening(state: SessionState) = state.phase == Phase.LISTENING
