@@ -103,6 +103,9 @@ class AnthropicLlmClient:
                 "tools": [{"name": "decide", "description": "다음에 어르신이 할 행동 하나를 정한다.",
                            "input_schema": action_schema(target_ids)}],
                 "tool_choice": {"type": "tool", "name": "decide"},
+                # 생각 끄기: 이 판단은 후보 8개 중 고르기라 깊은 추론이 필요 없는데 Haiku 5.5는 기본으로 생각을 켜서 느리다
+                # (2026-11-13 실측 4회씩: 기본 1.5~1.8초 -> 끔 1.2초, 답 동일. effort를 낮춰도 추가 이득 없음)
+                "thinking": {"type": "disabled"},
             },
             timeout=timeout_s,
         )

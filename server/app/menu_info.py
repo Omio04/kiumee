@@ -56,7 +56,7 @@ _MENU = {
     "베이글": "쫄깃하고 담백한 동그란 빵이에요.",
     "와플": "격자 무늬로 구운 바삭하고 달콤한 빵이에요.",
     # 옵션
-    "샷추가": "커피를 더 진하게 마시려고 에스프레소를 한 번 더 넣는 거예요.",
+    "샷 추가": "커피를 더 진하게 마시려고 에스프레소를 한 번 더 넣는 거예요.",
     "샷": "에스프레소 한 번 분량이에요. 추가하면 커피가 더 진해져요.",
     "시럽": "단맛을 더하는 설탕물이에요. 넣으면 더 달아져요.",
     "휘핑": "위에 올리는 달콤한 생크림이에요.",
@@ -67,7 +67,7 @@ _MENU = {
     "디카페인": "커피 속 카페인을 거의 뺀 커피예요. 밤에 마셔도 부담이 적어요.",
     "텀블러": "개인 컵을 가져오면 쓰는 거예요. 보통 할인이 있어요.",
 }
-_KEYS = sorted(((normalize(k), v) for k, v in _MENU.items()), key=lambda kv: -len(kv[0]))
+_KEYS = sorted(((normalize(k), k, v) for k, v in _MENU.items()), key=lambda kv: -len(kv[0]))
 
 # "…가 뭐야" 류: 메뉴 · 옵션이 무엇인지 · 어떤지 묻는 말
 _INFO = re.compile(
@@ -94,13 +94,27 @@ def is_screen_question(utterance: Optional[str]) -> bool:
 
 
 def _lookup(text: str) -> Optional[Tuple[str, str]]:
+    """(보여 줄 이름, 설명). 이름이 영문이면 이름 없이 설명만 ("HOT은"을 어떻게 읽을지 정할 수 없다)."""
     n = normalize(text)
     if not n:
         return None
-    for key, desc in _KEYS:
+    for key, name, desc in _KEYS:
         if key in n:
-            return key, desc
+            return (name if name.isascii() else name), desc
     return None
+
+
+def _topic(name: str) -> str:
+    """"카페라떼는" · "샷 추가는": 마지막 글자 받침에 따라 은/는."""
+    last = name.strip()[-1:]
+    if "가" <= last <= "힣":
+        return name + ("은" if (ord(last) - 0xAC00) % 28 else "는")
+    return name
+
+
+def _named(hit: Tuple[str, str]) -> str:
+    name, desc = hit
+    return desc if name.isascii() else f"{_topic(name)} {desc}"
 
 
 def explain(utterance: str, history: Sequence[HistoryItem]) -> Optional[str]:
@@ -112,5 +126,8 @@ def explain(utterance: str, history: Sequence[HistoryItem]) -> Optional[str]:
         hit = _lookup(last.targetText) if last else None
     if hit is None:
         return None
-    text = hit[1] + FOLLOW_UP
-    return text if len(text) <= MAX_EXPLAIN else hit[1][:MAX_EXPLAIN]
+    # 이름을 앞에 붙인다: 설명 뒤에 "그걸로 할게요"라고 하면 무엇인지 이력의 이 문장에서 알 수 있어야 한다
+    text = _named(hit) + FOLLOW_UP
+    if len(text) <= MAX_EXPLAIN:
+        return text
+    return (hit[1] + FOLLOW_UP)[:MAX_EXPLAIN]

@@ -19,7 +19,7 @@ import argparse, asyncio, json, os, pathlib, sys, time
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 from app.agent import LlmGuideAgent                                  # noqa: E402
-from app.llm import GeminiLlmClient, HeuristicFakeLlmClient          # noqa: E402
+from app.llm import AnthropicLlmClient, GeminiLlmClient, HeuristicFakeLlmClient          # noqa: E402
 from app.models import ActionType, GuideRequest, HistoryItem         # noqa: E402
 from app.settings import Settings                                    # noqa: E402
 
@@ -92,6 +92,7 @@ def history_item(screen, resp):
 async def run_one(agent, sc, max_turns, pace):
     screen, goal, hist = S1, None, []
     sid, serial = S1, 0
+    picked = None
     utter = sc["say"]
     base = persona(sc.get("item") or "아메리카노", sc.get("temp") or "HOT")
     inject = dict(sc.get("inject", {}))
@@ -99,6 +100,8 @@ async def run_one(agent, sc, max_turns, pace):
     result = "미완료"
     for turn in range(max_turns):
         snap = dict(SNAPS[screen], screenId=sid)
+        if picked and screen in (S3, S4):                  # 실제 키오스크처럼 고른 메뉴 이름이 옵션 창 제목 · 장바구니에 보인다
+            snap["elements"] = [dict(e, text=e["text"].replace("아메리카노", picked)) for e in snap["elements"]]
         req = GuideRequest.model_validate({"sessionId": "sim", "utterance": utter, "goal": goal, "snapshot": snap,
                                            "history": [h.model_dump(mode="json") for h in hist[-5:]]})
         if pace:
@@ -122,6 +125,8 @@ async def run_one(agent, sc, max_turns, pace):
             result = "DONE"; break
         if a.type == ActionType.TAP:
             taps.append((screen, a.guideText))
+            if screen == S2 and a.guideText in MENU:
+                picked = a.guideText
             nxt = NEXT.get((screen, a.guideText), screen)
             if nxt == S6:
                 result = "카드 화면 도달"; break
@@ -157,10 +162,16 @@ async def run_one(agent, sc, max_turns, pace):
 
 
 async def main(a):
-    s = Settings(app_key="x", llm_provider=a.llm, cache_size=0, fastpath=True,
+    s = Settings(app_key="x", llm_provider=a.llm, cache_size=0, fastpath=True, progress_hint=not a.no_progress,
+                 anthropic_api_key=os.environ.get("ANTHROPIC_API_KEY", ""),
                  gemini_api_key=os.environ.get("GEMINI_API_KEY", ""),
                  llm_model=os.environ.get("LLM_MODEL", "gemini-3.5-flash-lite"))
-    llm = GeminiLlmClient(s.gemini_api_key, s.llm_model) if a.llm == "gemini" else HeuristicFakeLlmClient()
+    if a.llm == "gemini":
+        llm = GeminiLlmClient(s.gemini_api_key, s.llm_model)
+    elif a.llm == "anthropic":
+        llm = AnthropicLlmClient(s.anthropic_api_key, os.environ.get("LLM_MODEL", "claude-haiku-5-5"))
+    else:
+        llm = HeuristicFakeLlmClient()
     agent = LlmGuideAgent(llm, s)
     rows = []
     for sc in SCENARIOS:
@@ -181,9 +192,10 @@ async def main(a):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--llm", choices=["heuristic", "gemini"], default="heuristic")
+    ap.add_argument("--llm", choices=["heuristic", "gemini", "anthropic"], default="heuristic")
     ap.add_argument("--max-turns", type=int, default=14)
     ap.add_argument("--pace", type=float, default=3.0)
     ap.add_argument("--only", default="")
+    ap.add_argument("--no-progress", action="store_true", help="진행 상황 요약 끄기 (비교용)")
     ap.add_argument("--verbose", action="store_true")
     sys.exit(asyncio.run(main(ap.parse_args())))

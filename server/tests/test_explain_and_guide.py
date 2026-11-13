@@ -37,7 +37,14 @@ def test_screen_questions_detected(q):
 
 def test_all_menu_descriptions_fit_the_contract():
     for k, v in menu_info._MENU.items():
-        assert len(v + menu_info.FOLLOW_UP) <= menu_info.MAX_EXPLAIN, k
+        assert len(menu_info._named((k, v)) + menu_info.FOLLOW_UP) <= menu_info.MAX_EXPLAIN, k
+
+
+def test_explanation_starts_with_the_menu_name_so_that_it_can_be_chosen_later():
+    assert menu_info.explain("카페라떼가 뭐야", []).startswith("카페라떼는 ")
+    assert menu_info.explain("아메리카노가 뭐예요", []).startswith("아메리카노는 ")
+    assert menu_info.explain("샷 추가가 뭔가요", []).startswith("샷 추가는 ") or menu_info.explain("샷 추가가 뭔가요", []).startswith("샷추가는 ")
+    assert menu_info.explain("바닐라라떼가 뭐야", []).startswith("바닐라라떼는 ")
 
 
 def test_longest_name_wins():

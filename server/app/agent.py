@@ -25,7 +25,7 @@ from typing import Dict, List, Optional, Protocol
 from . import privacy
 from .cache import ResponseCache, request_key
 from .jamo import dice, normalize
-from . import elder, menu_info, screen_guide
+from . import elder, menu_info, progress, screen_guide
 from .llm import LlmClient, LlmRateLimited, LlmTimeout, LlmUpstream
 from .models import (MAX_GOAL, MAX_HISTORY, ActionType, ElementKind, GuideAction, GuideRequest, GuideResponse,
                      LlmKind, ScreenElement)
@@ -242,6 +242,9 @@ class LlmGuideAgent:
             top = ranked[0]
             second = ranked[1].match if len(ranked) > 1 else 0.0
             repeat = any(same_item(top.element.text, c) for c in chosen)
+            # 방금 누른 옵션(HOT · ICE …)은 '고른 메뉴'에 안 들어가서(진행 · 옵션 버튼 제외) 선택이 바뀐 새 화면에서도
+            # 같은 말("따뜻한 걸로")에 또 HOT을 고르는 무한 반복이 생겼다 (2026-11-13 시뮬레이션). 방금 누른 버튼이면 다음 단계는 LLM이.
+            repeat = repeat or (pressed is not None and same_item(top.element.text, pressed))
             if not repeat and top.match >= self.s.fast_min_score and top.match - second >= self.s.fast_margin:
                 meta["source"] = "fastpath"
                 return self._finish(GuideResponse(goal=goal, action=GuideAction.tap(top.element.id, top.element.text),
@@ -255,7 +258,8 @@ class LlmGuideAgent:
         context = [e.text for e in sorted(els, key=lambda e: (round(e.rect.top, 2), e.rect.left))][:30]
         new_screen = screen_guide.screen_changed(req)
         user = build_user(goal, req.history, candidates, context, pressed=pressed, chosen=chosen,
-                          question=asking, new_screen=new_screen)
+                          question=asking, new_screen=new_screen,
+                          progress=progress.summarize(req.history) if self.s.progress_hint else None)
 
         action = None
         deadline = t0 + self.s.total_budget_s
