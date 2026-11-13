@@ -275,10 +275,33 @@ def _reason_only(say: str) -> str:
 _NOT_A_BUTTON = {"화면", "버튼", "아래", "위쪽", "아래쪽", "오른쪽", "왼쪽", "하단", "상단", "그곳", "여기", "이것", "그것"}
 
 
+MISSING_ID = "MISSING"       # 도움 모드: 누를 칸이 글자 목록에 없을 때 AI가 고르는 값 (형식이 목록 안 번호만 허용하면 아무 칸이나 억지로 고른다)
+_UNDO_BUTTONS = {"처음으로", "처음", "초기화", "취소", "전체취소", "주문취소", "삭제", "전체삭제", "이전", "뒤로", "뒤로가기", "홈"}
+_UNDO_INTENT = re.compile(r"취소|처음|다시|잘못|빼|지우|초기|돌아|그만|이전|뒤로|삭제|안 할|안할|없던")
+_NAME_AGREE = 0.5            # AI가 쓴 버튼 이름과 고른 칸의 글자가 이보다 덜 비슷하면 고른 칸을 믿지 않는다 (깨진 글자 주문담기↔주문달기 0.71은 통과)
+
+
+def _clean_name(text: str) -> str:
+    """버튼 이름에서 가격(4,500원)을 뗀다: 글자 읽기는 "결제하기"와 "4,500원"을 따로 읽기도 한다."""
+    return re.sub(r"[\d,\.]+\s*원?", "", text or "").strip()
+
+
+def _name_score(name: str, text: str) -> float:
+    """이름과 칸 글자가 얼마나 같은가 (앱 NameMatcher.score 와 같은 규칙): 같음 1.0 · 품음 0.95 · 그 밖은 자모 유사도."""
+    n, t = normalize(_clean_name(name)), normalize(text)
+    if len(n) < 2 or len(t) < 2:
+        return 0.0
+    if n == t:
+        return 1.0
+    if len(n) >= 3 and n in t:
+        return 0.95
+    return dice(n, t)
+
+
 def _seek_name(sentence: str) -> Optional[str]:
     """누르라는 문장에서 찾는 버튼 이름 하나. 가격(2,000원)은 뗀다: 글자 읽기는 "결제하기"와 "2,000원"을 따로 읽기도 한다."""
     for ph in _named_phrases(sentence):
-        name = re.sub(r"[\d,\.]+\s*원?", "", ph).strip()
+        name = _clean_name(ph)
         if len(normalize(name)) >= 2 and name not in _NOT_A_BUTTON:
             return name[:30]
     return None
@@ -652,7 +675,7 @@ class LlmGuideAgent:
             if attempt > 0 and remaining < self.s.min_retry_s:
                 break
             raw = await self._complete(user + (RETRY_NOTE if attempt > 0 and not repeat_retry else ""), max(0.5, min(self.s.llm_timeout_s, remaining)),
-                                       list(by_id), meta, system=help_mode.HELP_SYSTEM, image=req.image)
+                                       list(by_id) + [MISSING_ID], meta, system=help_mode.HELP_SYSTEM, image=req.image)
             meta["llm_calls"] = int(meta["llm_calls"]) + 1
             if self.s.debug_prompts:
                 log.info("KL_DEBUG 도움 원답=%s", raw)
@@ -676,6 +699,20 @@ class LlmGuideAgent:
         if action is None:
             meta["source"] = "fallback"
             return self._finish(GuideResponse(goal=prev_goal, action=GuideAction.ask_user(fallback), source="fallback"), meta, t0)
+        named = (action.guideText or action.boxText or "").strip() if action.action == LlmKind.GUIDE else ""
+        chosen = by_id.get(action.targetId or "")
+        if chosen is not None and named and _name_score(named, chosen.text) < _NAME_AGREE:
+            # 형식이 "목록 안의 번호"를 강제해서, 목록에 없는 버튼(결제하기)을 말하면서 번호는 아무 칸(마카롱 · 상품)이나 고른다 (2026-11-13 실기기).
+            # 말한 이름과 고른 칸이 다르면 칸을 믿지 않는다 → 아래에서 사진 위치나 찾기(seek)로 넘어간다
+            action = action.model_copy(update={"targetId": None})
+            meta["target_mismatch"] = True
+        chosen = by_id.get(action.targetId or "")
+        if chosen is not None and normalize(chosen.text) in {normalize(w) for w in _UNDO_BUTTONS} and not _UNDO_INTENT.search(req.utterance or ""):
+            # 되돌리는 버튼(처음으로 · 취소 · 초기화)은 어르신이 되돌리길 원할 때만 가리킨다: 진짜 버튼이 안 보일 때 대신 고르면 주문이 날아간다 (2026-11-13 실기기)
+            meta["unsafe_target"] = True
+            action = action.model_copy(update={"action": LlmKind.ASK_USER, "targetId": None, "guideText": None,
+                                               "message": _reason_only(action.message or "") or None})
+            named = ""
         photo = _photo_box(action, bool(req.image), by_id) if action.action == LlmKind.GUIDE else None
         if photo is not None:                                                # 글자 목록에 없지만 사진에서 찾은 칸: 박스로 가리킨다
             box, name = photo
@@ -686,6 +723,13 @@ class LlmGuideAgent:
             meta["source"] = "help"
             meta["photo_box"] = True
             return self._finish(resp, meta, t0)
+        seek_name = _clean_name(named)[:30] if action.action == LlmKind.GUIDE and action.targetId not in by_id else ""
+        if len(normalize(seek_name)) >= 2 and seek_name not in _NOT_A_BUTTON:
+            # 누를 칸은 정했는데 글자 목록에도 사진 위치에도 없다 → "누르세요"라고 하지 않고 찾는다(앱이 읽히는 순간 노란 칸을 친다)
+            body = _clean_message(action.message, "", 80)
+            meta["seek"] = True
+            meta["source"] = "help"
+            return self._finish(GuideResponse(goal=prev_goal, action=GuideAction.ask_user(_seek_text(body, seek_name)), seek=seek_name, source="help"), meta, t0)
         resp = self.validator.validate(action, by_id, goal=prev_goal)       # 후보 밖 버튼은 안내하지 않는다 (화이트리스트)
         a = resp.action
         say = ""

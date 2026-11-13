@@ -310,3 +310,56 @@ async def test_later_step_buttons_are_not_sought(snaps):
     llm = ScriptedFakeLlmClient([answer("옵션을 먼저 골라야 해요. 다 고르면 '주문담기'를 누르세요.")])
     r = (await agent(llm).next(_food_req(snaps, "결제하고 싶어", []))).response
     assert r.seek is None                                                                               # 지금 누를 칸이 아니면 찾지 않는다
+
+
+# ---- 실기기 로그 (2026-11-13 20:0x): 결제하기는 글자 목록에 없는데, 형식이 번호를 강제해서 AI가 엉뚱한 칸(마카옹 · 상품) 번호를 골랐다
+CART = ["메가엠지씨커피", "처음으로", "푸드", "상품", "허니 브레드", "마카옹", "조코칩 쿠키", "치즈케이크", "장바구니 조회", "남은시간", "선택한 상품", "1개"]
+
+
+def _cart_req(snaps, said):
+    d = make_req(snaps, "s01_dine", said, history=[])
+    d["snapshot"]["elements"] = _els(*CART)
+    return GuideRequest.model_validate(d)
+
+
+def _guide_raw(target_id, text, msg):
+    return '{"screenAsks":"x","action":"GUIDE","targetId":%s,"guideText":"%s","message":"%s"}' % (target_id, text, msg)
+
+
+async def test_wrong_number_with_a_different_name_is_not_highlighted(snaps):
+    macaron = CART.index("마카옹")
+    llm = ScriptedFakeLlmClient([_guide_raw(f'"e{macaron}"', "결제하기", "치즈케이크 1개가 담겨 있어요. 아래 검은 결제하기 칸을 눌러 주세요.")])
+    r = await agent(llm).next(_cart_req(snaps, "이제 뭐 해야 돼"))
+    assert r.response.action.type.value == "ASK_USER" and r.response.seek == "결제하기"         # 마카옹에 노란 칸을 치지 않는다
+    assert "누르" not in r.response.action.question and "치즈케이크 1개가 담겨 있어요." in r.response.action.question
+    assert r.meta.get("target_mismatch") is True
+
+
+async def test_null_number_with_a_name_becomes_a_seek_not_an_error(snaps):
+    llm = ScriptedFakeLlmClient([_guide_raw('"null"', "4,500원 결제하기", "맞으면 아래 노란 칸 결제하기를 눌러 주세요.")])
+    r = await agent(llm).next(_cart_req(snaps, "결제하고 싶다니까"))
+    assert r.response.seek == "결제하기" and "찾지 못했어요" not in r.response.action.question       # 예전: "버튼을 찾지 못했어요"
+
+
+async def test_garbled_but_same_name_is_still_trusted(snaps):
+    d = make_req(snaps, "s01_dine", "결제하고 싶어", history=[]); d["snapshot"]["elements"] = _els("초기화", "텀블러 선택", "주문달기")
+    llm = ScriptedFakeLlmClient([_guide_raw('"e2"', "주문담기", "옵션은 안 고르셔도 돼요.")])
+    r = (await agent(llm).next(GuideRequest.model_validate(d))).response
+    assert r.action.type.value == "TAP" and r.action.targetId == "e2"                                  # 주문담기 ↔ 주문달기는 같은 칸으로 믿는다
+
+
+# ---- 되돌리는 버튼은 원할 때만 / 목록에 없음(MISSING)은 찾기로
+async def test_reset_button_is_not_pointed_unless_the_elder_wants_to_undo(snaps):
+    home = CART.index("처음으로")
+    llm = ScriptedFakeLlmClient([_guide_raw(f'"e{home}"', "처음으로", "아직 메뉴 고르는 화면이에요. 처음으로를 눌러 주세요.")])
+    r = await agent(llm).next(_cart_req(snaps, "결재를 하고 싶어"))
+    assert r.response.action.type.value == "ASK_USER" and r.meta.get("unsafe_target") is True
+    llm2 = ScriptedFakeLlmClient([_guide_raw(f'"e{home}"', "처음으로", "처음 화면으로 갈게요.")])
+    r2 = await agent(llm2).next(_cart_req(snaps, "잘못 눌렀어 처음부터 다시 할래"))
+    assert r2.response.action.type.value == "TAP" and r2.response.action.guideText == "처음으로"   # 원하면 가리킨다
+
+
+async def test_missing_target_becomes_a_seek_and_missing_is_offered_to_the_llm(snaps):
+    llm = ScriptedFakeLlmClient([_guide_raw('"MISSING"', "결제하기", "치즈케이크가 담겨 있어요.")])
+    r = await agent(llm).next(_cart_req(snaps, "결제하고 싶어"))
+    assert r.response.seek == "결제하기" and "MISSING" in llm.calls[0]["target_ids"]
