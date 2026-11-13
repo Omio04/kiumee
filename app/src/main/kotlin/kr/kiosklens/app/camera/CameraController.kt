@@ -7,6 +7,7 @@ import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.core.SurfaceOrientedMeteringPointFactory
 import androidx.camera.core.resolutionselector.AspectRatioStrategy
@@ -18,8 +19,10 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicLong
+import kr.kiosklens.core.model.FrameMotion
 import kr.kiosklens.core.port.FrameSink
 import kr.kiosklens.core.port.Logger
+import kr.kiosklens.overlay.tracking.CameraMotionTracker
 
 /**
  * 후면 카메라 미리보기 + 분석 프레임을 [FrameSink]로 보낸다.
@@ -28,15 +31,21 @@ import kr.kiosklens.core.port.Logger
  *   작은 글자를 거의 못 읽었다 (2026-11-11 웹캠 확인). 지원하지 않으면 가장 가까운 낮은 해상도로 내려간다.
  * - 분석은 "최신 한 장만 유지" 전략: 처리가 느리면 CameraX 가 알아서 건너뛴다.
  * - 분석 프레임 크기(회전 보정 후)는 [onAnalysisSize] 로 알려 준다(오버레이 좌표 변환용).
+ * - 프레임마다 화면 전체의 움직임을 [onMotion] 으로 알려 준다(흔들림 따라가기, P5 `CameraMotionTracker`).
+ *   OCR은 같은 화면이면 2초에 한 번만 다시 읽어서, 그 사이 흔들리면 노란 테두리가 버튼에서 벗어나기 때문.
  */
 class CameraController(
     private val context: Context,
     private val sink: FrameSink,
     private val logger: Logger,
+    /** 프레임마다의 카메라 움직임. 분석 스레드에서 불린다 (`ViewOverlay.onFrameMotion`은 어느 스레드든 안전). */
+    private val onMotion: (FrameMotion) -> Unit = {},
     private val onAnalysisSize: (width: Int, height: Int) -> Unit,
 ) {
     private val executor = Executors.newSingleThreadExecutor()
     private val ids = AtomicLong()
+    private val motion = CameraMotionTracker()                             // 분석 스레드에서만 쓴다
+    private var motionFailed = false
     private var provider: ProcessCameraProvider? = null
     @Volatile private var reportedSize = ""
 
@@ -65,7 +74,9 @@ class CameraController(
                             reportedSize = key; onAnalysisSize(w, h)
                             logger.d("CameraController", "analysis size $key (rotation $rot)")
                         }
-                        sink.submit(ImageProxyFrame(proxy, ids.incrementAndGet(), System.currentTimeMillis()))   // 닫는 책임은 sink
+                        val id = ids.incrementAndGet()
+                        trackMotion(proxy, id, rot)                                   // sink에 넘기기 전에 (넘긴 뒤에는 닫혔을 수 있음)
+                        sink.submit(ImageProxyFrame(proxy, id, System.currentTimeMillis()))   // 닫는 책임은 sink
                     } catch (t: Throwable) {
                         proxy.close()
                     }
@@ -104,6 +115,16 @@ class CameraController(
     fun stop() {
         provider?.unbindAll()
         executor.shutdown()
+    }
+
+    /** 밝기(Y) 평면만 읽어 직전 프레임과 비교한다. 실패해도 인식(sink)은 그대로 이어지게 삼킨다. */
+    private fun trackMotion(proxy: ImageProxy, id: Long, rot: Int) {
+        try {
+            val y = proxy.planes[0]
+            motion.onLumaFrame(id, y.buffer, y.rowStride, y.pixelStride, proxy.width, proxy.height, rot)?.let(onMotion)
+        } catch (t: Throwable) {
+            if (!motionFailed) { motionFailed = true; logger.w("CameraController", "motion tracking failed", t) }   // 한 번만 남긴다
+        }
     }
 
     companion object {
