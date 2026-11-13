@@ -36,7 +36,7 @@ class Settings:
     fast_min_score: float = 0.85
     fast_margin: float = 0.20
     rate_limit_per_min: int = 60              # 키+IP 기준 분당 요청 수
-    max_body_bytes: int = 64 * 1024           # 이미지는 받지 않으므로 작게 제한
+    max_body_bytes: int = 1024 * 1024         # 사진(선택, 약 100~200KB)이 붙을 수 있어 1MB. 사진 상한은 models.GuideRequest.image
 
     @staticmethod
     def from_env() -> "Settings":
@@ -62,5 +62,5 @@ class Settings:
             fast_min_score=float(e("FASTPATH_MIN_SCORE", "0.85")),
             fast_margin=float(e("FASTPATH_MARGIN", "0.20")),
             rate_limit_per_min=int(e("RATE_LIMIT_PER_MIN", "60")),
-            max_body_bytes=int(e("MAX_BODY_BYTES", str(64 * 1024))),
+            max_body_bytes=int(e("MAX_BODY_BYTES", str(1024 * 1024))),
         )
