@@ -25,7 +25,7 @@ from typing import Dict, List, Optional, Protocol
 from . import privacy
 from .cache import ResponseCache, request_key
 from .jamo import dice, normalize
-from . import elder, menu_info, progress, screen_guide
+from . import elder, expectation, menu_info, progress, screen_guide, screen_type
 from .llm import LlmClient, LlmRateLimited, LlmTimeout, LlmUpstream
 from .models import (MAX_GOAL, MAX_HISTORY, ActionType, ElementKind, GuideAction, GuideRequest, GuideResponse,
                      LlmKind, ScreenElement)
@@ -36,6 +36,8 @@ from .settings import Settings
 from .validator import MSG_ASK, MSG_DONE, MSG_NOT_DONE, MSG_NOT_SEEN, MSG_UNKNOWN, ActionValidator
 
 log = logging.getLogger("kl")
+
+MSG_LOYALTY_NO_CLOSE = "적립 화면이에요. 닫기(×)가 잘 안 보여요. 화면이 잘 보이게 비춰 주세요."
 
 # 결제가 "진행 중"이라는 뜻의 화면 문구. 이 계획의 범위는 결제 수단 선택까지라서, 보이면 안내를 마칩니다.
 _DONE_PATTERNS = [normalize(p) for p in (
@@ -211,6 +213,18 @@ class LlmGuideAgent:
             meta.update(source="rule", candidates=0)
             return self._finish(GuideResponse(goal=goal, action=GuideAction.done(MSG_DONE), source="rule"), meta, t0)  # 규칙은 이미 즉시라 캐시 불필요
 
+        # 2-0) 화면 종류: 글자로 이 화면이 무슨 화면인지 먼저 정한다 (LLM 추측에 맡기지 않는다)
+        stype = screen_type.classify(els)
+        meta["screen"] = stype.value
+        if stype == screen_type.ScreenType.LOYALTY and "적립" not in (req.utterance or ""):
+            # 적립은 건너뛴다 (P2 인수 문서: 어르신이 요청하지 않았으면). 실제로 보이는 닫기(×)가 있을 때만 안내하고,
+            # 없으면 지어내지 않고 다시 비춰 달라고 한다.
+            close = screen_type.skip_button(els)
+            meta.update(source="rule", candidates=0)
+            if close is not None:
+                return self._finish(GuideResponse(goal=goal, action=GuideAction.tap(close.id, close.text), source="rule"), meta, t0)
+            return self._finish(GuideResponse(goal=goal, action=GuideAction.unknown(MSG_LOYALTY_NO_CLOSE), source="rule"), meta, t0)
+
         # 2-1) 질문: "라떼가 뭐야?" → 사전에 있으면 LLM 없이 설명 (goal은 그대로: 질문이 목표에 섞이면 안 된다)
         asking = menu_info.is_info_question(req.utterance)
         if asking:
@@ -220,7 +234,7 @@ class LlmGuideAgent:
                 return self._finish(GuideResponse(goal=prev_goal, action=GuideAction.ask_user(text), source="rule"), meta, t0)
         # 2-2) "뭘 눌러야 돼요?" → 지금 화면에서 고를 수 있는 것을 알려 준다
         if menu_info.is_screen_question(req.utterance):
-            text = screen_guide.describe(els, changed=False)
+            text = screen_guide.describe(els, changed=False, label=screen_type.label(stype))
             if text:
                 meta.update(source="rule", candidates=0, described=True)
                 return self._finish(GuideResponse(goal=prev_goal, action=GuideAction.ask_user(text), source="rule"), meta, t0)
@@ -257,9 +271,13 @@ class LlmGuideAgent:
         # (예전엔 일반 글자 6개만 보여서 판단할 근거가 없었다, 2026-11-12 시험)
         context = [e.text for e in sorted(els, key=lambda e: (round(e.rect.top, 2), e.rect.left))][:30]
         new_screen = screen_guide.screen_changed(req)
+        unseen = expectation.pressed_but_not_visible(req) if self.s.expectation_check else None
+        if unseen:
+            meta["unseen"] = True
         user = build_user(goal, req.history, candidates, context, pressed=pressed, chosen=chosen,
                           question=asking, new_screen=new_screen,
-                          progress=progress.summarize(req.history) if self.s.progress_hint else None)
+                          progress=progress.summarize(req.history) if self.s.progress_hint else None,
+                          unseen=unseen, screen=screen_type.label(stype))
 
         action = None
         deadline = t0 + self.s.total_budget_s
@@ -288,7 +306,7 @@ class LlmGuideAgent:
             resp = resp.model_copy(update={"goal": prev_goal})
         elif resp.action.type == ActionType.UNKNOWN and not asking:
             # 새 화면인데 고를 버튼을 못 정함: "못 찾았어요"로 끝내지 않고 고를 수 있는 것을 알려 준다
-            text = screen_guide.describe(els, changed=new_screen)
+            text = screen_guide.describe(els, changed=new_screen, label=screen_type.label(stype))
             if text:
                 meta["described"] = True
                 resp = GuideResponse(goal=goal, action=GuideAction.ask_user(text), source="rule")

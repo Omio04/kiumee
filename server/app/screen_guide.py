@@ -37,10 +37,11 @@ def choices(elements: Sequence[ScreenElement]) -> List[str]:
     return out
 
 
-def describe(elements: Sequence[ScreenElement], changed: bool) -> Optional[str]:
+def describe(elements: Sequence[ScreenElement], changed: bool, label: Optional[str] = None) -> Optional[str]:
     """고를 수 있는 것을 알려 주는 한 문장 (ASK_USER 질문). 버튼이 하나도 없으면 None."""
     labels = choices(elements)
-    head = "화면이 바뀌었어요. " if changed else "지금 화면에서는 "
+    # 종류를 알면 "옵션을 고르는 화면이에요."로 시작한다 (무슨 화면인지가 어르신께 가장 필요한 정보)
+    head = f"{label}이에요. " if label else ("화면이 바뀌었어요. " if changed else "지금 화면에서는 ")
     while labels:
         text = head + ", ".join(labels) + _TAIL
         if len(text) <= MAX_TEXT:

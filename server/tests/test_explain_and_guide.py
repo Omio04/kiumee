@@ -94,7 +94,7 @@ async def test_unknown_on_changed_screen_becomes_a_screen_description(snaps):
     llm = ScriptedFakeLlmClient(['{"action":"UNKNOWN","message":"버튼을 찾지 못했어요."}'])
     r = await run(LlmGuideAgent(llm, S(fastpath=False)), snaps, "s03_options", None, history=hist, goal="아메리카노")
     q = r.response.action.question
-    assert r.response.action.type.value == "ASK_USER" and q.startswith("화면이 바뀌었어요") and "버튼을 찾지" not in q
+    assert r.response.action.type.value == "ASK_USER" and q.startswith("옵션을 고르는 화면이에요") and "버튼을 찾지" not in q
     assert "[새 화면]" in llm.calls[0]["user"]
 
 

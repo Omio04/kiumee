@@ -25,6 +25,7 @@ from app.settings import Settings                                    # noqa: E40
 
 SNAPS = {p.stem: json.loads(p.read_text(encoding="utf-8")) for p in (ROOT / "testdata/snapshots").glob("*.json")}
 S1, S2, S3, S4, S5, S6 = "s01_dine", "s02_menu", "s03_options", "s04_cart", "s05_payment", "s06_card"
+S7 = "s07_loyalty"
 
 # (화면, 누른 글자) → 다음 화면. 없으면 같은 화면
 NEXT = {
@@ -38,6 +39,8 @@ NEXT = {
 # 누르면 같은 화면이지만 내용이 달라지는 버튼 (탭 · 옵션 선택 · 수량): 앱은 새 화면 번호를 받는다 (P2 ScreenTracker 선택 감지)
 SAME_SCREEN_NEW_ID = {(S2, "커피"), (S2, "음료"), (S2, "디저트"), (S3, "HOT"), (S3, "ICE"), (S3, "샷 추가"), (S3, "시럽 추가"),
                       (S4, "+"), (S4, "-"), (S5, "쿠폰 사용")}
+# 적립 창이 결제 앞에 끼는 키오스크 (시나리오 18)
+NEXT_LOYALTY = {(S4, "결제하기"): S7, (S7, "×"): S5}
 MENU = ("아메리카노", "카페라떼", "바닐라라떼", "녹차라떼", "딸기스무디")
 
 # 시나리오: say = 처음 말. 되물음에는 질문 주제(dine/temp/extra/pay/menu/confirm)에 맞는 대답을 한다 (실제 노인처럼 물어본 것에 답함).
@@ -65,6 +68,7 @@ SCENARIOS = [
     dict(id="15 카드번호를 말함", say="아메리카노 주세요", item="아메리카노", temp="HOT", inject={"pay": "카드 1234 5678 9012 3456"}),
     dict(id="16 옵션을 물어봄", say="아메리카노 주세요", item="아메리카노", temp="HOT", inject={"extra": "샷 추가가 뭐예요"}),
     dict(id="17 아이스 선택", say="아이스 아메리카노 주세요", item="아메리카노", temp="ICE"),
+    dict(id="18 적립 화면이 끼어듦", say="아메리카노 주세요", item="아메리카노", temp="HOT", loyalty=True),
 ]
 
 
@@ -72,10 +76,10 @@ def topic_of(question):
     q = question or ""
     if "매장" in q or "포장" in q:
         return "dine"
+    if any(w in q for w in ("샷", "시럽", "추가")):         # "HOT으로 선택하셨어요. 샷이나 시럽을…"은 추가 옵션 질문
+        return "extra"
     if any(w in q for w in ("HOT", "ICE", "따뜻", "시원", "차가", "뜨거")):
         return "temp"
-    if any(w in q for w in ("샷", "시럽", "추가")):
-        return "extra"
     if any(w in q for w in ("카드", "결제", "삼성", "카카오", "페이")):
         return "pay"
     if any(w in q for w in ("무엇", "드시고", "메뉴", "어떤 걸", "뭘")):
@@ -127,7 +131,7 @@ async def run_one(agent, sc, max_turns, pace):
             taps.append((screen, a.guideText))
             if screen == S2 and a.guideText in MENU:
                 picked = a.guideText
-            nxt = NEXT.get((screen, a.guideText), screen)
+            nxt = (NEXT_LOYALTY if sc.get("loyalty") else {}).get((screen, a.guideText)) or NEXT.get((screen, a.guideText), screen)
             if nxt == S6:
                 result = "카드 화면 도달"; break
             if nxt != screen or (screen, a.guideText) in SAME_SCREEN_NEW_ID:

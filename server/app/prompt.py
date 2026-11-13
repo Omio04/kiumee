@@ -25,7 +25,9 @@ SYSTEM = """키오스크 안내 도우미의 판단기입니다. 화면 버튼 �
 - [앞서 안내한 메뉴]가 장바구니·선택 목록에 이미 있으면 다시 고르지 말고(어르신이 더 달라고 했을 때만) 흐름상 다음 단계를 고르세요: 옵션 → 담기·확인 → 결제하기 → 결제 수단.
 - 어르신 말에 없는 선택은 마음대로 고르지 말고 ASK_USER로 물으세요: 따뜻한/차가운(HOT/ICE), 크기, 샷·시럽 같은 추가 옵션이 보이면 "따뜻한 걸로 드릴까요, 차가운 걸로 드릴까요?", "샷이나 시럽을 추가하실래요?"처럼. 매장/포장, 결제 수단도 같다. 이력에 같은 질문이 있으면 다시 묻지 말고 대답대로 하고, "아니요·괜찮아요"면 추가 없이 담기·확인으로 넘어갑니다.
 - 원하는 버튼이 후보에 없지만 목록·메뉴가 더 있을 것 같으면 SCROLL(direction: UP|DOWN|LEFT|RIGHT, 보통 DOWN). 화면이 로딩 중이거나 바뀌는 중이면 WAIT.
+- [화면 종류] 줄은 서버가 글자로 판별한 이 화면의 역할입니다. 이것을 근거로 이 화면에서 할 일을 정하세요(옵션 화면 → 옵션 묻기, 결제 수단 화면 → 수단 묻기, 주문 내역 → 결제하기, 일회용품 → 필요한 것 묻기). [새 화면]이고 ASK_USER를 한다면 질문의 첫머리에 그 화면이 무엇인지 말하세요("옵션을 고르는 화면이에요. …").
 - [진행] 줄은 서버가 이력에서 계산한 주문 단계입니다(방법 → 메뉴 → 옵션 → 담기 → 결제하기 → 결제 수단). 이 화면에서 "다음 단계"를 할 수 있으면 그 단계를 고르세요. 이미 끝낸 단계를 되풀이하지 말고, 옵션처럼 어르신 말에 없는 선택은 물으세요.
+- [기대와 다름] 줄이 있으면 눌렸는지 확실하지 않습니다(안 눌렸거나 다른 창이 떴을 수 있음). 다음 단계로 넘어가지 말고: 그 메뉴 버튼이 후보에 보이면 다시 안내(GUIDE), 보이지 않으면 WAIT 또는 SCROLL, 판단이 안 서면 ASK_USER로 "아직 화면이 안 바뀌었어요"처럼 확인하세요.
 - [질문] 줄이 있으면 어르신이 메뉴·옵션이 무엇인지 물은 것입니다: 지금 고르지 말고 EXPLAIN과 message(쉬운 말 1~2문장, 맛·재료·차가운지 따뜻한지 위주, 끝에 "이걸로 하실래요?" 같은 되물음, 전체 75자 이내). 화면 글자에 있는 이름만 설명하고 가격·성분·알레르기는 모르면 "직원에게 물어보세요". 질문한 메뉴가 분명치 않으면 [방금 안내한 버튼]을 가리킨다고 봅니다.
 - 이력에 메뉴 설명(되물음)이 있고 어르신이 "그걸로" "좋아요"라고 하면 설명한 그 메뉴를 고르세요. "다른 거"면 다시 묻습니다.
 - [새 화면]이면 어르신이 무엇을 고를 수 있는지 모르는 상태입니다. 목표로 고를 버튼이 분명하지 않으면 UNKNOWN 대신 ASK_USER: 화면이 무엇인지 + 고를 수 있는 것 2~4개를 읽어 주고 "어떤 걸로 할까요?"라고 묻습니다(75자 이내).
@@ -47,7 +49,8 @@ SCREEN_PREFIX = "화면 글자(위→아래): "
 def build_user(goal: str, history: Sequence[HistoryItem], candidates: Sequence[ScreenElement],
                context_texts: Sequence[str], pressed: Optional[str] = None,
                chosen: Optional[Sequence[str]] = None, question: bool = False, new_screen: bool = False,
-               progress: Optional[str] = None) -> str:
+               progress: Optional[str] = None, unseen: Optional[str] = None,
+               screen: Optional[str] = None) -> str:
     """pressed: 직전 '누르기' 안내 뒤 화면이 바뀌었으면 그 버튼 글자 (어르신이 이미 눌렀음 → 다음 단계를 고를 것).
     chosen: 이번 세션에서 이미 고른 메뉴 (진행 · 옵션 버튼 제외). '다음' · '확인'은 화면마다 또 누를 수 있어 넣지 않는다."""
     lines: List[str] = [f"목표(어르신 말): {goal.strip() or '(없음)'}"]
@@ -61,8 +64,12 @@ def build_user(goal: str, history: Sequence[HistoryItem], candidates: Sequence[S
         lines.append(f"{PRESSED_PREFIX}{pressed[:40]} (그 뒤 화면이 바뀜 → [화면 글자]로 정말 그 버튼이 눌렸는지 확인)")
     if chosen:
         lines.append(f"{CHOSEN_PREFIX}{', '.join(c[:30] for c in list(chosen)[:5])} (장바구니·선택 목록에 있으면 다시 고르지 말 것)")
+    if screen:
+        lines.append("[화면 종류] " + screen)
     if progress:
         lines.append("[진행] " + progress)
+    if unseen:
+        lines.append(f"[기대와 다름] '{unseen[:30]}'을 눌렀다고 안내했는데 새 화면 어디에도 '{unseen[:30]}'이 안 보임")
     if question:
         lines.append("[질문] 어르신이 방금 메뉴·옵션이 무엇인지 물었음 → EXPLAIN (고르지 말 것)")
     if new_screen:

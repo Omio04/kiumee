@@ -28,6 +28,7 @@ class Settings:
     debug_prompts: bool = False               # 개발용: 요청 화면 · 프롬프트 · LLM 원답 · 결정을 서버 기록에 남김 (배포 금지)
     candidate_k: int = 8                      # 설계: 후보 K=8
     progress_hint: bool = True                # 진행 상황(지금까지 · 다음 단계) 요약을 LLM에 준다 (app/progress.py)
+    expectation_check: bool = True            # 눌렀다던 메뉴가 새 화면에 안 보이면 LLM에 알린다 (app/expectation.py)
     cache_size: int = 256                     # 같은 요청 재처리 방지 (0이면 끔)
     cache_ttl_s: float = 30.0
     fastpath: bool = True                     # 확실한 경우 LLM을 건너뜀(로컬 규칙)
@@ -52,6 +53,7 @@ class Settings:
             debug_prompts=_env_bool("DEBUG_PROMPTS", False),
             candidate_k=int(e("CANDIDATE_K", "8")),
             progress_hint=_env_bool("PROGRESS_HINT", True),
+            expectation_check=_env_bool("EXPECTATION_CHECK", True),
             cache_size=int(e("CACHE_SIZE", "256")),
             cache_ttl_s=float(e("CACHE_TTL_S", "30")),
             fastpath=_env_bool("FASTPATH", True),

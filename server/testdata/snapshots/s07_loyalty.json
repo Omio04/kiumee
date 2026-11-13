@@ -1,0 +1,32 @@
+{
+ "screenId": "s07_loyalty",
+ "frameId": 6,
+ "timestampMs": 0,
+ "stableFrames": 2,
+ "elements": [
+  {
+   "id": "e1",
+   "text": "스탬프 적립을 하시겠어요?",
+   "kind": "TEXT",
+   "rect": {
+    "left": 0.15,
+    "top": 0.2,
+    "right": 0.85,
+    "bottom": 0.3
+   },
+   "confidence": 0.95
+  },
+  {
+   "id": "e2",
+   "text": "×",
+   "kind": "BUTTON_LIKE",
+   "rect": {
+    "left": 0.86,
+    "top": 0.12,
+    "right": 0.95,
+    "bottom": 0.18
+   },
+   "confidence": 0.95
+  }
+ ]
+}
