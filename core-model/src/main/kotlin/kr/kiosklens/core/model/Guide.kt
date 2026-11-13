@@ -97,4 +97,9 @@ data class GuideResponse(
     /** 지금까지 어르신이 말한 목표. 다음 요청의 [GuideRequest.goal]에 그대로 넣는다. 비어 있을 수 있다. */
     val goal: String,
     val action: GuideAction,
+    /**
+     * 도움 모드: 버튼을 가리킬 때 안내 문장 앞에 읽어 줄 이유 · 해결 방법 한 문장 ("메뉴를 먼저 골라야 넘어가요."). 없을 수 있다.
+     * 선택 필드라 모르는 쪽은 무시하면 된다 (계약 v1과 호환).
+     */
+    val say: String? = null,
 )

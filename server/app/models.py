@@ -153,6 +153,7 @@ class GuideAction(BaseModel):
 class GuideResponse(BaseModel):
     goal: str = Field(default="", max_length=MAX_GOAL)   # 앱은 다음 요청의 goal에 그대로 넣음
     action: GuideAction
+    say: Optional[str] = Field(default=None, max_length=MAX_TEXT)   # 도움 모드: 버튼을 가리킬 때 앞에 읽어 줄 이유 · 해결 방법 한 문장 (없으면 생략, 모르는 앱은 무시)
     source: Optional[str] = None     # 진단용 (llm | fastpath | rule | fake | fallback). 내용이 아님. 앱은 무시
 
 

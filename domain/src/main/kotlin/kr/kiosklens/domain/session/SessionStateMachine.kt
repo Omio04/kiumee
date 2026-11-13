@@ -43,6 +43,11 @@ class SessionStateMachine(
      * 서버도 `HELP_MODE=true`로 켜야 질문에 맞는 대답("또 도움이 필요하세요?")이 온다. 끄면 예전 방식 그대로.
      */
     private val helpMode: Boolean = false,
+    /**
+     * 도움 모드에서 답을 다 읽은 뒤 **저절로 다시 듣는가**. 기본은 아니오: 앱이 말하는 도중 끊지 못하고, 답이 끝나면 어르신이
+     * "말하기"를 눌러 다시 물어본다 (주변 소음을 말로 오인하는 일이 없다, 2026-11-13). 켜면 버튼 없이 계속 듣는다.
+     */
+    private val handsFree: Boolean = false,
 ) {
     fun reduce(state: SessionState, event: SessionEvent): Transition {
         if (event is SessionEvent.Ticketed && event.ticket != state.ticket) return stay(state)
@@ -70,9 +75,11 @@ class SessionStateMachine(
      *   읽던 안내를 끊고 듣는다. 목표 · 이력은 그대로 두고, 들은 말은 다음 요청의 utterance가 되어 서버가 목표에 붙인다.
      * - 이미 듣는 중이면 무시한다.
      */
-    private fun onStart(state: SessionState, sessionId: String): Transition = when (state.phase) {
-        Phase.IDLE, Phase.DONE, Phase.ERROR -> newSession(state, sessionId)
-        Phase.LISTENING -> stay(state)
+    private fun onStart(state: SessionState, sessionId: String): Transition = when {
+        // 도움 모드(버튼 방식): 앱이 말하거나 생각하는 동안에는 끼어들 수 없다. 답이 끝나면 누른다 (2026-11-13 요청)
+        helpMode && !handsFree && state.phase in BUSY_PHASES -> stay(state)
+        state.phase == Phase.IDLE || state.phase == Phase.DONE || state.phase == Phase.ERROR -> newSession(state, sessionId)
+        state.phase == Phase.LISTENING -> stay(state)
         else -> listenMore(state)
     }
 
@@ -167,7 +174,11 @@ class SessionStateMachine(
 
     private fun onSpeechFailed(state: SessionState, error: SttError): Transition {
         if (state.phase != Phase.LISTENING) return stay(state)
-        if (helpMode && error != SttError.PERMISSION) return keepListening(state)   // 계속 듣는다 (인식기가 잠깐 못 알아들은 것뿐)
+        if (helpMode && error == SttError.PERMISSION) return toError(state, texts.speechError(error))   // 권한 문제는 다시 해도 같다
+        if (helpMode) {
+            if (handsFree) return keepListening(state)                          // 계속 듣는다 (인식기가 잠깐 못 알아들은 것뿐)
+            return backToWaiting(state, if (error == SttError.NO_SPEECH) texts.silence() else texts.speechError(error))
+        }
         if (state.listeningToAdd) return resume(state)                     // 보태려던 말만 실패: 하던 안내는 계속
         if (error != SttError.PERMISSION && inProgress(state)) return askAgainLater(state)
         return if (error == SttError.NO_SPEECH) toIdleSaying(state, texts.silence()) else toError(state, texts.speechError(error))
@@ -175,14 +186,21 @@ class SessionStateMachine(
 
     /** 아무 말도 못 들었다. 보태려던 말이면 하던 안내로, 질문에 대한 대답이면 잠시 뒤 다시 묻고, 처음 말하기면 세션을 끝낸다. */
     private fun heardNothing(state: SessionState): Transition = when {
-        helpMode -> keepListening(state)
+        helpMode -> if (handsFree) keepListening(state) else backToWaiting(state, texts.silence())
         state.listeningToAdd -> resume(state)
         inProgress(state) -> askAgainLater(state)
         else -> toIdleSaying(state, texts.silence())
     }
 
+    /** 도움 모드(버튼 방식): 말을 못 들었다. 세션은 그대로 두고 한 마디 안내한 뒤 "말하기"를 기다린다. */
+    private fun backToWaiting(state: SessionState, text: String): Transition {
+        val t = state.ticket + 1
+        return Transition(state.copy(phase = Phase.WAIT_CHANGE, ticket = t, listeningToAdd = false),
+            listOf(StopListening, Speak(text, t)))
+    }
+
     /**
-     * 도움 모드: 말이 없었다. 말없이 조용히 같은 자리에서 다시 듣는다 (어르신이 생각하실 시간).
+     * 도움 모드(계속 듣기): 말이 없었다. 말없이 조용히 같은 자리에서 다시 듣는다 (어르신이 생각하실 시간).
      * 너무 오래(MAX_SILENT_ROUNDS번) 조용하면 한 번 안내하고 쉰다 — 마이크를 영원히 켜 두지 않는다.
      */
     private fun keepListening(state: SessionState): Transition {
@@ -219,11 +237,13 @@ class SessionStateMachine(
                 // 도움 모드: 답 · 버튼 안내를 다 읽으면 버튼 없이 다시 듣는다. 다만 서버가 실패해 "잠시만요"를 읽은 경우(아직 못 답한 말이 있음)는
                 // 잠깐 뒤 같은 말로 다시 묻는 예전 흐름을 쓴다.
                 if (helpMode && !(state.guide?.retryOnTimeout == true && state.pendingUtterance != null))
-                    Transition(state.copy(phase = Phase.LISTENING, ticket = t, listeningToAdd = false),
+                    if (handsFree) Transition(state.copy(phase = Phase.LISTENING, ticket = t, listeningToAdd = false),
                         listOf(StartListening(t), StartTimer(timeouts.listenSilenceMs, t)))
+                    else Transition(state.copy(phase = Phase.WAIT_CHANGE, ticket = t))     // 타이머 없이 기다린다: 어르신이 누르면 질문
                 else Transition(state.copy(phase = Phase.WAIT_CHANGE, ticket = t),
                     listOf(StartTimer(state.guide?.waitMs ?: timeouts.waitChangeRepeatMs, t)))
-            Phase.ASKING -> Transition(state.copy(phase = Phase.LISTENING, ticket = t),        // 다 읽은 뒤에야 듣기 시작 (에코 방지)
+            Phase.ASKING -> if (helpMode && !handsFree) Transition(state.copy(phase = Phase.WAIT_CHANGE, ticket = t, guide = null))   // 대답이 끝났다: 버튼을 기다린다
+            else Transition(state.copy(phase = Phase.LISTENING, ticket = t),        // 다 읽은 뒤에야 듣기 시작 (에코 방지)
                 listOf(StartListening(t), StartTimer(timeouts.listenSilenceMs, t)))
             Phase.LOST -> Transition(state.copy(phase = Phase.SCANNING, ticket = t), listOf(StartTimer(timeouts.scanningMs, t)))
             Phase.DONE, Phase.ERROR -> Transition(SessionState(phase = Phase.IDLE, ticket = t, snapshot = state.snapshot), listOf(ClearHighlight))
@@ -251,7 +271,8 @@ class SessionStateMachine(
                 val latest = base.snapshot?.takeIf { it.screenId == asked.screenId }
                 val now = latest?.findElement(element.id)
                 val rect = if (latest != null && now != null) HighlightArea.of(now, latest.elements) else HighlightArea.of(element, asked.elements)
-                val spoken = texts.tap(rect, action.guideText)
+                val pointer = texts.tap(rect, action.guideText)
+                val spoken = response.say?.trim()?.takeIf { it.isNotEmpty() }?.let { "$it $pointer" } ?: pointer   // 이유 · 방법 + 어느 칸을 누를지
                 val t = base.ticket + 1
                 Transition(
                     base.copy(phase = Phase.GUIDING, ticket = t, guide = Guidance(asked.screenId, element.id, rect, spoken)),
@@ -295,6 +316,8 @@ class SessionStateMachine(
             Phase.SCANNING -> Transition(state.copy(phase = Phase.LOST, ticket = t), listOf(Speak(texts.lost(), t)))   // 10초
             Phase.WAIT_CHANGE -> {                                                               // 15초
                 val g = state.guide ?: return stay(state)
+                // 도움 모드: 물어볼 때만 답한다. 안내를 다시 읽지 않는다 (서버가 실패해 못 답한 질문을 다시 묻는 경우만 예외)
+                if (helpMode && !(g.retryOnTimeout && state.pendingUtterance != null)) return stay(state)
                 if (g.retryOnTimeout || missedChange(state, g)) requestOrScan(state.copy(guide = null), listOf(ClearHighlight))   // 최신 화면으로 다시 묻기
                 else Transition(state.copy(phase = Phase.GUIDING, ticket = t), listOf(Speak(g.spokenText, t)))   // 다시 읽기
             }
@@ -366,6 +389,9 @@ class SessionStateMachine(
     private fun stay(state: SessionState) = Transition(state)
 
     private companion object {
+        /** 앱이 말하거나 생각 중이라 "말하기"를 눌러도 소용없는 단계 (도움 모드 · 버튼 방식) */
+        val BUSY_PHASES = setOf(Phase.ASKING, Phase.GUIDING, Phase.PLANNING, Phase.LOST, Phase.DONE, Phase.ERROR)
+
         /** 화면 전환을 놓쳤다고 볼 "처음 보는 글자" 수 (옵션 창: 제목 · 옵션 · 취소 · 담기 …) */
         const val MISSED_CHANGE_NEW_TEXTS = 3
 

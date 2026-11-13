@@ -23,7 +23,7 @@ object OrbColors {
     const val FADE_MS = 200L
 
     fun of(state: OrbState): Shade = when (state) {
-        OrbState.LISTENING -> LISTEN
+        OrbState.LISTENING, OrbState.IDLE -> LISTEN      // 누를 수 있을 때(대기)와 듣는 중은 빨강, 앱이 말하거나 생각 중이면 하늘색(지금은 못 누름)
         OrbState.PROBLEM -> WARM
         else -> SKY
     }

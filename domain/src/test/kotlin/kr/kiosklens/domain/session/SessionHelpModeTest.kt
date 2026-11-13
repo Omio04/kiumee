@@ -33,7 +33,7 @@ import org.junit.Test
  */
 class SessionHelpModeTest {
     private class Driver(var state: SessionState = SessionState()) {
-        private val machine = SessionStateMachine(helpMode = true)
+        private val machine = SessionStateMachine(helpMode = true, handsFree = true)
         fun send(event: SessionEvent): Transition = machine.reduce(state, event).also { state = it.next }
         fun send(make: (ticket: Int) -> SessionEvent): Transition = send(make(state.ticket))
         val ticket get() = state.ticket

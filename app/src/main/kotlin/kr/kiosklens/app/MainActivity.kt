@@ -66,6 +66,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var overlay: ViewOverlay
     private lateinit var note: TextView
+    private lateinit var hint: TextView
     private lateinit var micButton: MicButtonView
     private lateinit var preview: PreviewView
     private lateinit var loading: LoadingScreen
@@ -169,6 +170,7 @@ class MainActivity : AppCompatActivity() {
         micButton.isEnabled = true
         val g = GraphFactory.create(this, work, overlay)
         graph = g
+        if (BuildConfig.HELP_MODE) g.greet()
 
         camera = CameraController(this, g.frameSink, logger, onMotion = overlay::onFrameMotion) { w, h ->   // 흔들림만큼 노란 테두리를 옮긴다 (P5)
             runOnUiThread { overlay.setAnalysisSize(w, h); recognition?.setAnalysisSize(w, h) }
@@ -203,6 +205,9 @@ class MainActivity : AppCompatActivity() {
         viewfinder.look = ViewfinderLook.of(lastScan == ScanStatus.READY, orb)   // 키오스크를 찾았는지는 조준 모서리로
         val description = UiTexts.micDescription(phase)                          // 자막 대신 TalkBack이 읽는 설명
         if (micButton.contentDescription != description) micButton.contentDescription = description
+        val line = UiTexts.hint(phase, BuildConfig.HELP_MODE)
+        hint.text = line.orEmpty()
+        hint.visibility = if (line != null && note.visibility != View.VISIBLE) View.VISIBLE else View.GONE   // 문제 안내가 있으면 그것이 먼저
     }
 
     private fun renderDebug() {
@@ -244,6 +249,13 @@ class MainActivity : AppCompatActivity() {
             background = GradientDrawable().apply { cornerRadius = dp(22).toFloat(); setColor(Color.argb(235, 0x14, 0x34, 0x4D)) }
             setPadding(dp(20), dp(16), dp(20), dp(16)); visibility = View.GONE
         }
+        hint = TextView(this).apply {                                                       // 버튼 위의 짧은 안내 (처음 켰을 때 · 질문을 기다릴 때)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f); setTextColor(Color.WHITE); gravity = Gravity.CENTER
+            setLineSpacing(0f, 1.2f); typeface = Typeface.DEFAULT_BOLD
+            background = GradientDrawable().apply { cornerRadius = dp(22).toFloat(); setColor(Color.argb(190, 0x14, 0x34, 0x4D)) }
+            setPadding(dp(20), dp(14), dp(20), dp(14)); visibility = View.GONE
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO                  // TalkBack은 버튼 설명이 읽어 준다
+        }
         micButton = MicButtonView(this).apply {
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE                  // 설명이 바뀌면 TalkBack이 읽어 준다
             contentDescription = UiTexts.micDescription(Phase.IDLE)
@@ -260,6 +272,7 @@ class MainActivity : AppCompatActivity() {
         val bottom = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL
             addView(note, LinearLayout.LayoutParams(match, ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(dp(20), 0, dp(20), 0) })
+            addView(hint, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(dp(20), 0, dp(20), dp(10)) })
             addView(micButton, LinearLayout.LayoutParams(micSize, micSize))
         }
         ViewCompat.setOnApplyWindowInsetsListener(bottom) { v, insets ->                 // 시스템 내비게이션 바에 가리지 않게

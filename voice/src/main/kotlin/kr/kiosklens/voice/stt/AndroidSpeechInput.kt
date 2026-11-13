@@ -48,6 +48,8 @@ class AndroidSpeechInput(
     private val echo: EchoGuard,
     private val logger: Logger,
     private val silenceMs: Long = 1200,
+    /** 말이 시작된 뒤 이 시간이 지나면 녹음을 끊고 지금까지 들은 것으로 답한다 (시끄러운 곳에서 끝없이 듣는 것 방지) */
+    private val maxSpeechMs: Long = 8000,
 ) : SpeechInput {
     private val main = Handler(Looper.getMainLooper())
     @Volatile private var current: SpeechRecognizer? = null
@@ -81,13 +83,24 @@ class AndroidSpeechInput(
         var recognizer: SpeechRecognizer? = null
         var usingOffline = true
         var usingOnDevice = false
+        var lastPartial = ""
+        var capRunnable = Runnable {}
 
         fun finish(event: SttEvent) {
             if (finished) return
             finished = true
+            main.removeCallbacks(capRunnable)
             _level.value = 0f
             trySend(event)
             close()
+        }
+
+        capRunnable = Runnable {                                          // 녹음 상한: 멈추라고 하고, 결과가 안 오면 마지막 부분 결과로 마친다
+            if (finished) return@Runnable
+            runCatching { recognizer?.stopListening() }
+            main.postDelayed({
+                if (!finished) finish(if (lastPartial.isNotBlank()) SttEvent.Final(lastPartial) else SttEvent.Error(SttError.NO_SPEECH))
+            }, 1500)
         }
 
         fun begin() {                                                        // 항상 메인 스레드에서 호출
@@ -98,14 +111,14 @@ class AndroidSpeechInput(
             recognizer = r; current = r
             r.setRecognitionListener(object : RecognitionListener {
                 override fun onReadyForSpeech(params: Bundle?) {}
-                override fun onBeginningOfSpeech() {}
+                override fun onBeginningOfSpeech() { main.removeCallbacks(capRunnable); main.postDelayed(capRunnable, maxSpeechMs) }
                 override fun onRmsChanged(rmsdB: Float) { if (!finished) _level.value = SttMapping.level(rmsdB) }
                 override fun onBufferReceived(buffer: ByteArray?) {}
                 override fun onEndOfSpeech() {}
                 override fun onEvent(eventType: Int, params: Bundle?) {}
                 override fun onPartialResults(partialResults: Bundle?) {
                     val t = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
-                    if (!finished && !t.isNullOrBlank()) trySend(SttEvent.Partial(t))
+                    if (!finished && !t.isNullOrBlank()) { lastPartial = t; trySend(SttEvent.Partial(t)) }
                 }
                 override fun onResults(results: Bundle?) {
                     val texts = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION).orEmpty()
@@ -137,6 +150,7 @@ class AndroidSpeechInput(
 
         awaitClose {
             _level.value = 0f
+            main.removeCallbacks(capRunnable)
             main.post {                                                      // 수집이 취소되면 마이크를 놓는다
                 recognizer?.let { runCatching { it.cancel(); it.destroy() } }
                 if (current === recognizer) current = null

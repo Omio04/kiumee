@@ -84,7 +84,8 @@ object DtoMapper {
             "UNKNOWN" -> GuideAction.Unknown(str("reason"))
             else -> throw BadResponse("모르는 type: $type")
         }
-        return GuideResponse(goal = (root["goal"] as? String).orEmpty(), action = action)
+        val say = (root["say"] as? String)?.trim()?.takeIf { it.isNotEmpty() }?.take(80)
+        return GuideResponse(goal = (root["goal"] as? String).orEmpty(), action = action, say = say)
     }
 
     /** 오류 본문에서 code만 꺼낸다 (message는 개발자용이라 어르신께 읽지 않는다). */

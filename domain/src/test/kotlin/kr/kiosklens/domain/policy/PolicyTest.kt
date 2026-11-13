@@ -3,6 +3,7 @@ package kr.kiosklens.domain.policy
 import kr.kiosklens.core.model.NormRect
 import kr.kiosklens.core.model.ScrollDir
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PolicyTest {
@@ -23,13 +24,17 @@ class PolicyTest {
         assertEquals("화면 가운데", phraser.phrase(at(0.5f, 0.5f)))
     }
 
-    @Test fun `안내 문장은 위치 + 버튼 글자 + 버튼을 누르세요`() {
-        assertEquals("화면 오른쪽 아래 깜빡이는 결제하기 버튼을 누르세요", texts.tap(at(0.8f, 0.9f), "결제하기"))
-        assertEquals("화면 왼쪽 위 깜빡이는 HOT 버튼을 누르세요", texts.tap(at(0.2f, 0.3f), " HOT "))
+    @Test fun `안내 문장은 위치 + 노란색 칸을 눌러 주세요 + 적힌 글자`() {
+        assertEquals("화면 오른쪽 아래 노란색 칸을 눌러 주세요. 적힌 글자는 결제하기", texts.tap(at(0.8f, 0.9f), "결제하기"))
+        assertEquals("화면 왼쪽 위 노란색 칸을 눌러 주세요. 적힌 글자는 HOT", texts.tap(at(0.2f, 0.3f), " HOT "))
     }
 
-    @Test fun `버튼 글자가 이미 버튼으로 끝나면 버튼을 또 붙이지 않는다`() {
-        assertEquals("화면 가운데 깜빡이는 확인 버튼을 누르세요", texts.tap(at(0.5f, 0.5f), "확인 버튼"))
+    @Test fun `글자 뒤에 조사를 붙이지 않아서 어떤 이름이 와도 말이 맞다`() {
+        for (name in listOf("확인 버튼", "아메리카노", "ICE", "샷 추가", "×")) {
+            val t = texts.tap(at(0.5f, 0.5f), name)
+            assertEquals("화면 가운데 노란색 칸을 눌러 주세요. 적힌 글자는 $name", t)
+            assertTrue(t.endsWith(name))
+        }
     }
 
     @Test fun `밀기 안내`() {

@@ -34,7 +34,7 @@ from .parser import ActionParser, ParseError
 from .prompt import RETRY_NOTE, SYSTEM, build_user
 from .ranker import JamoNgramRanker, answer_button, is_flow_button, same_item
 from .settings import Settings
-from .validator import MSG_ASK, MSG_DONE, MSG_NOT_DONE, MSG_NOT_SEEN, MSG_UNKNOWN, ActionValidator
+from .validator import _clean_message, MSG_ASK, MSG_DONE, MSG_NOT_DONE, MSG_NOT_SEEN, MSG_UNKNOWN, ActionValidator
 
 log = logging.getLogger("kl")
 
@@ -168,6 +168,10 @@ def _generic_unknown(resp: GuideResponse) -> bool:
     # "버튼을 찾지 못했어요. 화면이 잘 보이게 비춰 주세요" 같은 상투적인 말은 어르신 질문에 대한 대답이 아니다.
     # "화면에 캐모마일 메뉴가 보이지 않아요"처럼 무엇이 없는지 말한 대답은 남긴다.
     return not reason or any(normalize(w) in reason for w in ("버튼을 찾", "화면이 잘 보이게", "정면에서 비춰", "찾지 못했"))
+
+
+def _waiting_talk_text(text: str) -> bool:
+    return any(w in normalize(text) for w in _WAITING_TALK)
 
 
 def _waiting_talk(resp: GuideResponse) -> bool:
@@ -513,8 +517,11 @@ class LlmGuideAgent:
             return self._finish(GuideResponse(goal=prev_goal, action=GuideAction.ask_user(fallback), source="fallback"), meta, t0)
         resp = self.validator.validate(action, by_id, goal=prev_goal)       # 후보 밖 버튼은 안내하지 않는다 (화이트리스트)
         a = resp.action
-        if a.type == ActionType.TAP:
-            pass                                                              # 버튼을 가리킨다 (앱: "{위치} 깜빡이는 ○○ 버튼을 누르세요")
+        if a.type == ActionType.TAP:                                          # 버튼을 가리킨다 + 앞에 읽을 이유 · 방법 한 문장(say)
+            say = _clean_message(action.message, "", 60)
+            if say and (_waiting_talk_text(say) or any(w in normalize(say) for w in _APP_CLAIMS)):
+                say = ""                                                      # 앱이 뭔가 하는 듯한 말은 읽지 않는다
+            resp = resp.model_copy(update={"say": say or None})
         elif a.type == ActionType.DONE:
             resp = GuideResponse(goal=prev_goal, action=GuideAction.done(help_mode.MSG_BYE), source=resp.source)
         else:                                                                 # 대답(ASK_USER · EXPLAIN · UNKNOWN · SCROLL) → 말하고 계속 듣는다

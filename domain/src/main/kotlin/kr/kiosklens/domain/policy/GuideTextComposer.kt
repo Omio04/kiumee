@@ -13,13 +13,13 @@ import kr.kiosklens.core.model.SttError
 class GuideTextComposer(private val phraser: PositionPhraser = PositionPhraser()) {
 
     /**
-     * "화면 왼쪽 위 깜빡이는 아메리카노 버튼을 누르세요"
-     * 설계서는 "{guideText}를"이지만, HOT · ICE 같은 글자는 을/를을 정하기 어려워 "버튼을"로 고정한다.
+     * "화면 왼쪽 위 노란색 칸을 눌러 주세요. 적힌 글자는 아메리카노"
+     * (2026-11-13) 예전 "깜빡이는 ○○ 버튼을 누르세요"는 어르신께 "깜빡이는", "버튼"이 와닿지 않았다. 눈에 보이는 **노란색 칸**을 말하고,
+     * 맞는 칸인지 확인할 수 있게 적힌 글자를 덧붙인다. 글자 뒤에 조사(을/를 · 이라고/라고)를 붙이지 않아서 HOT · ICE · 어떤 이름이 와도 맞는 말이다.
      */
     fun tap(rect: NormRect, guideText: String): String {
         val name = guideText.trim()
-        val obj = if (name.endsWith("버튼")) "${name}을" else "$name 버튼을"
-        return "${phraser.phrase(rect)} 깜빡이는 $obj 누르세요"
+        return "${phraser.phrase(rect)} 노란색 칸을 눌러 주세요. 적힌 글자는 $name"
     }
 
     /** SCROLL: "화면을 아래로 밀어서 딸기스무디 찾아 주세요". guideText는 찾는 대상 이름 (문장 아님, contract.md 3.2) */

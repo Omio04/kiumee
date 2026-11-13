@@ -42,4 +42,22 @@ class UiTextsTest {
         assertTrue(guiding.startsWith("노란 테두리를 눌러 주세요") && guiding.contains("길게 누르세요"))   // 길게 누르기 = 처음부터
         for (p in Phase.values()) assertFalse("$p", UiTexts.micDescription(p).contains("\n"))
     }
+
+    @Test fun `처음 켰을 때 안내는 마이크나 말하기 같은 이름 대신 모양과 위치로 말한다`() {
+        val first = UiTexts.hint(Phase.IDLE, true)!!
+        assertTrue(first.contains("아래 빨간 버튼"))
+        val jargon = listOf("마이크", "말하기", "음성", "녹음", "STT")
+        for (p in Phase.values()) for (mode in listOf(true, false)) {
+            val t = UiTexts.hint(p, mode) ?: continue
+            assertTrue("$p: $t", jargon.none { t.contains(it) })
+            assertFalse("$p: $t", t.contains("하늘색"))                // 대기 중 버튼은 빨강 (2026-11-13), 하늘색은 "지금은 못 누름"이라 안내에 쓰지 않는다
+        }
+        assertTrue(UiTexts.status(Phase.IDLE, null).contains("빨간 버튼"))
+    }
+
+    @Test fun `질문을 기다릴 때 안내는 도움 모드에서만 나온다`() {
+        assertTrue(UiTexts.hint(Phase.WAIT_CHANGE, true)!!.contains("눌러 물어보세요"))
+        assertEquals(null, UiTexts.hint(Phase.WAIT_CHANGE, false))
+        assertEquals(null, UiTexts.hint(Phase.GUIDING, true))                              // 읽어 주는 중에는 글자를 더 띄우지 않는다
+    }
 }

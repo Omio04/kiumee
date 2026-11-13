@@ -27,7 +27,8 @@ class OrbColorsTest {
     @Test fun `듣는 중만 빨강, 문제는 주황, 나머지는 하늘색`() {
         assertEquals(OrbColors.LISTEN, OrbColors.of(OrbState.LISTENING))
         assertEquals(OrbColors.WARM, OrbColors.of(OrbState.PROBLEM))
-        for (s in listOf(OrbState.IDLE, OrbState.THINKING, OrbState.SPEAKING, OrbState.DONE)) {
+        assertEquals(OrbColors.LISTEN, OrbColors.of(OrbState.IDLE))
+        for (s in listOf(OrbState.THINKING, OrbState.SPEAKING, OrbState.DONE)) {
             assertEquals("$s", OrbColors.SKY, OrbColors.of(s))
         }
     }

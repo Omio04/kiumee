@@ -101,7 +101,7 @@ class VoiceMappingTest {
     }
 
     @Test fun `긴 안내를 문장 단위로 나눈다`() {
-        assertEquals(listOf("화면 왼쪽 위 깜빡이는 아메리카노 버튼을 누르세요"), SpeechSplit.split("화면 왼쪽 위 깜빡이는 아메리카노 버튼을 누르세요"))
+        assertEquals(listOf("화면 왼쪽 위 노란색 칸을 눌러 주세요.", "적힌 글자는 아메리카노"), SpeechSplit.split("화면 왼쪽 위 노란색 칸을 눌러 주세요. 적힌 글자는 아메리카노"))   // 안내는 두 문장으로 읽는다
         assertEquals(2, SpeechSplit.split("안내창이 떴어요. 확인 버튼을 눌러 주세요. 천천히 하셔도 돼요.").size)
         assertEquals(listOf("네. 좋아요"), SpeechSplit.split("네. 좋아요"))                 // 짧은 조각은 합친다
         assertEquals(listOf("가"), SpeechSplit.split("  가 "))

@@ -49,7 +49,7 @@ class SessionStateMachineTest {
     }
 
     private val goal = "따뜻한 아메리카노 한 잔 주세요"
-    private val guideAmericano = "화면 왼쪽 위 깜빡이는 아메리카노 버튼을 누르세요"
+    private val guideAmericano = "화면 왼쪽 위 노란색 칸을 눌러 주세요. 적힌 글자는 아메리카노"
 
     /** 메뉴 화면이 보이는 상태에서 말하고, 서버에 묻는 데까지 */
     private fun planningOnMenu(): Driver = Driver().apply {

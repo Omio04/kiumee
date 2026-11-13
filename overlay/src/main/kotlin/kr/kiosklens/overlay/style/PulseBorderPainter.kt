@@ -19,6 +19,7 @@ import kr.kiosklens.overlay.transform.PxRect
  * 어두운 선은 노란 선 **밑에 깔지 않고 양쪽 가장자리에만** 그린다 — 밑에 깔면 반투명 노란 선이 거무스름해진다.
  */
 class PulseBorderPainter(density: Float) {
+    private val density = density
     private val ringW = BorderStyle.RING_DP * density
     private val edgeW = BorderStyle.EDGE_DP * density
     private val pad = BorderStyle.PAD_DP * density
@@ -38,7 +39,8 @@ class PulseBorderPainter(density: Float) {
     private val corner = RectF()
 
     fun draw(canvas: Canvas, r: PxRect, level: Float, alpha: Float = 1f, progress: Float = 1f) {
-        box.set(r.left - pad, r.top - pad, r.right + pad, r.bottom + pad)               // 노란 선 가운데
+        val (gx, gy) = BorderStyle.grow(r.width, r.height, density)                       // 글자 칸의 약 2배 넓이로 (글자를 안 가리게)
+        box.set(r.left - gx - pad, r.top - gy - pad, r.right + gx + pad, r.bottom + gy + pad)   // 노란 선 가운데
         val off = (ringW + edgeW) / 2f                                                    // 노란 선 가장자리 바로 바깥
         outer.set(box.left - off, box.top - off, box.right + off, box.bottom + off)
         inner.set(box.left + off, box.top + off, box.right - off, box.bottom - off)

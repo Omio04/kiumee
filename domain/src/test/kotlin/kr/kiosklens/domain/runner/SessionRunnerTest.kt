@@ -103,7 +103,7 @@ class SessionRunnerTest {
         assertEquals("아메리카노 주세요", brain.requests.single().utterance)
         assertEquals("sid-1", brain.requests.single().sessionId)
         assertEquals("e4", hand.targets.filterNotNull().first().elementId)
-        assertTrue(mouth.said.single().contains("아메리카노 버튼을 누르세요"))
+        assertTrue(mouth.said.single().let { it.contains("노란색 칸을 눌러 주세요") && it.contains("아메리카노") })
     }
 
     @Test fun `화면이 바뀌면 같은 목표로 다시 묻는다`() {
