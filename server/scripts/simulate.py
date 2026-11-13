@@ -72,18 +72,25 @@ SCENARIOS = [
 ]
 
 
+_TOPICS = (
+    ("dine", ("매장", "포장")),
+    ("temp", ("HOT", "ICE", "따뜻", "시원", "차가", "뜨거")),
+    ("extra", ("샷", "시럽", "추가")),
+    ("pay", ("카드", "결제", "삼성", "카카오", "페이")),
+    ("menu", ("무엇", "드시고", "메뉴", "뭘")),
+)
+
+
 def topic_of(question):
-    q = question or ""
-    if "매장" in q or "포장" in q:
-        return "dine"
-    if any(w in q for w in ("샷", "시럽", "추가")):         # "HOT으로 선택하셨어요. 샷이나 시럽을…"은 추가 옵션 질문
-        return "extra"
-    if any(w in q for w in ("HOT", "ICE", "따뜻", "시원", "차가", "뜨거")):
-        return "temp"
-    if any(w in q for w in ("카드", "결제", "삼성", "카카오", "페이")):
-        return "pay"
-    if any(w in q for w in ("무엇", "드시고", "메뉴", "어떤 걸", "뭘")):
-        return "menu"
+    """사람은 질문의 마지막 내용에 대답한다: 뒤 문장부터 보고, 그 문장에서 가장 먼저 나온 주제에 대답한다.
+    ("HOT으로 선택하셨어요. 샷이나 시럽을 추가하실래요?" → 추가 옵션 / "HOT, ICE, 샷 추가 중에서 고를 수 있어요" → 온도)"""
+    import re
+    sentences = [x for x in re.split(r"(?<=[.?!])\s*", question or "") if x.strip()]
+    for sentence in reversed(sentences):
+        hits = [(min(sentence.find(w) for w in words if w in sentence), name) for name, words in _TOPICS
+                if any(w in sentence for w in words)]
+        if hits:
+            return min(hits)[1]
     return "confirm"
 
 
