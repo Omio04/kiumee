@@ -132,7 +132,7 @@ async def test_anthropic_forces_tool_use_and_unwraps_it():
         seen["b"] = json.loads(req.content)
         return httpx.Response(200, json={"content": [{"type": "tool_use", "name": "decide", "id": "t",
                                                       "input": {"action": "GUIDE", "targetId": "e1", "guideText": "포장하기"}}]})
-    c = AnthropicLlmClient("sk", "m", http=httpx.AsyncClient(transport=httpx.MockTransport(h)))
+    c = AnthropicLlmClient("sk", "claude-haiku-5-5", http=httpx.AsyncClient(transport=httpx.MockTransport(h)))
     out = await c.complete("s", "u", 4)
     assert json.loads(out)["targetId"] == "e1"
     assert seen["b"]["tool_choice"] == {"type": "tool", "name": "decide"}
@@ -191,3 +191,18 @@ async def test_api_returns_cached_answer_on_client_retry(snaps):
         r2 = await c.post("/v1/guide/next", json=body, headers={"X-App-Key": "k"})
     assert r1.status_code == r2.status_code == 200 and r1.json()["action"] == r2.json()["action"]
     assert len(llm.calls) == 1
+
+
+async def test_bigger_claude_models_get_auto_tool_choice_and_no_disabled_thinking():
+    """Sonnet · Opus · Fable은 tool_choice:tool 과 thinking:disabled 를 400으로 거절한다 (2026-11-13 확인)."""
+    seen = {}
+
+    def h(request):
+        seen["b"] = json.loads(request.content)
+        return httpx.Response(200, json={"content": [{"type": "tool_use", "input": {"action": "ASK_USER", "message": "네"}}]})
+
+    for model, thinking in (("claude-sonnet-5-5", {"type": "between_tools"}), ("claude-opus-5-5", None), ("claude-fable-5-2", None)):
+        c = AnthropicLlmClient("sk", model, http=httpx.AsyncClient(transport=httpx.MockTransport(h)))
+        await c.complete("s", "u", 4)
+        assert seen["b"]["tool_choice"] == {"type": "auto"} and "decide 도구" in seen["b"]["system"]
+        assert seen["b"].get("thinking") == thinking

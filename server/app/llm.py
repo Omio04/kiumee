@@ -83,6 +83,25 @@ class LlmClient(Protocol):
                        target_ids: Optional[Sequence[str]] = None, image: Optional[str] = None) -> str: ...
 
 
+_USE_TOOL_NOTE = "\n\n반드시 decide 도구를 호출해서 답하세요 (글로 답하지 마세요)."
+
+
+def _forces_tool(model: str) -> bool:
+    """도구 호출 강제(tool_choice: tool)는 Haiku만 받는다. Sonnet · Opus · Fable은 400으로 거절해서 auto로 보내고 프롬프트로 도구를 쓰게 한다."""
+    return "haiku" in (model or "").lower()
+
+
+def _thinking_param(model: str) -> dict:
+    """생각 끄기는 모델마다 값이 다르다 (2026-11-13 확인: 같은 값을 보내면 400):
+    Haiku는 disabled, Sonnet은 between_tools, 그 밖의 큰 모델은 disabled를 거절하니 보내지 않는다."""
+    m = (model or "").lower()
+    if "haiku" in m:
+        return {"thinking": {"type": "disabled"}}
+    if "sonnet" in m:
+        return {"thinking": {"type": "between_tools"}}
+    return {}
+
+
 class AnthropicLlmClient:
     # max_tokens: Haiku 5.5는 같은 글을 예전보다 30%쯤 많은 토큰으로 센다 → 한국어 문장이 든 JSON이 잘리지 않게 넉넉히
     def __init__(self, api_key: str, model: str, http: Optional[httpx.AsyncClient] = None, max_tokens: int = 300):
@@ -103,14 +122,14 @@ class AnthropicLlmClient:
                 "max_tokens": self.max_tokens,
                 # temperature는 보내지 않는다: 기본 모델 claude-haiku-5-5는 1이 아닌 값(0 포함)을 400으로 거절한다.
                 # 출력 모양은 아래 도구 강제(decide · enum 스키마)가 잡는다.
-                "system": system,
+                "system": system if _forces_tool(self.model) else system + _USE_TOOL_NOTE,
                 "messages": [{"role": "user", "content": ([{"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": image}}, {"type": "text", "text": user}] if image else user)}],
                 "tools": [{"name": "decide", "description": "다음에 어르신이 할 행동 하나를 정한다.",
                            "input_schema": action_schema(target_ids)}],
-                "tool_choice": {"type": "tool", "name": "decide"},
+                "tool_choice": ({"type": "tool", "name": "decide"} if _forces_tool(self.model) else {"type": "auto"}),
                 # 생각 끄기: 이 판단은 후보 8개 중 고르기라 깊은 추론이 필요 없는데 Haiku 5.5는 기본으로 생각을 켜서 느리다
                 # (2026-11-13 실측 4회씩: 기본 1.5~1.8초 -> 끔 1.2초, 답 동일. effort를 낮춰도 추가 이득 없음)
-                "thinking": {"type": "disabled"},
+                **_thinking_param(self.model),
             },
             timeout=timeout_s,
         )
