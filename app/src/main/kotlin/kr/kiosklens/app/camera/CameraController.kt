@@ -3,9 +3,12 @@ package kr.kiosklens.app.camera
 import android.content.Context
 import android.util.Size
 import androidx.camera.core.AspectRatio
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
+import androidx.camera.core.SurfaceOrientedMeteringPointFactory
 import androidx.camera.core.resolutionselector.AspectRatioStrategy
 import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.resolutionselector.ResolutionStrategy
@@ -68,11 +71,34 @@ class CameraController(
                     }
                 }
                 p.unbindAll()
-                p.bindToLifecycle(owner, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
+                val camera = p.bindToLifecycle(owner, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
+                runCatching { tuneExposure(camera) }.onFailure { logger.w("CameraController", "exposure tuning skipped: $it") }
             } catch (t: Throwable) {
                 logger.e("CameraController", "camera start failed", t)
             }
         }, ContextCompat.getMainExecutor(context))
+    }
+
+    /**
+     * 스스로 빛나는 키오스크 화면이 하얗게 날아가지 않게 ([ExposureTuning]).
+     * - 노출을 약 0.5EV 낮춘다
+     * - 측광 영역을 받는 기기면 노출을 가운데(조준 모서리 안 = 키오스크 자리) 기준으로 맞추고 계속 유지한다(자동 취소 끔)
+     * - 초점은 건드리지 않는다: 영역으로 초점을 잡으면 한 번 맞추고 멈춰서, 거리가 바뀌어도 다시 맞추지 않는다
+     * 못 받는 기기는 그냥 넘어간다 (에뮬레이터 웹캠은 노출 보정만 받고 측광 영역은 0개).
+     */
+    private fun tuneExposure(camera: Camera) {
+        val exposure = camera.cameraInfo.exposureState
+        if (exposure.isExposureCompensationSupported) {
+            val range = exposure.exposureCompensationRange
+            val index = ExposureTuning.index(ExposureTuning.TARGET_EV, exposure.exposureCompensationStep.toFloat(), range.lower, range.upper)
+            camera.cameraControl.setExposureCompensationIndex(index)
+            logger.d("CameraController", "exposure index $index (step ${exposure.exposureCompensationStep}, range $range)")
+        }
+        val center = SurfaceOrientedMeteringPointFactory(1f, 1f).createPoint(0.5f, 0.5f, ExposureTuning.METERING_SIZE)
+        val metering = FocusMeteringAction.Builder(center, FocusMeteringAction.FLAG_AE).disableAutoCancel().build()
+        val supported = camera.cameraInfo.isFocusMeteringSupported(metering)
+        if (supported) camera.cameraControl.startFocusAndMetering(metering)
+        logger.d("CameraController", "center metering ${if (supported) "on" else "unsupported"}")
     }
 
     fun stop() {
