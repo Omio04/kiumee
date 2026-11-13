@@ -107,20 +107,53 @@ def test_ratelimit():
     assert rl.allow("k")[0]
 
 
-def test_dotenv_is_read_but_never_overrides_the_environment(tmp_path, monkeypatch):
-    from app.settings import load_dotenv
-    f = tmp_path / ".env"
-    f.write_text('# 주석\nGEMINI_API_KEY="abc123"\nexport LLM_PROVIDER=gemini  # 설명\n\nEMPTY=\nAPP_KEY=from_file\n', encoding="utf-8")
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-    monkeypatch.delenv("LLM_PROVIDER", raising=False)
-    monkeypatch.setenv("APP_KEY", "from_shell")
-    assert load_dotenv(f) == 3
+def test_dotenv_is_read_without_touching_the_process_environment(tmp_path, monkeypatch):
     import os
-    assert os.environ["GEMINI_API_KEY"] == "abc123" and os.environ["LLM_PROVIDER"] == "gemini"
-    assert os.environ["APP_KEY"] == "from_shell"                        # 명령줄 값이 우선
-    assert load_dotenv(tmp_path / "없음.env") == 0
-    g = tmp_path / "ex.env"
-    g.write_text("OTHER_KEY=            # 무료 키: https://example.com\n", encoding="utf-8")
-    monkeypatch.delenv("OTHER_KEY", raising=False)
-    load_dotenv(g)
-    assert os.environ["OTHER_KEY"] == ""                                # 주석이 값으로 들어가면 안 된다
+    from app.settings import Settings, read_dotenv
+    f = tmp_path / ".env"
+    lines = ["# 주석", 'GEMINI_API_KEY="abc123"', "export LLM_PROVIDER=gemini  # 설명", "", "EMPTY=", "APP_KEY=from_file",
+             "OTHER_KEY=            # 무료 키: https://example.com"]
+    f.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    for k in ("GEMINI_API_KEY", "LLM_PROVIDER", "APP_KEY"):
+        monkeypatch.delenv(k, raising=False)                          # 시험은 바깥 환경에 기대지 않는다 (예: LLM_PROVIDER=fake 로 돌려도 통과)
+    before = dict(os.environ)
+    d = read_dotenv(f)
+    assert d["GEMINI_API_KEY"] == "abc123" and d["LLM_PROVIDER"] == "gemini" and d["EMPTY"] == "" and d["OTHER_KEY"] == ""   # 주석이 값으로 들어가면 안 된다
+    assert dict(os.environ) == before                                  # 전역(환경변수)을 바꾸지 않는다
+    assert read_dotenv(tmp_path / "없음.env") == {}
+    monkeypatch.setenv("APP_KEY", "from_shell")
+    s2 = Settings.from_env(dotenv_path=f)
+    assert s2.app_key == "from_shell" and s2.gemini_api_key == "abc123" and s2.llm_provider == "gemini"      # 명령줄 값이 .env 보다 우선
+    assert dict(os.environ).get("GEMINI_API_KEY") == before.get("GEMINI_API_KEY")                              # from_env 도 환경변수를 바꾸지 않는다
+    assert Settings.from_env(env={"APP_KEY": "x"}, dotenv_path=f).gemini_api_key == ""                         # env 를 주면 그것만 쓴다 (시험용)
+
+
+def _dice_reference(a: str, b: str) -> float:
+    """최적화 전의 계산(캐시 없음). 새 dice 가 같은 값을 내는지 비교하는 기준."""
+    from app.jamo import ngrams, to_jamo
+    ga, gb = ngrams(to_jamo(a)), ngrams(to_jamo(b))
+    ta, tb = sum(ga.values()), sum(gb.values())
+    if ta == 0 or tb == 0:
+        return 0.0
+    return 2.0 * sum(min(v, gb[k]) for k, v in ga.items() if k in gb) / (ta + tb)
+
+
+def test_cached_dice_gives_exactly_the_same_scores_as_the_plain_computation():
+    import random
+    from app.jamo import dice
+    from app.kiosk import BRANDS
+    rnd = random.Random(7)
+    pool = list("가나다라마바사아자차카타파하아메리카노라떼ㅂ12 .,ABcd") + ["스", "벅", "스", "커", "피"]
+    words = ["".join(rnd.choice(pool) for _ in range(rnd.randint(0, 14))) for _ in range(300)]
+    words += [w for _, (_, ws) in BRANDS.items() for w in ws] + ["아메리카노", "아메리키노", "", " ", "ㅋㅋ"]
+    for a in words[:120]:
+        for b in words[::7]:
+            assert dice(a, b) == _dice_reference(a, b) == dice(b, a) or abs(dice(a, b) - _dice_reference(a, b)) < 1e-12
+
+
+def test_kiosk_identify_is_unchanged_by_the_precomputed_words():
+    from app.kiosk import identify
+    from app.models import ScreenElement
+    mk = lambda t: ScreenElement.model_validate({"id": t, "text": t, "rect": {"left": .1, "top": .1, "right": .2, "bottom": .2}, "confidence": .9, "kind": "TEXT"})
+    assert identify([mk("메가엠지씨커피"), mk("처음으로")]).name is not None or identify([mk("메가엠지씨커피")]).category is not None
+    assert identify([mk("아무 글자")]).confidence == 0.0

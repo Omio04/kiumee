@@ -15,7 +15,11 @@ import java.util.concurrent.atomic.AtomicReference
  * - 디스크에 쓰지 않는다. 오래된 사진([MAX_AGE_MS] 초과)은 보내지 않는다.
  * - 켜고 끄기: BuildConfig.SEND_IMAGE (local.properties kl.sendImage). 서버도 민감한 글자가 읽힌 요청에서는 사진을 버린다.
  */
-class FrameJpegCache(private val nowMs: () -> Long = System::currentTimeMillis) {
+class FrameJpegCache(
+    private val nowMs: () -> Long = System::currentTimeMillis,
+    /** 사진 하나 만드는 데 걸린 시간(ms)과 크기(바이트)를 알린다. 내용은 담지 않는다. 폰에서 비용을 재서 줄일 곳을 정하려고 둔 장치 */
+    private val onCost: (ms: Long, bytes: Int) -> Unit = { _, _ -> },
+) {
     private class Shot(val base64: String, val atMs: Long)
 
     private val latest = AtomicReference<Shot?>(null)
@@ -36,6 +40,7 @@ class FrameJpegCache(private val nowMs: () -> Long = System::currentTimeMillis) 
             if (out !== src) src.recycle()
             out.recycle()
             latest.set(Shot(Base64.encodeToString(bytes, Base64.NO_WRAP), now))
+            onCost(nowMs() - now, bytes.size)
         }
     }
 

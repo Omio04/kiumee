@@ -2,21 +2,22 @@
 from __future__ import annotations
 
 import os
+from typing import Mapping
 from dataclasses import dataclass, field
 
 VERSION = "0.2.0"   # 0.2.0: API 계약 v1 (docs/contract.md)
 
 
-def load_dotenv(path: "str | os.PathLike | None" = None) -> int:
-    """server/.env 의 KEY=VALUE 를 환경변수로 읽는다 (의존성 없이). 이미 정해진 환경변수는 덮어쓰지 않는다 → 명령줄 값이 .env 보다 우선.
-    따옴표 · 주석(#) · 빈 줄을 처리한다. 파일이 없으면 0. 읽은 개수를 돌려준다. 값은 로그에 남기지 않는다."""
+def read_dotenv(path: "str | os.PathLike | None" = None) -> dict:
+    """server/.env 의 KEY=VALUE 를 딕셔너리로 읽는다 (의존성 없이). 프로세스 환경변수(os.environ)는 건드리지 않는다.
+    따옴표 · 주석(#) · 빈 줄을 처리한다. 파일이 없으면 빈 딕셔너리. 값은 로그에 남기지 않는다."""
     from pathlib import Path
     f = Path(path) if path else Path(__file__).resolve().parent.parent / ".env"
     try:
         lines = f.read_text(encoding="utf-8-sig").splitlines()
     except OSError:
-        return 0
-    n = 0
+        return {}
+    out: dict = {}
     for raw in lines:
         line = raw.strip()
         if not line or line.startswith("#") or "=" not in line:
@@ -31,14 +32,13 @@ def load_dotenv(path: "str | os.PathLike | None" = None) -> int:
             v = ""                                          # KEY=   # 설명  → 값 없음 (.env.example 모양)
         elif " #" in v:
             v = v.split(" #", 1)[0].rstrip()
-        if k and k not in os.environ:
-            os.environ[k] = v
-            n += 1
-    return n
+        if k:
+            out[k] = v
+    return out
 
 
-def _env_bool(name: str, default: bool) -> bool:
-    v = os.environ.get(name)
+def _env_bool(env: Mapping[str, str], name: str, default: bool) -> bool:
+    v = env.get(name)
     if v is None:
         return default
     return v.strip().lower() in ("1", "true", "yes", "on")
@@ -50,6 +50,7 @@ class Settings:
     llm_provider: str = "anthropic"           # anthropic | gemini | fake
     anthropic_api_key: str = field(default="", repr=False)
     gemini_api_key: str = field(default="", repr=False)
+    fallback_model: str = "gemini-3.5-flash-lite"   # Claude 일시 오류 때 대신 답할 Gemini 모델 (GEMINI_API_KEY가 있을 때만)
     llm_model: str = "claude-haiku-5-5"       # p95 2초 예산에 맞춘 빠른 모델 (바꿀 때는 평가 스크립트로 비교)
     llm_timeout_s: float = 5.0                # LlmClient 타임아웃. 무료 Gemini는 가끔 4초를 넘어 4 → 5초 (앱 6초 안)
     total_budget_s: float = 5.5               # 요청 하나의 서버 처리 예산. 앱 타임아웃(6초) 안에 답이 도착하도록 LLM 재요청을 제한
@@ -69,27 +70,30 @@ class Settings:
     max_body_bytes: int = 1024 * 1024         # 사진(선택, 약 100~200KB)이 붙을 수 있어 1MB. 사진 상한은 models.GuideRequest.image
 
     @staticmethod
-    def from_env() -> "Settings":
-        load_dotenv()                                   # server/.env (있으면). 명령줄 환경변수가 우선
-        e = os.environ.get
+    def from_env(env: "Mapping[str, str] | None" = None, dotenv_path: "str | os.PathLike | None" = None) -> "Settings":
+        """env 를 주면 그것만 쓴다(시험용). 안 주면 server/.env 위에 프로세스 환경변수를 덮어 쓴 값을 쓴다 → 명령줄 값이 .env 보다 우선.
+        어느 쪽도 os.environ 을 바꾸지 않는다."""
+        env = dict(env) if env is not None else {**read_dotenv(dotenv_path), **os.environ}
+        e = env.get
         return Settings(
             app_key=e("APP_KEY", ""),
             llm_provider=e("LLM_PROVIDER", "anthropic").strip().lower(),
             anthropic_api_key=e("ANTHROPIC_API_KEY", ""),
             gemini_api_key=e("GEMINI_API_KEY", ""),
+            fallback_model=e("FALLBACK_MODEL", "gemini-3.5-flash-lite"),
             llm_model=e("LLM_MODEL", "gemini-3.5-flash-lite" if e("LLM_PROVIDER", "anthropic").strip().lower() == "gemini" else "claude-haiku-5-5"),
             llm_timeout_s=float(e("LLM_TIMEOUT_S", "5.0")),
             total_budget_s=float(e("TOTAL_BUDGET_S", "5.5")),
             min_retry_s=float(e("MIN_RETRY_S", "1.2")),
             hedge_after_s=float(e("HEDGE_AFTER_S", "1.6")),
-            debug_prompts=_env_bool("DEBUG_PROMPTS", False),
+            debug_prompts=_env_bool(env, "DEBUG_PROMPTS", False),
             candidate_k=int(e("CANDIDATE_K", "8")),
-            progress_hint=_env_bool("PROGRESS_HINT", True),
-            expectation_check=_env_bool("EXPECTATION_CHECK", True),
-            help_mode=_env_bool("HELP_MODE", False),
+            progress_hint=_env_bool(env, "PROGRESS_HINT", True),
+            expectation_check=_env_bool(env, "EXPECTATION_CHECK", True),
+            help_mode=_env_bool(env, "HELP_MODE", False),
             cache_size=int(e("CACHE_SIZE", "256")),
             cache_ttl_s=float(e("CACHE_TTL_S", "30")),
-            fastpath=_env_bool("FASTPATH", True),
+            fastpath=_env_bool(env, "FASTPATH", True),
             fast_min_score=float(e("FASTPATH_MIN_SCORE", "0.85")),
             fast_margin=float(e("FASTPATH_MARGIN", "0.20")),
             rate_limit_per_min=int(e("RATE_LIMIT_PER_MIN", "60")),

@@ -204,7 +204,7 @@ async def test_bigger_claude_models_get_auto_tool_choice_and_no_disabled_thinkin
     for model, thinking in (("claude-sonnet-5-5", {"type": "between_tools"}), ("claude-opus-5-5", None), ("claude-fable-5-2", None)):
         c = AnthropicLlmClient("sk", model, http=httpx.AsyncClient(transport=httpx.MockTransport(h)))
         await c.complete("s", "u", 4)
-        assert seen["b"]["tool_choice"] == {"type": "auto"} and "decide 도구" in seen["b"]["system"]
+        assert seen["b"]["tool_choice"] == {"type": "auto"} and "decide 도구" in seen["b"]["system"][0]["text"]
         assert seen["b"].get("thinking") == thinking
 
 
@@ -222,3 +222,17 @@ async def test_fallback_llm_takes_over_on_transient_errors_but_not_on_auth():
     with pytest.raises(LlmUpstream):
         await c.complete("s", "u", 4)                                              # 키 문제는 숨기지 않는다
     assert second.calls == []
+
+
+async def test_anthropic_system_prompt_is_marked_cacheable():
+    """같은 지시문이 매 요청 반복되므로 캐시에서 읽게 표시한다 (입력 요금 약 1/10)."""
+    seen = {}
+
+    def h(request):
+        seen["b"] = json.loads(request.content)
+        return httpx.Response(200, json={"content": [{"type": "tool_use", "input": {"action": "ASK_USER", "message": "네"}}]})
+
+    c = AnthropicLlmClient("sk", "claude-haiku-5-5", http=httpx.AsyncClient(transport=httpx.MockTransport(h)))
+    await c.complete("지시문", "u", 4)
+    block = seen["b"]["system"][0]
+    assert block["text"] == "지시문" and block["cache_control"] == {"type": "ephemeral"}

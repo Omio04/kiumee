@@ -196,8 +196,19 @@ class LlmAction(BaseModel):
     guideText: Optional[str] = None
     message: Optional[str] = None
     direction: Optional[str] = None
-    box: Optional[List[int]] = None        # 도움 모드: 사진에서 누를 칸 [위, 왼쪽, 아래, 오른쪽] 0~1000 (후보에 없을 때만)
+    box: Optional[List[float]] = None      # 도움 모드: 사진에서 누를 칸 [위, 왼쪽, 아래, 오른쪽] 0~1000 (후보에 없을 때만)
     boxText: Optional[str] = None          # 그 칸에 적힌 글자
+
+    @field_validator("box", mode="before")
+    @classmethod
+    def _box_like(cls, v):
+        # 모델이 "850" · 소수 · 숫자가 아닌 값을 주어도 box 하나 때문에 답 전체를 버리지 않는다 (box만 없는 것으로)
+        if v is None or not isinstance(v, (list, tuple)):
+            return None
+        try:
+            return [float(x) for x in v][:4] if len(v) == 4 else None
+        except (TypeError, ValueError):
+            return None
     screenAsks: Optional[str] = None       # 진단용: 모델이 적은 "이 화면이 묻는 것" (앱에는 나가지 않음)
 
     @field_validator("targetId", "guideText", "message", "direction", mode="before")

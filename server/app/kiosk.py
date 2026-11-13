@@ -54,24 +54,29 @@ class Kiosk:
         return f"{self.category} 키오스크"
 
 
+# 브랜드 낱말을 미리 정규화해 둔 읽기 전용 목록 (BRANDS 에서 계산한 값이라 바뀌지 않는다)
+_BRAND_WORDS: Tuple[Tuple[str, str, str], ...] = tuple((brand, category, normalize(w)) for brand, (category, words) in BRANDS.items() for w in words)
+_CATEGORY_NORMALIZED: Dict[str, Tuple[str, ...]] = {c: tuple(normalize(w) for w in ws) for c, ws in CATEGORY_WORDS.items()}
+
+
 def identify(elements: Sequence[ScreenElement]) -> Kiosk:
     """화면 글자로 가게와 종류를 추정한다."""
     texts = [t for t in (normalize(e.text) for e in elements) if t]
     # 1) 가게 이름: 글자가 브랜드 낱말을 품거나 자모가 비슷하면 (오타 허용)
     best: Tuple[float, Optional[str], Optional[str]] = (0.0, None, None)
-    for brand, (category, words) in BRANDS.items():
-        for w in words:
-            nw = normalize(w)
-            for t in texts:
-                score = 1.0 if nw in t else (dice(t, nw) if len(t) >= MIN_FUZZY_LEN else 0.0)
-                if score > best[0]:
-                    best = (score, brand, category)
+    for brand, category, nw in _BRAND_WORDS:                  # 낱말 정규화는 import 때 한 번만
+        for t in texts:
+            score = 1.0 if nw in t else (dice(t, nw) if len(t) >= MIN_FUZZY_LEN else 0.0)
+            if score > best[0]:
+                best = (score, brand, category)
+        if best[0] >= 1.0:
+            break                                              # 완전히 들어 있으면 더 좋은 점수는 없다
     if best[0] >= BRAND_DICE:
         return Kiosk(best[1], best[2], round(min(0.95, 0.4 + best[0] * 0.55), 2))
     # 2) 종류: 가게 이름은 모르지만 낱말로
     votes: List[Tuple[int, str]] = []
     for category, words in CATEGORY_WORDS.items():
-        hits = sum(1 for w in words if any(normalize(w) in t for t in texts))
+        hits = sum(1 for nw in _CATEGORY_NORMALIZED[category] if any(nw in t for t in texts))
         if hits:
             votes.append((hits, category))
     if votes:

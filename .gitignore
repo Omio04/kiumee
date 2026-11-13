@@ -9,3 +9,7 @@ captures/
 *.apk
 *.aab
 .env
+
+# IDE(VS Code Java)가 만드는 소스 사본 — 소스가 아니다
+core-model/bin/
+domain/bin/

@@ -8,6 +8,7 @@ import hmac
 import json
 import logging
 import os
+from functools import lru_cache
 import time
 import uuid
 from typing import Optional
@@ -40,7 +41,7 @@ def build_agent(s: Settings) -> GuideAgent:
         return LlmGuideAgent(GeminiLlmClient(s.gemini_api_key, s.llm_model), s)
     primary = AnthropicLlmClient(s.anthropic_api_key, s.llm_model)
     if s.gemini_api_key:                                   # Gemini 키도 있으면 Claude 일시 오류 때 대신 답한다
-        primary = FallbackLlmClient(primary, GeminiLlmClient(s.gemini_api_key, os.environ.get("FALLBACK_MODEL", "gemini-3.5-flash-lite")), log)
+        primary = FallbackLlmClient(primary, GeminiLlmClient(s.gemini_api_key, s.fallback_model), log)
     return LlmGuideAgent(primary, s)
 
 
@@ -124,11 +125,16 @@ def create_app(settings: Optional[Settings] = None, agent: Optional[GuideAgent] 
     return app
 
 
+@lru_cache(maxsize=1)
 def _default_app():
-    import os
     if os.environ.get("KL_SKIP_APP_INIT") == "1":
         return None
     return create_app()
 
 
-app = _default_app()
+def __getattr__(name: str):
+    """`uvicorn app.main:app` 이 처음 접근할 때 한 번만 앱을 만든다. 모듈을 불러오기만 해서는 아무것도 만들지 않는다
+    (예전: 불러오는 순간 앱을 만들어 키가 없으면 시험 수집부터 죽었다 — 전역 객체의 부작용)."""
+    if name == "app":
+        return _default_app()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

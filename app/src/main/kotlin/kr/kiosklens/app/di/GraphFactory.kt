@@ -35,7 +35,7 @@ object GraphFactory {
         var caption: (String) -> Unit = {}
         val speechOut = CaptionSpeechOutput(tts) { caption(it) }
         val speechIn = AndroidSpeechInput(app, echo, logger)
-        val frameJpeg = FrameJpegCache()
+        val frameJpeg = FrameJpegCache(onCost = { ms, bytes -> logger.d("KL_PERF", "jpeg ms=$ms bytes=$bytes") })
         // 사진을 서버(AI)에 보낼지: local.properties kl.sendImage (기본 켬). 끄면 예전처럼 글자만 보낸다
         val agent = RemoteGuideAgent(AgentConfig(BuildConfig.SERVER_URL, BuildConfig.APP_KEY), logger,
             imageProvider = { if (BuildConfig.SEND_IMAGE) frameJpeg.latestBase64() else null })

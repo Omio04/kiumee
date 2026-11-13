@@ -122,7 +122,10 @@ class AnthropicLlmClient:
                 "max_tokens": self.max_tokens,
                 # temperature는 보내지 않는다: 기본 모델 claude-haiku-5-5는 1이 아닌 값(0 포함)을 400으로 거절한다.
                 # 출력 모양은 아래 도구 강제(decide · enum 스키마)가 잡는다.
-                "system": system if _forces_tool(self.model) else system + _USE_TOOL_NOTE,
+                "system": [{"type": "text", "text": system if _forces_tool(self.model) else system + _USE_TOOL_NOTE,
+                            # 같은 지시문(약 5천 토큰)이 매 요청 반복된다 → 캐시에서 읽으면 입력 요금이 약 1/10 (2026-11-13 측정: 속도는 그대로, 한도 절약).
+                            # 5분 안에 다시 오면 적중. 최소 길이보다 짧은 지시문은 조용히 캐시 안 됨 (오류 아님)
+                            "cache_control": {"type": "ephemeral"}}],
                 "messages": [{"role": "user", "content": ([{"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": image}}, {"type": "text", "text": user}] if image else user)}],
                 "tools": [{"name": "decide", "description": "다음에 어르신이 할 행동 하나를 정한다.",
                            "input_schema": action_schema(target_ids)}],

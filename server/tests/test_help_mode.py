@@ -1,6 +1,4 @@
 """도움 모드: 어르신이 물으면 그 순간의 화면을 보고 답하고 "또 도움이 필요하세요?"라고 되묻는다."""
-import pytest
-
 from app import help_mode
 from app.agent import LlmGuideAgent
 from app.llm import ScriptedFakeLlmClient
