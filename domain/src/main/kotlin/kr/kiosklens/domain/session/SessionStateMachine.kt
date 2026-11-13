@@ -13,6 +13,7 @@ import kr.kiosklens.core.model.ScreenSnapshot
 import kr.kiosklens.core.model.SttError
 import kr.kiosklens.domain.policy.GuideTextComposer
 import kr.kiosklens.domain.policy.HighlightArea
+import kr.kiosklens.domain.policy.NameMatcher
 import kr.kiosklens.domain.policy.TimeoutPolicy
 import kr.kiosklens.domain.session.SessionEffect.CancelPending
 import kr.kiosklens.domain.session.SessionEffect.ClearHighlight
@@ -79,7 +80,11 @@ class SessionStateMachine(
      *   읽던 안내를 끊고 듣는다. 목표 · 이력은 그대로 두고, 들은 말은 다음 요청의 utterance가 되어 서버가 목표에 붙인다.
      * - 이미 듣는 중이면 무시한다.
      */
-    private fun onStart(state: SessionState, sessionId: String): Transition = when {
+    private fun onStart(state: SessionState, sessionId: String): Transition = clearSeek(onStartInner(state, sessionId))
+
+    private fun clearSeek(tr: Transition): Transition = if (tr.next.seek == null) tr else tr.copy(next = tr.next.copy(seek = null))
+
+    private fun onStartInner(state: SessionState, sessionId: String): Transition = when {
         // 도움 모드(버튼 방식): 앱이 말하거나 생각하는 동안에는 끼어들 수 없다. 답이 끝나면 누른다 (2026-11-13 요청)
         helpMode && !handsFree && state.phase in BUSY_PHASES -> stay(state)
         state.phase == Phase.IDLE || state.phase == Phase.DONE || state.phase == Phase.ERROR -> newSession(state, sessionId)
@@ -110,6 +115,7 @@ class SessionStateMachine(
 
     private fun onSnapshot(state: SessionState, s: ScreenSnapshot): Transition {
         val updated = state.copy(snapshot = s)
+        if (helpMode && state.phase == Phase.WAIT_CHANGE && state.seek != null) seekFound(updated, s)?.let { return it }
         return when (state.phase) {
             Phase.SCANNING -> requestOrScan(updated, listOf(CancelPending))                 // 화면을 찾음 → 서버에 묻기
             Phase.LOST -> requestOrScan(updated, listOf(StopSpeaking, CancelPending))       // 다시 보임 → 바로 묻기
@@ -137,6 +143,27 @@ class SessionStateMachine(
                 } else stay(updated)
             else -> stay(updated)
         }
+    }
+
+    /**
+     * 찾던 칸이 화면 글자에 읽혔다 → 지금 바로 노란 칸을 치고 알려 준다 (어르신이 다시 묻지 않아도).
+     * 말은 AI가 사진에서 읽은 정확한 이름으로, 칸은 글자 읽기가 찾은 위치로 한다.
+     */
+    private fun seekFound(state: SessionState, s: ScreenSnapshot): Transition? {
+        val name = state.seek ?: return null
+        val el = NameMatcher.find(name, s.elements) ?: return null
+        val t = state.ticket + 1
+        val rect = HighlightArea.of(el, s.elements)
+        val spoken = texts.tap(rect, name)
+        val action = GuideAction.Tap(el.id, name)
+        return Transition(
+            state.copy(
+                phase = Phase.GUIDING, ticket = t, seek = null,
+                guide = Guidance(s.screenId, el.id, rect, spokenText = spoken, targetText = el.text),
+                history = (state.history + HistoryItem.of(s.screenId, action)).takeLast(GuideRequest.MAX_HISTORY),
+            ),
+            listOf(Highlight(HighlightTarget(el.id, rect)), Speak("이제 보여요. $spoken", t)),
+        )
     }
 
     private fun phaseIsListening(state: SessionState) = state.phase == Phase.LISTENING
@@ -260,7 +287,8 @@ class SessionStateMachine(
                     else Transition(state.copy(phase = Phase.WAIT_CHANGE, ticket = t))     // 타이머 없이 기다린다: 어르신이 누르면 질문
                 else Transition(state.copy(phase = Phase.WAIT_CHANGE, ticket = t),
                     listOf(StartTimer(state.guide?.waitMs ?: timeouts.waitChangeRepeatMs, t)))
-            Phase.ASKING -> if (helpMode && !handsFree) Transition(state.copy(phase = Phase.WAIT_CHANGE, ticket = t, guide = null))   // 대답이 끝났다: 버튼을 기다린다
+            Phase.ASKING -> if (helpMode && !handsFree) Transition(state.copy(phase = Phase.WAIT_CHANGE, ticket = t, guide = null),   // 대답이 끝났다: 버튼을 기다린다
+                if (state.seek != null) listOf(StartTimer(SEEK_WAIT_MS, t)) else emptyList())                              // 찾는 칸이 있으면 이만큼만 기다린다
             else Transition(state.copy(phase = Phase.LISTENING, ticket = t),        // 다 읽은 뒤에야 듣기 시작 (에코 방지)
                 listOf(StartListening(t), StartTimer(timeouts.listenSilenceMs, t)))
             Phase.LOST -> Transition(state.copy(phase = Phase.SCANNING, ticket = t), listOf(StartTimer(timeouts.scanningMs, t)))
@@ -309,7 +337,11 @@ class SessionStateMachine(
                 base, asked.screenId, action.guideText,
                 choiceIds = action.targetIds.filter { asked.findElement(it)?.kind == ElementKind.BUTTON_LIKE },
             )
-            is GuideAction.AskUser -> speakThen(base, Phase.ASKING, action.question)
+            is GuideAction.AskUser -> speakThen(base, Phase.ASKING, action.question).let { tr ->
+                // 도움 모드: 칠 칸이 아직 없다는 알림이면 찾는 이름을 기억한다 (읽히면 자동으로 노란 칸)
+                val name = response.seek?.trim()?.takeIf { helpMode && it.length >= 2 }
+                if (name == null) tr else tr.copy(next = tr.next.copy(seek = name))
+            }
             is GuideAction.Done -> speakThen(base, Phase.DONE, action.guideText)
             is GuideAction.Unknown -> speakAndWait(base, asked.screenId, action.reason, retry = true)
         }
@@ -343,6 +375,7 @@ class SessionStateMachine(
             Phase.LISTENING -> heardNothing(state)                                              // 무음 8초
             Phase.SCANNING -> Transition(state.copy(phase = Phase.LOST, ticket = t), listOf(Speak(texts.lost(), t)))   // 10초
             Phase.WAIT_CHANGE -> {                                                               // 15초
+                if (state.seek != null) return Transition(state.copy(seek = null))                 // 찾던 칸이 끝내 안 읽혔다: 포기한다
                 val g = state.guide ?: return stay(state)
                 // 도움 모드: 물어볼 때만 답한다. 안내를 다시 읽지 않는다 (서버가 실패해 못 답한 질문을 다시 묻는 경우만 예외)
                 if (helpMode && !(g.retryOnTimeout && state.pendingUtterance != null)) return stay(state)
@@ -422,6 +455,9 @@ class SessionStateMachine(
     private companion object {
         /** AI가 사진에서 가리킨 박스를 사방으로 이만큼(0~1) 넓힌다: 모델 박스가 칸을 조금 못 덮어도 글자가 가려지지 않게 */
         const val PHOTO_BOX_PAD = 0.012f
+
+        /** 찾는 칸이 읽히길 기다리는 시간 (이 뒤에도 안 읽히면 포기) */
+        const val SEEK_WAIT_MS = 90_000L
 
         fun NormRect.padded(p: Float) = NormRect((left - p).coerceAtLeast(0f), (top - p).coerceAtLeast(0f), (right + p).coerceAtMost(1f), (bottom + p).coerceAtMost(1f))
         /** 앱이 말하거나 생각 중이라 "말하기"를 눌러도 소용없는 단계 (도움 모드 · 버튼 방식) */

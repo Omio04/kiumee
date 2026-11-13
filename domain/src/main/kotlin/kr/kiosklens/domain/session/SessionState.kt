@@ -60,6 +60,8 @@ data class SessionState(
     val requestedSnapshot: ScreenSnapshot? = null,
     /** 지금 안내 중인 내용 (GUIDING · WAIT_CHANGE) */
     val guide: Guidance? = null,
+    /** 찾는 칸의 이름: AI는 아는데 글자 읽기에 아직 없다. 읽히는 순간 노란 칸을 치고 비운다. 다음 질문 · 시간 초과에도 비운다 */
+    val seek: String? = null,
     /** 안내 중에 "말하기"를 다시 눌러 듣는 중. 못 들으면 세션을 끝내지 않고 하던 안내로 돌아간다 */
     val listeningToAdd: Boolean = false,
     /** 서버 요청이 연달아 실패한 횟수. 답을 받으면 0 */

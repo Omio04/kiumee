@@ -135,4 +135,44 @@ class SessionClickModeTest {
         assertTrue(hl.rect.width < box.width + 0.1f)                                // 박스를 거의 그대로 (두 배로 키우지 않는다)
         assertTrue(tr.effects.filterIsInstance<Speak>().first().text.contains("주문담기"))
     }
+
+    // ---- 칠 칸이 아직 없다는 알림(seek): 찾는 이름을 기억했다가 글자가 읽히는 순간 노란 칸을 친다 (2026-11-13 실기기: 주문담기가 글자 목록에 없었다)
+    private fun askedSeek(): Driver {
+        val d = asked()
+        d.send { GuideReceived(it, GuideResponse("", GuideAction.AskUser("'주문담기' 칸이 아직 안 읽혀요. 크게 나오게 비춰 주세요."), seek = "주문담기")) }
+        return d
+    }
+
+    private val menuWithoutButton = menu
+    private val menuWithGarbled = menu.copy(screenId = "s02_menu_b", frameId = 11, elements = menu.elements + Screens.el("n9", "주문달기", 0.55f, 0.9f, 0.95f, 0.97f))
+
+    @Test fun `찾는 칸이 읽히면 다시 묻지 않아도 노란 칸을 치고 알려 준다`() {
+        val d = askedSeek()
+        assertEquals("주문담기", d.state.seek)
+        val done = d.send { SpeechFinished(it) }
+        assertEquals(Phase.WAIT_CHANGE, d.phase)
+        assertTrue(done.effects.any { it is SessionEffect.StartTimer })                 // 무한정 기다리지 않는다
+        val none = d.send(SnapshotReceived(menuWithoutButton))                           // 아직 안 읽힘
+        assertTrue(none.effects.isEmpty() && d.state.seek == "주문담기")
+        val found = d.send(SnapshotReceived(menuWithGarbled))                            // 깨진 글자로 읽힘
+        assertEquals(Phase.GUIDING, d.phase)
+        assertEquals("n9", found.effects.filterIsInstance<SessionEffect.Highlight>().single().target.elementId)
+        val spoken = found.effects.filterIsInstance<Speak>().single().text
+        assertTrue(spoken, spoken.contains("노란색 칸을 눌러 주세요") && spoken.contains("주문담기"))   // 말은 AI가 읽은 정확한 이름
+        assertNull(d.state.seek)
+    }
+
+    @Test fun `새 질문을 누르면 찾던 것을 비운다`() {
+        val d = askedSeek(); d.send { SpeechFinished(it) }
+        d.send(StartPressed("s2"))
+        assertNull(d.state.seek)
+    }
+
+    @Test fun `시간이 지나도 안 읽히면 포기한다`() {
+        val d = askedSeek(); d.send { SpeechFinished(it) }
+        d.send { TimedOut(it) }
+        assertNull(d.state.seek)
+        val tr = d.send(SnapshotReceived(menuWithGarbled))                              // 그 뒤에 읽혀도 갑자기 말하지 않는다
+        assertTrue(tr.effects.none { it is Speak })
+    }
 }

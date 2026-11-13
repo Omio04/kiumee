@@ -284,3 +284,29 @@ def test_fuzzy_match_needs_a_clear_winner():
     assert _pressed_candidate("'주문담기'를 눌러 주세요.", cands).id == "a"                  # 정확히 같은 칸이 있으면 그쪽
     cands2 = {"a": mk("a", "주문담기X"), "b": mk("b", "주문담7")}
     assert _pressed_candidate("'주문담기'를 눌러 주세요.", cands2) is None
+
+
+# ---- 누르라고 하면서 칠 칸이 없으면 "누르세요"라고 말하지 않고 찾는다고 알린다 (2026-11-13 실기기 로그: 주문담기 · 2,000원 결제하기가 글자 목록에 없었다)
+async def test_press_words_without_any_candidate_become_a_seek_request(snaps):
+    llm = ScriptedFakeLlmClient([answer("빨리 결제하려면 옵션을 먼저 정해야 해요. 없으면 '주문담기'를 누르세요.")])
+    r = (await agent(llm).next(_food_req(snaps, "빨리 결제하고 싶은데", []))).response
+    assert r.action.type.value == "ASK_USER" and r.seek == "주문담기"
+    assert "누르세요" not in r.action.question and "주문담기" in r.action.question and "비춰" in r.action.question and len(r.action.question) <= 80
+
+
+async def test_price_is_removed_from_the_sought_name(snaps):
+    llm = ScriptedFakeLlmClient([answer("화면 하단의 '2,000원 결제하기' 검은 칸을 누르시면 결제로 넘어가요.")])
+    r = (await agent(llm).next(_food_req(snaps, "이제 뭐 해야 돼", []))).response
+    assert r.seek == "결제하기"
+
+
+async def test_a_matching_candidate_wins_over_seeking(snaps):
+    llm = ScriptedFakeLlmClient([answer("케이크는 위쪽 '푸드'를 눌러 보세요.")])
+    r = (await agent(llm).next(_food_req(snaps, "케이크 먹고 싶어", []))).response
+    assert r.action.type.value == "TAP" and r.action.guideText == "푸드" and r.seek is None            # 칸이 있으면 찾지 않고 바로 가리킨다
+
+
+async def test_later_step_buttons_are_not_sought(snaps):
+    llm = ScriptedFakeLlmClient([answer("옵션을 먼저 골라야 해요. 다 고르면 '주문담기'를 누르세요.")])
+    r = (await agent(llm).next(_food_req(snaps, "결제하고 싶어", []))).response
+    assert r.seek is None                                                                               # 지금 누를 칸이 아니면 찾지 않는다

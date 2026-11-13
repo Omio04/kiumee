@@ -272,6 +272,26 @@ def _reason_only(say: str) -> str:
     return " ".join(kept).strip()
 
 
+_NOT_A_BUTTON = {"화면", "버튼", "아래", "위쪽", "아래쪽", "오른쪽", "왼쪽", "하단", "상단", "그곳", "여기", "이것", "그것"}
+
+
+def _seek_name(sentence: str) -> Optional[str]:
+    """누르라는 문장에서 찾는 버튼 이름 하나. 가격(2,000원)은 뗀다: 글자 읽기는 "결제하기"와 "2,000원"을 따로 읽기도 한다."""
+    for ph in _named_phrases(sentence):
+        name = re.sub(r"[\d,\.]+\s*원?", "", ph).strip()
+        if len(normalize(name)) >= 2 and name not in _NOT_A_BUTTON:
+            return name[:30]
+    return None
+
+
+def _seek_text(text: str, name: str) -> str:
+    """누르라는 문장은 빼고(칠 칸이 없으니 "누르세요"라고 말하지 않는다), 그 칸이 안 읽힌다는 말로 바꾼다. 80자 안."""
+    kept = [p for p in re.split(r"(?<=[.!?])\s+", text.strip()) if p and not _PRESS_SENTENCE.search(p)]
+    tail = f"'{name}' 칸이 아직 안 읽혀요. 크게 나오게 비춰 주세요. 보이면 노란색으로 알려 드릴게요."
+    head = (" ".join(kept))[: max(0, 80 - len(tail) - 1)].rstrip()
+    return (head + " " + tail).strip()
+
+
 def _photo_box(action, has_image: bool, candidates: dict) -> Optional[tuple]:
     """AI가 사진에서 직접 가리킨 칸: (Box, 칸 글자). 글자 목록(후보)에 없는 칸일 때만, 사진이 있고 박스가 말이 될 때만."""
     if not has_image:
@@ -689,7 +709,15 @@ class LlmGuideAgent:
                 text = f"화면을 {way + ' ' if way else ''}밀어서 '{name}' 칸을 찾아 보세요." if name else fallback
             if _waiting_talk(resp) or any(w in normalize(text) for w in _APP_CLAIMS):
                 text = fallback                                               # 앱이 뭔가 하는 듯한 말은 하지 않는다
-            resp = GuideResponse(goal=prev_goal, action=GuideAction.ask_user(help_mode.with_follow_up(text)), source=resp.source)
+            seek = None
+            sent = _press_sentence(text) if a.type == ActionType.ASK_USER else None
+            if sent and not any(w in sent for w in _AFTER_WORDS):
+                seek = _seek_name(sent)                                       # 누르라면서 칠 칸이 없다 → "누르세요"는 말하지 않고 찾는다고 알린다
+            if seek:
+                meta["seek"] = True
+                resp = GuideResponse(goal=prev_goal, action=GuideAction.ask_user(_seek_text(text, seek)), seek=seek, source=resp.source)
+            else:
+                resp = GuideResponse(goal=prev_goal, action=GuideAction.ask_user(help_mode.with_follow_up(text)), source=resp.source)
         meta["source"] = "help"
         return self._finish(resp, meta, t0)
 

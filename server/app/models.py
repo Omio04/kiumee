@@ -178,6 +178,7 @@ class GuideResponse(BaseModel):
     goal: str = Field(default="", max_length=MAX_GOAL)   # 앱은 다음 요청의 goal에 그대로 넣음
     action: GuideAction
     say: Optional[str] = Field(default=None, max_length=MAX_TEXT)   # 도움 모드: 버튼을 가리킬 때 앞에 읽어 줄 이유 · 해결 방법 한 문장 (없으면 생략, 모르는 앱은 무시)
+    seek: Optional[str] = Field(default=None, max_length=30)   # 도움 모드: 누를 칸 이름을 AI는 아는데 글자 읽기에 아직 없을 때. 앱이 이름을 기억했다가 읽히는 순간 노란 칸을 친다 (없으면 생략)
     box: Optional[Box] = None        # TAP인데 그 칸이 글자 목록에 없고 사진에서 찾은 경우의 위치 (targetId는 "photo"). 없으면 생략
     source: Optional[str] = None     # 진단용 (llm | fastpath | rule | fake | fallback). 내용이 아님. 앱은 무시
 

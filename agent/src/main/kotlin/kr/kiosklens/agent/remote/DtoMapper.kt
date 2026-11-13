@@ -96,7 +96,8 @@ object DtoMapper {
             val l = f("left"); val t = f("top"); val r = f("right"); val bt = f("bottom")
             if (l == null || t == null || r == null || bt == null) null else NormRect(l, t, r, bt).takeIf { it.isValid }
         }
-        return GuideResponse(goal = (root["goal"] as? String).orEmpty(), action = action, say = say, box = box)
+        val seek = (root["seek"] as? String)?.trim()?.takeIf { it.length >= 2 }?.take(30)
+        return GuideResponse(goal = (root["goal"] as? String).orEmpty(), action = action, say = say, box = box, seek = seek)
     }
 
     /** 오류 본문에서 code만 꺼낸다 (message는 개발자용이라 어르신께 읽지 않는다). */

@@ -107,4 +107,9 @@ data class GuideResponse(
      * 선택 필드라 모르는 쪽은 무시한다 (계약 v1과 호환).
      */
     val box: NormRect? = null,
+    /**
+     * 누를 칸의 이름을 AI는 아는데 글자 읽기에 아직 없을 때(ASK_USER). 앱이 이름을 기억했다가 화면 글자에 비슷한 것이 읽히는 순간 노란 칸을 친다.
+     * 선택 필드라 모르는 쪽은 무시한다 (계약 v1과 호환).
+     */
+    val seek: String? = null,
 )
