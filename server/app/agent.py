@@ -525,7 +525,11 @@ class LlmGuideAgent:
         elif a.type == ActionType.DONE:
             resp = GuideResponse(goal=prev_goal, action=GuideAction.done(help_mode.MSG_BYE), source=resp.source)
         else:                                                                 # 대답(ASK_USER · EXPLAIN · UNKNOWN · SCROLL) → 말하고 계속 듣는다
-            text = a.question or a.reason or (a.guideText if a.type == ActionType.SCROLL else None) or fallback
+            text = a.question or a.reason or fallback
+            if a.type == ActionType.SCROLL and not (a.question or a.reason):    # 버튼 이름만 읽으면 알아들을 수 없다 — 문장으로 만든다 (2026-11-13 실기기)
+                way = {"UP": "위로", "DOWN": "아래로"}.get(str(getattr(a.direction, "value", a.direction) or "").upper(), "")
+                name = (a.guideText or "").strip()
+                text = f"화면을 {way + ' ' if way else ''}밀어서 '{name}' 칸을 찾아 보세요." if name else fallback
             if _waiting_talk(resp) or any(w in normalize(text) for w in _APP_CLAIMS):
                 text = fallback                                               # 앱이 뭔가 하는 듯한 말은 하지 않는다
             resp = GuideResponse(goal=prev_goal, action=GuideAction.ask_user(help_mode.with_follow_up(text)), source=resp.source)
