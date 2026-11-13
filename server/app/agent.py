@@ -25,7 +25,7 @@ from typing import Dict, List, Optional, Protocol
 from . import privacy
 from .cache import ResponseCache, request_key
 from .jamo import dice, normalize
-from . import elder, expectation, hidden_button, kiosk, menu_info, progress, screen_guide, screen_type
+from . import elder, expectation, help_mode, hidden_button, kiosk, menu_info, progress, screen_guide, screen_type
 from .screen_memory import ScreenMemory
 from .llm import LlmClient, LlmRateLimited, LlmTimeout, LlmUpstream
 from .models import (MAX_GOAL, MAX_HISTORY, ActionType, ElementKind, GuideAction, GuideRequest, GuideResponse,
@@ -210,7 +210,9 @@ def _repeat_guard(req: GuideRequest, resp: GuideResponse) -> GuideResponse:
             break
     if same == 0:
         return resp
-    if same >= 2:
+    if same == 1 and req.utterance:
+        return resp                                            # 새로 말씀하셨으면 질문을 그대로 둔다 ("아직 잘 모르겠어요"는 그 말을 무시한 것처럼 들린다)
+    if same >= 3:                                              # 세 번 물어도 진전이 없으면 직원 도움 (음성 인식 오류가 한두 번 겹칠 수 있다)
         return GuideResponse(goal=resp.goal, action=GuideAction.done(MSG_STUCK), source="rule")
     return GuideResponse(goal=resp.goal, source="rule", action=GuideAction.ask_user(
         "아직 잘 모르겠어요. 하고 싶은 것을 짧게 한 번 더 말씀해 주세요."))
@@ -218,6 +220,13 @@ def _repeat_guard(req: GuideRequest, resp: GuideResponse) -> GuideResponse:
 
 # 옵션 줄마다 반복되는 뜻 없는 버튼 글자: 빠른 길로 고르면 엉뚱한 줄의 버튼을 안내한다
 _GENERIC_LABELS = frozenset(normalize(w) for w in ("선택", "추가", "선택안함", "+", "-"))
+
+
+def _done_is_justified(req: GuideRequest, stype) -> bool:
+    """안내를 끝내도 되는가: 결제 진행/완료 화면이거나, 이번 세션에서 결제 수단 버튼을 이미 눌렀다."""
+    if stype in (screen_type.ScreenType.CARD, screen_type.ScreenType.COMPLETE):
+        return True
+    return any(h.action == ActionType.TAP and h.targetText and progress.stage_of(h.targetText) == progress.PAY for h in req.history)
 
 
 def _change_line(change) -> Optional[str]:
@@ -286,13 +295,14 @@ class LlmGuideAgent:
 
         # 1-1) 어르신 말투 (LLM 없이 즉시): 도움 요청 · 그만 · 다시 말해줘 · 화면에 없는 현금
         prev_goal = (req.goal or "").strip()
-        early = self._elder_rule(req, els, prev_goal)
+        help_on = self.s.help_mode and bool(req.utterance)
+        early = self._elder_rule(req, els, prev_goal, help_on)
         if early is not None:
             meta.update(source="rule", candidates=0, elder=True)
             return self._finish(early, meta, t0)
 
         # 2) 로컬 규칙: 결제 진행 화면
-        if _is_done_screen(els):
+        if _is_done_screen(els) and not help_on:
             meta.update(source="rule", candidates=0)
             return self._finish(GuideResponse(goal=goal, action=GuideAction.done(MSG_DONE), source="rule"), meta, t0)  # 규칙은 이미 즉시라 캐시 불필요
 
@@ -301,10 +311,16 @@ class LlmGuideAgent:
         meta["screen"] = stype.value
         probs = screen_type.probabilities(els)                  # 이 종류일 확률 (글자 단서의 상대 비율)
         meta["screen_p"] = probs[0][1] if probs else 0.0
-        kiosk_hint = kiosk.identify(els).text()                 # 참고만: 어떤 규칙도 가게 이름에 의존하지 않는다
+        kiosk_info = kiosk.identify(els)
+        kiosk_hint = kiosk_info.text()                           # 참고만: 어떤 규칙도 가게 이름에 의존하지 않는다
+        # 주문형 키오스크일 때만 쓰는 장치(진행 단계 · 눌렀는지 확인): 기차표 같은 다른 키오스크에서는 "다음 단계: 담기"처럼 틀린 말을 하게 된다
+        ordering = screen_type.is_ordering(stype, kiosk_info.category)
+        meta["ordering"] = ordering
         change = self.memory.observe(req.sessionId, req.snapshot.screenId, stype, els)
         if change is not None:
             meta["changed_from"] = change.from_type.value
+        if help_on:                                              # 도움 모드: 질문에 그 순간의 화면을 보고 답한다
+            return await self._answer_question(req, els, goal, prev_goal, stype, probs, kiosk_hint, change, meta, t0)
         if stype == screen_type.ScreenType.LOYALTY and "적립" not in (req.utterance or ""):
             # 적립은 건너뛴다 (P2 인수 문서: 어르신이 요청하지 않았으면). 실제로 보이는 닫기(×)가 있을 때만 안내하고,
             # 없으면 지어내지 않고 다시 비춰 달라고 한다.
@@ -347,7 +363,7 @@ class LlmGuideAgent:
         #      "샷 추가하실래요?" → "아니요"를 '취소' 버튼으로 누르면 주문이 취소된다 (2026-11-12)
         pressed = _pressed_text(req)
         chosen = _chosen_items(req)
-        if self.s.fastpath and goal and not asking and answer_button(req.utterance) is None:
+        if self.s.fastpath and goal and not asking and answer_button(req.utterance) is None and stype in screen_type.FASTPATH_TYPES:
             top = ranked[0]
             second = ranked[1].match if len(ranked) > 1 else 0.0
             repeat = any(same_item(top.element.text, c) for c in chosen)
@@ -373,15 +389,15 @@ class LlmGuideAgent:
         # (예전엔 일반 글자 6개만 보여서 판단할 근거가 없었다, 2026-11-12 시험)
         context = [e.text for e in sorted(els, key=lambda e: (round(e.rect.top, 2), e.rect.left))][:30]
         new_screen = screen_guide.screen_changed(req)
-        unseen = expectation.pressed_but_not_visible(req) if self.s.expectation_check else None
-        lookalike = expectation.lookalike_menu(req) if self.s.expectation_check else None
+        unseen = expectation.pressed_but_not_visible(req) if (self.s.expectation_check and ordering) else None
+        lookalike = expectation.lookalike_menu(req) if (self.s.expectation_check and ordering) else None
         if lookalike:
             meta["lookalike"] = True
         if unseen:
             meta["unseen"] = True
         user = build_user(goal, req.history, candidates, context, pressed=pressed, chosen=chosen,
                           question=asking, new_screen=new_screen,
-                          progress=progress.summarize(req.history) if self.s.progress_hint else None,
+                          progress=progress.summarize(req.history) if (self.s.progress_hint and ordering) else None,
                           unseen=unseen, screen=screen_type.describe_probabilities(probs) or screen_type.label(stype),
                           kiosk=kiosk_hint, change=_change_line(change), lookalike=lookalike)
 
@@ -420,6 +436,13 @@ class LlmGuideAgent:
                 resp = GuideResponse(goal=goal, action=GuideAction.unknown(MSG_UNKNOWN), source="fallback")
         if action.action == LlmKind.GUIDE and resp.action.type == ActionType.UNKNOWN:
             meta["rejected"] = True                    # LLM이 후보에 없는 버튼을 말함
+        # 6-1) 종료(DONE)는 끝났다는 증거가 있을 때만: 카드 결제/완료 화면이거나 결제 수단을 이미 눌렀을 때.
+        #      증거 없이 AI가 DONE이라 하면(기차표 시뮬레이션 T2: 도착역을 고르자마자 "다음 화면에서 안내를 따라 주세요") 끝내지 않고 화면을 설명한다.
+        if (resp.action.type == ActionType.DONE and action.action == LlmKind.DONE and not _done_is_justified(req, stype)
+                and not _premature_done(req, chosen)):      # 아무것도 안 고른 경우는 아래 7)의 기존 문구("잘 못 알아들었어요")
+            meta["rejected"] = True
+            text = screen_guide.describe(els, changed=new_screen, label=screen_type.label(stype), change=change)
+            resp = GuideResponse(goal=goal, action=GuideAction.ask_user(text or MSG_ASK), source="rule")
         # 7) 이른 '끝' 막기: 고른 것이 없는데 DONE이면 끝내지 않고 다시 묻는다 (앱은 묻고 나서 바로 듣는다)
         if resp.action.type == ActionType.DONE and _premature_done(req, chosen):
             meta["rejected"] = True
@@ -435,9 +458,13 @@ class LlmGuideAgent:
         return self._finish(resp, meta, t0)
 
     @staticmethod
-    def _elder_rule(req: GuideRequest, els: List[ScreenElement], prev_goal: str) -> Optional[GuideResponse]:
+    def _elder_rule(req: GuideRequest, els: List[ScreenElement], prev_goal: str, help_on: bool = False) -> Optional[GuideResponse]:
         """목표를 바꾸지 않고 바로 답하는 말들. 해당 없으면 None."""
         u = req.utterance
+        if help_on and help_mode.is_decline(u, req.history):
+            return GuideResponse(goal=prev_goal, action=GuideAction.done(help_mode.MSG_BYE), source="rule")
+        if help_on and u and "직원" not in u and elder.is_help(u):
+            return None                                          # "도와줘요" · "어떻게 해야 돼"는 끝내는 말이 아니라 질문이다
         if elder.is_help(u):
             return GuideResponse(goal=prev_goal, action=GuideAction.done(elder.MSG_HELP), source="rule")
         if elder.is_stop(u):
@@ -454,14 +481,58 @@ class LlmGuideAgent:
             return GuideResponse(goal=prev_goal, action=GuideAction.ask_user(elder.MSG_CASH), source="rule")
         return None
 
-    async def _complete(self, user: str, timeout: float, ids: List[str], meta: Dict[str, object]) -> str:
+    async def _answer_question(self, req, els, goal, prev_goal, stype, probs, kiosk_hint, change, meta, t0):
+        """도움 모드: 어르신 말을 질문으로 보고, 그 순간의 화면 전체를 보여 주고 AI가 답하게 한다. 답 뒤에 "또 도움이 필요하세요?"를 붙인다."""
+        candidates = help_mode.candidates_for_help(els)
+        by_id = {c.id: c for c in candidates}
+        user = help_mode.build_user(req.utterance or "", req.history, els, candidates,
+                                    screen=screen_type.describe_probabilities(probs) or screen_type.label(stype),
+                                    kiosk=kiosk_hint, change=_change_line(change))
+        meta["help"] = True
+        meta["candidates"] = len(candidates)
+        action = None
+        deadline = t0 + self.s.total_budget_s
+        for attempt in range(2):
+            remaining = deadline - time.perf_counter()
+            if attempt > 0 and remaining < self.s.min_retry_s:
+                break
+            raw = await self._complete(user if attempt == 0 else user + RETRY_NOTE, max(0.5, min(self.s.llm_timeout_s, remaining)),
+                                       list(by_id), meta, system=help_mode.HELP_SYSTEM)
+            meta["llm_calls"] = int(meta["llm_calls"]) + 1
+            if self.s.debug_prompts:
+                log.info("KL_DEBUG 도움 원답=%s", raw)
+            try:
+                action = self.parser.parse(raw)
+                break
+            except ParseError:
+                meta["retry"] = True
+        label = screen_type.label(stype)
+        fallback = f"{label}이에요. 어떤 점이 궁금하세요?" if label else "무엇이 궁금하세요?"
+        if action is None:
+            meta["source"] = "fallback"
+            return self._finish(GuideResponse(goal=prev_goal, action=GuideAction.ask_user(fallback), source="fallback"), meta, t0)
+        resp = self.validator.validate(action, by_id, goal=prev_goal)       # 후보 밖 버튼은 안내하지 않는다 (화이트리스트)
+        a = resp.action
+        if a.type == ActionType.TAP:
+            pass                                                              # 버튼을 가리킨다 (앱: "{위치} 깜빡이는 ○○ 버튼을 누르세요")
+        elif a.type == ActionType.DONE:
+            resp = GuideResponse(goal=prev_goal, action=GuideAction.done(help_mode.MSG_BYE), source=resp.source)
+        else:                                                                 # 대답(ASK_USER · EXPLAIN · UNKNOWN · SCROLL) → 말하고 계속 듣는다
+            text = a.question or a.reason or (a.guideText if a.type == ActionType.SCROLL else None) or fallback
+            if _waiting_talk(resp) or any(w in normalize(text) for w in _APP_CLAIMS):
+                text = fallback                                               # 앱이 뭔가 하는 듯한 말은 하지 않는다
+            resp = GuideResponse(goal=prev_goal, action=GuideAction.ask_user(help_mode.with_follow_up(text)), source=resp.source)
+        meta["source"] = "help"
+        return self._finish(resp, meta, t0)
+
+    async def _complete(self, user: str, timeout: float, ids: List[str], meta: Dict[str, object], system: str = SYSTEM) -> str:
         """LLM 한 번 부르기 (버튼 번호는 후보 안에서만 고르게 형식 강제).
 
         겹쳐 보내기: hedge_after_s 안에 답이 없거나 그 전에 일시 오류(혼잡 503 · 시간 초과 등)로 실패하면
         같은 요청을 하나 더 보내고 먼저 온 답을 쓴다. Gemini 무료 한도는 보통 1초인데 가끔 4초를 넘겨서
         서버 시간 초과 → 앱 오류가 잦았다 (2026-11-12 평가: LLM 판단 12건 중 5건 시간 초과).
         사용량 제한(429) · 인증 오류는 다시 보내지 않는다."""
-        call = lambda t: asyncio.ensure_future(self.llm.complete(SYSTEM, user, t, target_ids=ids))
+        call = lambda t: asyncio.ensure_future(self.llm.complete(system, user, t, target_ids=ids))
         t0 = time.perf_counter()
         tasks = [call(timeout)]
         hedge = self.s.hedge_after_s

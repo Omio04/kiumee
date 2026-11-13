@@ -50,10 +50,10 @@ async def test_agent_tells_the_llm_about_the_mismatch_and_can_turn_it_off(snaps)
     async def run(**kw):
         llm = ScriptedFakeLlmClient(['{"action":"WAIT","message":"아직 화면이 안 바뀌었어요."}'])
         s = Settings(**{"app_key": "k", "fastpath": False, "cache_size": 0, "hedge_after_s": 0, **kw})
-        await LlmGuideAgent(llm, s).next(req(snaps, "s05_payment", TAP_AMERICANO))
+        await LlmGuideAgent(llm, s).next(req(snaps, "s04_cart", [{"screenId": "s02_menu", "action": "TAP", "targetText": "딸기스무디"}]))
         return llm.calls[0]["user"]
     on = await run()
-    assert "[기대와 다름] '아메리카노'을 눌렀다고 안내했는데" in on
+    assert "[기대와 다름] '딸기스무디'을 눌렀다고 안내했는데" in on
     assert "[기대와 다름]" not in await run(expectation_check=False)
 
 

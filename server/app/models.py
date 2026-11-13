@@ -175,6 +175,7 @@ class LlmAction(BaseModel):
     guideText: Optional[str] = None
     message: Optional[str] = None
     direction: Optional[str] = None
+    screenAsks: Optional[str] = None       # 진단용: 모델이 적은 "이 화면이 묻는 것" (앱에는 나가지 않음)
 
     @field_validator("targetId", "guideText", "message", "direction", mode="before")
     @classmethod

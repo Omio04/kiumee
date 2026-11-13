@@ -39,21 +39,31 @@ async def test_payment_pressed_before_any_menu_is_not_finished(snaps):
 
 async def test_done_after_a_chosen_menu_stays_done(snaps):
     history = [{"screenId": "s1", "action": "TAP", "targetText": "아메리카노"},
-               {"screenId": "s2", "action": "TAP", "targetText": "결제하기"}]
+               {"screenId": "s2", "action": "TAP", "targetText": "결제하기"},
+               {"screenId": "s3", "action": "TAP", "targetText": "신용카드"}]      # 종료는 결제 수단을 누른 증거가 있을 때만
     r = await _next(_req(snaps, history))
     assert r.response.action.type == ActionType.DONE
+
+
+async def test_done_without_proof_that_the_flow_ended_is_not_accepted(snaps):
+    """기차표 시뮬레이션 T2: 도착역을 고르자마자 "다음 화면에서 안내를 따라 주세요"라며 끝내던 문제."""
+    history = [{"screenId": "s1", "action": "TAP", "targetText": "아메리카노"},
+               {"screenId": "s2", "action": "TAP", "targetText": "결제하기"}]      # 결제 수단은 아직
+    r = await _next(_req(snaps, history))
+    assert r.response.action.type == ActionType.ASK_USER and r.meta["rejected"] is True
 
 
 async def test_full_history_may_have_dropped_the_menu_so_done_is_trusted(snaps):
     # 앱은 최근 5개만 보낸다: 옵션 · 담기 · 결제로 꽉 차면 앞에서 고른 메뉴가 밀려났을 수 있다
     history = [{"screenId": f"s{i}", "action": "TAP", "targetText": t}
-               for i, t in enumerate(["ICE", "샷 추가", "담기", "포장", "결제하기"])]
+               for i, t in enumerate(["샷 추가", "담기", "포장", "결제하기", "신용카드"])]
     r = await _next(_req(snaps, history))
     assert r.response.action.type == ActionType.DONE
 
 
 async def test_asks_again_only_once_per_session(snaps):
-    history = [{"screenId": "s1", "action": "ASK_USER", "targetText": MSG_NOT_DONE}]
+    history = [{"screenId": "s0", "action": "TAP", "targetText": "신용카드"},
+               {"screenId": "s1", "action": "ASK_USER", "targetText": MSG_NOT_DONE}]
     r = await _next(_req(snaps, history, utterance="다 했어"))
     assert r.response.action.type == ActionType.DONE
 

@@ -28,6 +28,8 @@ _DIRECTIONS = ["UP", "DOWN", "LEFT", "RIGHT"]
 ACTION_SCHEMA = {
     "type": "object",
     "properties": {
+        # 먼저 적게 해서 화면이 묻는 것을 확인한 뒤 고르게 한다 ("부산 가는 표요"에 출발역 화면의 '부산'을 고르던 실수, 2026-11-13 기차표 시뮬레이션)
+        "screenAsks": {"type": "string", "description": "이 화면이 지금 묻는 것 한 줄 (예: 출발역 · 도착역 · 날짜 · 옵션 · 결제 수단)"},
         "action": {"type": "string", "enum": _ACTIONS},
         "targetId": {"type": "string", "description": "GUIDE일 때 [후보]의 id"},
         "guideText": {"type": "string", "description": "GUIDE일 때 버튼 글자, SCROLL일 때 찾는 메뉴 이름 (문장 아님)"},
@@ -35,7 +37,7 @@ ACTION_SCHEMA = {
                                                      "DONE · UNKNOWN이면 쉬운 존댓말 한 문장"},
         "direction": {"type": "string", "enum": _DIRECTIONS, "description": "SCROLL일 때만"},
     },
-    "required": ["action"],
+    "required": ["screenAsks", "action"],
 }
 
 

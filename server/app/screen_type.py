@@ -97,6 +97,18 @@ def classify(elements: Sequence[ScreenElement]) -> ScreenType:
     return ScreenType.UNKNOWN
 
 
+# 주문형(카페 · 식당) 키오스크에서만 쓰는 장치(진행 단계 · 눌렀는지 확인)를 켜도 되는 화면 종류.
+ORDERING_TYPES = frozenset({ScreenType.DINE, ScreenType.MENU, ScreenType.OPTIONS, ScreenType.ORDER_REVIEW, ScreenType.DISPOSABLE})
+# AI 없이 바로 안내하는 "빠른 길"을 써도 되는 화면 종류. 낯선 화면(UNKNOWN: 기차표 · 민원 · 무인 결제 …)에서는 글자 하나만 보고
+# 고르면 위험하다("부산 가는 표요"에 출발역 화면의 '부산'을 안내, 2026-11-13 기차표 시뮬레이션) → AI가 화면 전체를 보고 판단한다.
+FASTPATH_TYPES = ORDERING_TYPES | {ScreenType.PAYMENT}
+
+
+def is_ordering(t: ScreenType, kiosk_category) -> bool:
+    """주문형 키오스크로 보이는가: 화면 종류가 주문형이거나 가게 종류가 카페 · 햄버거 · 식당일 때."""
+    return t in ORDERING_TYPES or kiosk_category in ("카페", "햄버거", "샌드위치", "분식·식당")
+
+
 def label(t: ScreenType) -> Optional[str]:
     return LABEL.get(t)
 

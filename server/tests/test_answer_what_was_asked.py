@@ -67,7 +67,7 @@ async def test_the_same_question_is_not_repeated_over_and_over(snaps):
     r = await ask(llm, snaps, "s02_menu", "음", goal="무언가", history=one)
     assert r.response.action.type.value == "ASK_USER" and r.response.action.question != q       # 한 번 반복하면 다른 말로
 
-    two = one * 2
+    two = one * 3                                              # 세 번 물어도 진전이 없을 때 직원 도움
     r = await ask(ScriptedFakeLlmClient(['{"action":"ASK_USER","message":"%s"}' % q]), snaps, "s02_menu", "음", goal="무언가", history=two)
     assert r.response.action.type.value == "DONE" and "직원" in r.response.action.guideText     # 계속되면 직원 도움
 

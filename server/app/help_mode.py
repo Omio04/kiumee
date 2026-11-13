@@ -1,0 +1,104 @@
+"""도움 모드: 어르신이 막혔을 때 **물어보면** 지금 화면을 보고 그 질문에 답한다. 답한 뒤 "또 도움이 필요하세요?"라고 되묻고 계속 듣는다.
+
+왜 이 방식인가 (2026-11-13 사용 기록과 시뮬레이션에서 배운 것)
+- 한 단계마다 앱이 먼저 안내하는 방식은 틀릴 곳이 많았다: 엉뚱한 버튼 안내, 같은 말 반복, 너무 일찍 종료, 화면이 바뀐 걸 놓침.
+  게다가 앱이 말하는 도중에 어르신이 물으면 끊고 들어야 하고, 말할 때마다 버튼을 눌러야 했다.
+- 어르신이 막히는 순간은 정해져 있다: "이거 눌렀는데 왜 안 넘어가?", "이건 또 뭘 고르라는 거야?", "이거 꼭 해야 하는 거야?",
+  "내가 주문한 게 맞아?", "카드는 어디에 대야 해?", "아까 화면으로 어떻게 돌아가?", "이제 끝난 거야?"
+  물어봤을 때 **딱 그 순간의 화면**을 보고 그 질문에만 답하면, 이전 이력이 틀려도 영향이 없고 어느 키오스크든 같은 방식으로 작동한다.
+
+규칙 기반 안내는 최소로 두고(개인정보 · 결제 종료 증거 · 화이트리스트) 판단은 AI가 화면 전체를 보고 한다.
+"""
+from __future__ import annotations
+
+import re
+from typing import List, Optional, Sequence
+
+from .models import ActionType, ElementKind, HistoryItem, ScreenElement
+
+FOLLOW_UP = " 또 도움이 필요하세요?"
+MAX_ANSWER = 80 - len(FOLLOW_UP)
+MSG_BYE = "알겠어요. 또 필요하시면 언제든 말씀해 주세요."
+
+HELP_SYSTEM = """당신은 키오스크 앞에서 막힌 어르신의 질문에 답하는 안내자입니다. 카메라로 읽은 지금 화면만 근거로 답합니다.
+키오스크는 어르신이 직접 손으로 누릅니다. 당신은 화면을 바꾸거나 처리하지 않으므로 "바뀌는 중", "처리 중", "기다려 주세요", "찾아볼게요" 같은 말은 절대 하지 마세요. 키오스크 종류는 정해져 있지 않습니다(카페 · 식당 · 기차표 · 병원 · 민원 …): 어떤 키오스크든 [화면 글자]에 실제로 보이는 것으로만 판단하세요.
+
+어르신이 방금 한 말이 무엇을 묻는지 파악해 그 질문에만 답하세요.
+먼저, 막연하게 막혔다고 하시면("갑자기 막혔어", "지금 뭐 해야 돼?", "이거 안 된다는데 어떻게 해?") 무엇이 안 되는 상황인지 화면에서 직접 알아내세요:
+ ① 오류 · 경고 · 알림 문구를 찾습니다(실패 · 오류 · 다시 · 확인해 주세요 · 먼저 선택 · 필수 · 부족 · 인식 …). 있으면 그 뜻을 쉬운 말로 풀고, 어르신이 지금 할 일 하나를 알려 주세요(필요하면 GUIDE).
+ ② 문구가 없으면 이 화면이 묻는 것(제목)과, 아직 안 고른 필수 선택이 있는지 보고 지금 할 일 하나를 알려 주세요.
+ ③ 그다음에 무슨 화면이 나올지 한 마디 덧붙이면 좋습니다("누르시면 결제 수단 고르는 화면이 나와요").
+이어서 흔한 질문:
+- "이거 눌렀는데 왜 안 넘어가?" → 화면에서 빠진 필수 선택 · 안내 문구를 찾아 알려 주고, 눌러야 할 버튼이 있으면 GUIDE.
+- "이건 또 뭘 고르라는 거야?" → 이 화면이 묻는 것(제목)과 선택지를 쉬운 말로 설명.
+- "이거 꼭 해야 하는 거야?"(적립 · 일회용품 · 추가 옵션 등) → 안 해도 되는지 화면 근거로 답하고, 건너뛰는 버튼(× · 건너뛰기 · 아니오 · 필요 없음)이 보이면 GUIDE.
+- "내가 주문한 게 맞아?" → 화면의 주문 내역과 합계를 그대로 읽어 주고 맞는지 물어보세요.
+- "카드는 어디에 대야 해?" → 화면에 카드 넣는 곳이 안 보이면 안 보인다고 먼저 말하세요. 화면에 안내 문구가 있으면 그것을, 없으면 "보통 화면 아래쪽 단말기예요. 직원에게 물어보셔도 돼요."
+- "아까 화면으로 어떻게 돌아가?" → 이전 · 뒤로 · 처음으로 버튼이 보이면 GUIDE, 안 보이면 안 보인다고.
+- "이제 끝난 거야?" → 화면이 끝났는지(완료 · 영수증 · 번호표 문구) 답하고, 남은 일이 있으면 무엇인지.
+- 무엇인지 묻는 말(메뉴 · 옵션 · 좌석 등)은 화면에 보이는 이름을 쉬운 말로 설명. 가격 · 성분 · 알레르기는 모르면 직원에게 물어보라고.
+- 원하는 것이 이 화면에 없으면: 같은 화면의 탭 · 분류 · 목록에 있을 것 같다고 알려 주거나(위쪽 분류를 눌러 보세요), 이전 단계에서 고른 것이면 이전 버튼을, 아니면 없다고 먼저 대답하고 직원에게 물어보라고.
+원칙: 화면에 없는 것을 지어내지 마세요. 모르면 모른다고 하세요. 한 번에 하나만 말합니다. 쉬운 존댓말, message는 60자 이내. GUIDE(targetId는 [후보] id)는 "그 버튼을 누르세요"가 대답의 전부일 때만 쓰세요(예: 돌아가려면 이전). 이유 · 뜻을 설명해야 하면 ASK_USER로 설명하고 누를 버튼 이름을 말하세요(예: "메뉴를 먼저 고르라고 나와요. 확인을 누른 뒤 메뉴를 고르세요."). GUIDE는 앱이 "깜빡이는 ○○ 버튼을 누르세요"라고만 말해서 이유를 전할 수 없습니다. 어르신이 괜찮다 · 됐다 · 끝이라고 하면 DONE.
+[화면 종류]의 %는 글자로 계산한 추정이니 헷갈리면 화면 글자를 직접 보세요. [이전 대화]는 방금 주고받은 말입니다("그걸로"는 거기서 찾으세요). 카드번호 등 개인정보는 말하지 않습니다.
+JSON 한 줄만 출력하세요 (설명 금지):
+{"screenAsks":"이 화면이 묻는 것 한 줄","action":"GUIDE|ASK_USER|DONE|UNKNOWN","targetId":"GUIDE일 때 후보 id, 아니면 null","guideText":"GUIDE일 때 버튼 글자, 아니면 null","message":"어르신께 할 대답 60자 이내(GUIDE면 null)"}"""
+
+_ACTION_KO = {ActionType.TAP: "버튼을 가리킴", ActionType.ASK_USER: "대답함", ActionType.DONE: "끝냄", ActionType.UNKNOWN: "대답함",
+              ActionType.SCROLL: "밀기 안내", ActionType.WAIT: "대답함"}
+
+
+def build_user(utterance: str, history: Sequence[HistoryItem], elements: Sequence[ScreenElement], candidates: Sequence[ScreenElement],
+               screen: Optional[str] = None, kiosk: Optional[str] = None, change: Optional[str] = None) -> str:
+    lines: List[str] = [f"어르신 말: {utterance.strip()}"]
+    if kiosk:
+        lines.append("[키오스크 추정(참고)] " + kiosk)
+    if screen:
+        lines.append("[화면 종류] " + screen)
+    if change:
+        lines.append("[화면 변화] " + change)
+    recent = [h for h in history if h.targetText][-4:]
+    if recent:
+        lines.append("[이전 대화] " + " / ".join(f"{_ACTION_KO[h.action]}: {h.targetText[:70]}" for h in recent))
+    ordered = sorted(elements, key=lambda e: (round(e.rect.top, 2), e.rect.left))
+    lines.append("[화면 글자(위→아래)] " + " | ".join(e.text[:24] for e in ordered[:40]))
+    lines.append("[후보]")
+    for c in candidates:
+        lines.append(f"{c.id}|{c.text}")
+    return "\n".join(lines)
+
+
+_DECLINE = re.compile(r"^(?:아니(?:요|야|에요)?|없(?:어요|습니다|어)|괜찮(?:아요|습니다)|됐(?:어요|습니다|어요?)|이제\s*됐|충분|고마워요?|감사(?:합니다|해요)|끝(?:이에요|났어요)?)[\s.!,]*(?:괜찮아요|됐어요|없어요|고마워요|감사합니다)?[\s.!]*$")
+
+
+def is_decline(utterance: Optional[str], history: Sequence[HistoryItem]) -> bool:
+    """"또 도움이 필요하세요?"에 "아니요 · 괜찮아요 · 없어요"라고 답했는가 (그 질문 바로 뒤일 때만)."""
+    if not utterance or not history:
+        return False
+    last = history[-1]
+    if last.action != ActionType.ASK_USER or not (last.targetText or "").rstrip().endswith("도움이 필요하세요?"):
+        return False
+    return bool(_DECLINE.match(utterance.strip()))
+
+
+def with_follow_up(answer: str) -> str:
+    """대답 뒤에 "또 도움이 필요하세요?"를 붙인다 (80자 안에서). 이미 도움을 묻고 있으면 그대로."""
+    a = (answer or "").strip()
+    if not a:
+        return FOLLOW_UP.strip()
+    if "도움이 필요" in a or "도와드릴" in a:
+        return a[:80]
+    if len(a) > MAX_ANSWER:                                   # 문장 단위로 앞에서부터 자른다
+        kept = ""
+        for s in re.split(r"(?<=[.?!])\s+", a):
+            if len((kept + " " + s).strip()) > MAX_ANSWER:
+                break
+            kept = (kept + " " + s).strip()
+        a = kept or a[:MAX_ANSWER].rstrip()
+    return a + FOLLOW_UP
+
+
+def candidates_for_help(elements: Sequence[ScreenElement], limit: int = 14) -> List[ScreenElement]:
+    """도움 모드의 후보: 버튼처럼 보이는 것을 읽는 순서로 (후보 축소는 필요 없다 — 질문은 화면 전체를 보고 답한다)."""
+    from .ranker import candidate_pool
+    pool = candidate_pool(elements)
+    return sorted(pool, key=lambda e: (round(e.rect.top, 2), e.rect.left))[:limit]

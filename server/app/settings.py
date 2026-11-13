@@ -29,6 +29,7 @@ class Settings:
     candidate_k: int = 8                      # 설계: 후보 K=8
     progress_hint: bool = True                # 진행 상황(지금까지 · 다음 단계) 요약을 LLM에 준다 (app/progress.py)
     expectation_check: bool = True            # 눌렀다던 메뉴가 새 화면에 안 보이면 LLM에 알린다 (app/expectation.py)
+    help_mode: bool = False                   # 도움 모드: 어르신이 물어보면 그 순간의 화면을 보고 답한다 (app/help_mode.py)
     cache_size: int = 256                     # 같은 요청 재처리 방지 (0이면 끔)
     cache_ttl_s: float = 30.0
     fastpath: bool = True                     # 확실한 경우 LLM을 건너뜀(로컬 규칙)
@@ -54,6 +55,7 @@ class Settings:
             candidate_k=int(e("CANDIDATE_K", "8")),
             progress_hint=_env_bool("PROGRESS_HINT", True),
             expectation_check=_env_bool("EXPECTATION_CHECK", True),
+            help_mode=_env_bool("HELP_MODE", False),
             cache_size=int(e("CACHE_SIZE", "256")),
             cache_ttl_s=float(e("CACHE_TTL_S", "30")),
             fastpath=_env_bool("FASTPATH", True),

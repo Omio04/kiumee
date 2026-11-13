@@ -36,7 +36,7 @@ async def test_generic_labels_are_never_fast_pathed_even_when_unique():
 
 
 async def test_unique_specific_labels_still_use_the_fast_path():
-    els = [el(1, "아메리카노"), el(2, "카페라떼")]
+    els = [el(1, "아메리카노"), el(2, "4,500원", "PRICE"), el(3, "카페라떼"), el(4, "5,000원", "PRICE")]      # 가격이 있는 메뉴 화면
     r = await agent(ScriptedFakeLlmClient(['{"action":"UNKNOWN"}'])).next(req(els, utterance="아메리카노 주세요", goal=None))
     assert r.meta["source"] == "fastpath" and r.response.action.guideText == "아메리카노"
 
