@@ -12,6 +12,15 @@ import org.junit.Test
 class ShakeGateTest {
     private fun m(dx: Float, dy: Float = 0f, c: Float = 0.9f) = FrameMotion(1, dx, dy, confidence = c)
 
+    @Test fun continuousMotionFromStartupStillAllowsPeriodicRecognition() {
+        val gate = ShakeGate()
+        assertFalse(gate.allow(m(.02f), 0))
+        assertFalse(gate.allow(m(.02f), 899))
+        assertTrue(gate.allow(m(.02f), 900))
+        assertFalse(gate.allow(m(.02f), 1000))
+        assertTrue(gate.allow(m(.02f), 1800))
+    }
+
     @Test fun `가만히 있으면 통과한다`() {
         val g = ShakeGate()
         assertTrue(g.allow(m(0.001f), 0)); assertEquals(0, g.skipped)

@@ -20,14 +20,16 @@ class ShakeGate(
     private val maxSkipMs: Long = MAX_SKIP_MS,
 ) {
     private var lastPassMs: Long? = null
+    private var firstAttemptMs: Long? = null
     var skipped: Int = 0
         private set
 
     /** 이 프레임을 OCR로 보내도 되는가. [motion]이 null(비교할 직전 프레임이 없음 · 측정 실패)이면 통과. */
     fun allow(motion: FrameMotion?, nowMs: Long): Boolean {
         val shaking = motion != null && motion.confidence >= MIN_CONFIDENCE && hypot(motion.dx, motion.dy) > maxMotion
-        val last = lastPassMs
-        val starving = last != null && nowMs - last >= maxSkipMs
+        if (firstAttemptMs == null || nowMs < firstAttemptMs!!) firstAttemptMs = nowMs
+        val last = lastPassMs ?: firstAttemptMs!!
+        val starving = nowMs - last >= maxSkipMs
         if (shaking && !starving) {
             skipped++
             return false
