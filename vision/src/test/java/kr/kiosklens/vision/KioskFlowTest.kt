@@ -12,6 +12,35 @@ class KioskFlowTest {
         line("연하게",.2f,.4f),line("샷 추가",.5f,.4f),line("주문담기",.5f,.9f),
     ) + if(selected==null) emptyList() else listOf(line(selected,.4f,.15f))
 
+    @Test fun cartAdditionChangesTheScreenDespiteAnUnchangedMenu() {
+        val menu = listOf(
+            line("(ICE)아메리카노", .1f, .2f), line("(HOT)아메리카노", .5f, .2f),
+            line("장바구니 조회", .1f, .75f), line("결제하기", .7f, .9f),
+        )
+        val tracker = ScreenTracker()
+        val empty = Elements.filter(menu)
+        tracker.update(empty)
+        val start = tracker.update(empty)!!
+        val filled = Elements.filter(menu + line("(ICE)아메리카노", .1f, .82f))
+        assertNull(tracker.update(filled))
+        val added = tracker.update(filled)!!
+        assertTrue(added.changed)
+        assertNotEquals(start.snapshot.screenId, added.snapshot.screenId)
+        assertEquals(ElementKind.TEXT, added.snapshot.elements.single { it.rect.top == .82f }.kind)
+    }
+
+    @Test fun completionCanBeConfirmedWithOnlyTheHeadingAndOrderNumber() {
+        val tracker = ScreenTracker()
+        val menu = Elements.filter(options(null))
+        tracker.update(menu)
+        tracker.update(menu)
+        val done = Elements.filter(listOf(
+            line("결제가 완료되었습니다", .2f, .4f, .6f), line("주문번호 101", .4f, .5f),
+        ))
+        assertNull(tracker.update(done))
+        assertTrue(tracker.update(done)!!.changed)
+    }
+
     @Test fun optionSelectionAndResetAreConfirmedAsScreenUpdates() {
         val tracker=ScreenTracker()
         val empty=Elements.filter(options(null));val selected=Elements.filter(options("연하게"))

@@ -19,6 +19,7 @@ class GuideTextComposer(private val phraser: PositionPhraser = PositionPhraser()
      */
     fun tap(rect: NormRect, guideText: String): String {
         val name = guideText.trim()
+        if (name.endsWith("눌러 주세요.")) return name                               // main: 이미 문장이면 그대로 (주문 흐름의 안내 문장)
         return "${phraser.phrase(rect)} 노란색 칸을 눌러 주세요. 적힌 글자는 $name"
     }
 

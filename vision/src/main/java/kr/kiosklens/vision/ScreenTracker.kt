@@ -27,7 +27,8 @@ internal class ScreenTracker(
     val needsConfirmation get() = pending != null || stableFrames < 2
 
     fun update(lines: List<OcrLine>, frameId: Long = 0L, timestampMs: Long = 0L): ScreenUpdate? {
-        if (lines.size < minimumElements) {
+        val scene = interpreter.classifyLines(lines)
+        if (lines.size < minimumElements && scene == null) {
             pending = null
             pendingScene = null
             pendingSelection = null
@@ -37,7 +38,6 @@ internal class ScreenTracker(
         }
         val at = signature(lines)
         val keys = at.keys
-        val scene = interpreter.classifyLines(lines)
         val selection = selectionSignature(lines, scene)
         // 히스테리시스: 지금 화면은 STAY만 넘으면 유지하고, 새 화면은 연속 두 프레임이 CONFIRM을 넘어야 확정한다.
         // 흐린 프레임 하나에 "새 화면 후보"가 되어 두 프레임씩 확정이 끊기던 문제 (2026-11-11 웹캠 측정)
@@ -55,8 +55,9 @@ internal class ScreenTracker(
             pendingSelection = selection
             previous = emptyList()
             stableFrames = 0
+            val confirmedStage = scene != null && scene != referenceScene
             if (candidate == null || candidateScene != scene || candidateSelection != selection ||
-                similarity(candidate, keys) < CONFIRM) return null
+                (!confirmedStage && similarity(candidate, keys) < CONFIRM)) return null
             screenNumber++
             reference = keys
             referenceAt = at
@@ -83,7 +84,8 @@ internal class ScreenTracker(
         // An incomplete foreground dialog demotes every observed label. Do not revive old buttons.
         val canVote = lines.any { it.kindHint != ElementKind.TEXT }
         val voted = (lines + previous.filter { old -> canVote &&
-            lines.none { current -> Elements.distance(current.rect, old.rect) < 0.04f }
+            lines.none { current -> Elements.distance(current.rect, old.rect) < 0.04f ||
+                Elements.similar(Elements.key(current.text), Elements.key(old.text)) }
         }).take(ScreenSnapshot.MAX_ELEMENTS)
         previous = lines
         val screenId = "s$screenNumber"
@@ -95,6 +97,12 @@ internal class ScreenTracker(
 
     /** Missing summary OCR is unknown, not proof that the user's choice disappeared. */
     private fun selectionSignature(lines: List<OcrLine>, scene: String?): String? {
+        if (scene == "menu-cart") {
+            val cart = lines.first { Elements.key(it.text) == "장바구니조회" }
+            return lines.asSequence().filter { it.rect.top >= cart.rect.bottom }
+                .map { Elements.key(it.text) }.filter { it.startsWith("ice") || it.startsWith("hot") }
+                .sorted().joinToString("|")
+        }
         if (scene != "product-options") return null
         val strip = lines.firstOrNull { Elements.key(it.text).startsWith("선택된옵션") } ?: return null
         val inline = Elements.key(strip.text).removePrefix("선택된옵션")

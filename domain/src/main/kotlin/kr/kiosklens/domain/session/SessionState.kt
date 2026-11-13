@@ -84,4 +84,5 @@ data class Guidance(
     val retryOnTimeout: Boolean = false,
     /** 다 읽은 뒤 기다릴 시간. null이면 15초 (서버 실패 뒤에는 짧게) */
     val waitMs: Long? = null,
+    val choiceIds: List<String> = emptyList(),
 )

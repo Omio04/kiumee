@@ -27,6 +27,7 @@ from .cache import ResponseCache, request_key
 from .jamo import dice, normalize
 from . import elder, expectation, help_mode, hidden_button, kiosk, menu_info, progress, screen_guide, screen_type
 from .screen_memory import ScreenMemory
+from .kiosk_flow import kiosk_action
 from .llm import LlmClient, LlmRateLimited, LlmTimeout, LlmUpstream
 from .models import (MAX_GOAL, MAX_HISTORY, ActionType, Box, ElementKind, GuideAction, GuideRequest, GuideResponse,
                      LlmKind, ScreenElement)
@@ -378,6 +379,12 @@ class LlmGuideAgent:
             meta.update(source="rule", candidates=0, elder=True)
             return self._finish(early, meta, t0)
 
+        if not help_on:                                            # 연습 키오스크 주문 흐름 규칙(main): 도움 모드는 AI가 그 순간의 화면을 보고 답한다
+            practice_action = kiosk_action(req, goal)
+            if practice_action is not None:
+                meta.update(source="rule", candidates=0)
+                return self._finish(GuideResponse(goal=goal, action=practice_action, source="rule"), meta, t0)
+
         # 2) 로컬 규칙: 결제 진행 화면
         if _is_done_screen(els) and not help_on:
             meta.update(source="rule", candidates=0)
@@ -695,7 +702,10 @@ class FakeGuideAgent:
         req, dropped = privacy.sanitize(req)
         goal = _goal_of(req)
         ranked = self.ranker.rank(req.snapshot.elements, goal, req.utterance)
-        if _is_done_screen(req.snapshot.elements):
+        kiosk = kiosk_action(req, goal)
+        if kiosk is not None:
+            r = GuideResponse(goal=goal, action=kiosk, source="rule")
+        elif _is_done_screen(req.snapshot.elements):
             r = GuideResponse(goal=goal, action=GuideAction.done(MSG_DONE), source="fake")
         elif not ranked:
             r = GuideResponse(goal=goal, action=GuideAction.unknown(MSG_UNKNOWN), source="fake")

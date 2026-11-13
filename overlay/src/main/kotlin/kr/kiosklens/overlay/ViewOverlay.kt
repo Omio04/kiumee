@@ -37,6 +37,7 @@ import kr.kiosklens.overlay.transform.VisibleArea
 class ViewOverlay(context: Context) : View(context), HighlightSurface, MotionSink {
     private val painter = PulseBorderPainter(context.resources.displayMetrics.density)
     private val smoother = BoxSmoother()
+    private var choices = emptyList<NormRect>()
     private val lock = Any()
     private val holder = HighlightHolder { t -> onTargetChanged(t) }
 
@@ -97,6 +98,12 @@ class ViewOverlay(context: Context) : View(context), HighlightSurface, MotionSin
         smoother.setTarget(null)
         smoother.setTarget(rect)
         shownSince = SystemClock.uptimeMillis()
+    }
+
+    fun setChoices(rects: List<NormRect>) {
+        if (choices == rects) return
+        choices = rects
+        invalidate()
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -161,6 +168,9 @@ class ViewOverlay(context: Context) : View(context), HighlightSurface, MotionSin
             rect = smoother.current
             lost = health.isLost
             lostEvent = health.takeLostEvent()
+        }
+        if (m != null) for (choice in choices) {
+            painter.draw(canvas, m.map(choice, width.toFloat(), height.toFloat()), 1f)
         }
         val r = rect
         isTrackingLost = r != null && lost

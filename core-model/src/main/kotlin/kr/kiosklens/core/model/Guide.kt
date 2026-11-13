@@ -23,8 +23,8 @@ sealed interface GuideAction {
     /** 화면을 밀어서 찾게 안내. 계약에는 있지만 서버는 아직 보내지 않는다. 앱은 처리할 수 있어야 한다. */
     data class Scroll(val direction: ScrollDir, val guideText: String) : GuideAction
 
-    /** 화면 로딩 대기. 계약에는 있지만 서버는 아직 보내지 않는다. 앱은 처리할 수 있어야 한다. */
-    data class Wait(val guideText: String) : GuideAction
+    /** 안내를 읽고 화면 전환을 기다린다. targetIds는 화면에서 직접 고를 수 있는 버튼이다. */
+    data class Wait(val guideText: String, val targetIds: List<String> = emptyList()) : GuideAction
 
     /** 무엇을 원하는지 되묻기. question은 그대로 읽어 줄 문장 (60자 이내). */
     data class AskUser(val question: String) : GuideAction

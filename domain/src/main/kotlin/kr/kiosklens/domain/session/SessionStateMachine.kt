@@ -279,7 +279,11 @@ class SessionStateMachine(
             goal = response.goal,
             pendingUtterance = null,
             guideFailures = 0,
-            history = (state.history + HistoryItem.of(asked.screenId, action)).takeLast(GuideRequest.MAX_HISTORY),
+            history = (state.history + HistoryItem.of(asked.screenId, action).let { item ->
+                if (action is GuideAction.Tap && action.guideText.endsWith("눌러 주세요."))
+                    item.copy(targetText = asked.findElement(action.targetId)?.text ?: item.targetText)
+                else item
+            }).takeLast(GuideRequest.MAX_HISTORY),
         )
         return when (action) {
             is GuideAction.Tap -> {
@@ -301,7 +305,10 @@ class SessionStateMachine(
                 )
             }
             is GuideAction.Scroll -> speakAndWait(base, asked.screenId, texts.scroll(action.direction, action.guideText))
-            is GuideAction.Wait -> speakAndWait(base, asked.screenId, action.guideText)
+            is GuideAction.Wait -> speakAndWait(
+                base, asked.screenId, action.guideText,
+                choiceIds = action.targetIds.filter { asked.findElement(it)?.kind == ElementKind.BUTTON_LIKE },
+            )
             is GuideAction.AskUser -> speakThen(base, Phase.ASKING, action.question)
             is GuideAction.Done -> speakThen(base, Phase.DONE, action.guideText)
             is GuideAction.Unknown -> speakAndWait(base, asked.screenId, action.reason, retry = true)
@@ -380,10 +387,13 @@ class SessionStateMachine(
     }
 
     /** 문장을 읽고 화면 전환을 기다린다 (SCROLL · WAIT · UNKNOWN). 하이라이트는 없다. */
-    private fun speakAndWait(state: SessionState, screenId: String, text: String, retry: Boolean = false): Transition {
+    private fun speakAndWait(
+        state: SessionState, screenId: String, text: String, retry: Boolean = false,
+        choiceIds: List<String> = emptyList(),
+    ): Transition {
         val t = state.ticket + 1
         return Transition(
-            state.copy(phase = Phase.GUIDING, ticket = t, guide = Guidance(screenId, spokenText = text, retryOnTimeout = retry)),
+            state.copy(phase = Phase.GUIDING, ticket = t, guide = Guidance(screenId, spokenText = text, retryOnTimeout = retry, choiceIds = choiceIds)),
             listOf(ClearHighlight, Speak(text, t)),
         )
     }
