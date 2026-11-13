@@ -6,64 +6,53 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 추적 실패 1초 → 흐리게 (TrackingHealth) · 그리기 속도 재기 (RenderStats). 시간은 직접 넣는다. */
+/** 위치를 놓치면 숨기기 (TrackingHealth) · 그리기 속도 재기 (RenderStats). */
 class TrackingHealthTest {
-    /** 33ms마다 신뢰도 [conf]인 움직임을 [fromMs]부터 [toMs]까지 넣는다 */
-    private fun TrackingHealth.feed(fromMs: Long, toMs: Long, conf: Float) {
-        var t = fromMs
-        while (t <= toMs) { onMotion(conf, t); t += 33 }
+    @Test fun `믿을 만한 움직임이면 옮겨도 되고 놓치지 않는다`() {
+        val h = TrackingHealth()
+        repeat(90) { assertTrue(h.onMotion(0.9f, showing = true)) }
+        assertFalse(h.isLost)
     }
 
-    @Test fun `움직임 정보가 없으면 흐리게 하지 않는다 (연결 전 동작 그대로)`() {
+    @Test fun `테두리가 없을 때 믿을 수 없는 움직임은 놓침으로 보지 않는다`() {
         val h = TrackingHealth()
-        assertFalse(h.isLost(0)); assertFalse(h.isLost(10_000))
+        assertFalse(h.onMotion(0.1f, showing = false))
+        assertFalse(h.isLost)
+        assertTrue("나중에 테두리가 떠도 정상", h.onMotion(0.9f, showing = true))
     }
 
-    @Test fun `믿을 만한 움직임이 이어지면 정상`() {
+    @Test fun `테두리가 떠 있을 때 믿을 수 없는 움직임이 한 번 오면 바로 놓침`() {
         val h = TrackingHealth()
-        h.feed(0, 3_000, 0.9f)
-        assertFalse(h.isLost(3_000))
+        assertTrue(h.onMotion(0.9f, showing = true))
+        assertFalse(h.onMotion(0.2f, showing = true))
+        assertTrue(h.isLost)
     }
 
-    @Test fun `믿을 수 없는 움직임이 1초 넘게 이어지면 실패`() {
+    @Test fun `놓친 뒤에는 믿을 만한 움직임이 다시 와도 옮기지 않고 계속 놓침 (2026-11-13 시험 회귀)`() {
+        // 크게 움직여 놓친 뒤 다시 가만히 있으면, 예전에는 믿을 만한 움직임이 돌아와 엉뚱한 자리에 또렷하게 남았다
         val h = TrackingHealth()
-        h.feed(0, 500, 0.9f)
-        h.feed(533, 1_400, 0.1f)
-        assertFalse("아직 1초 안 됨", h.isLost(1_400))
-        h.feed(1_433, 1_600, 0.1f)
-        assertTrue(h.isLost(1_600))
+        h.onMotion(0.0f, showing = true)
+        repeat(60) { assertFalse("놓친 사이의 움직임을 모르므로 옮기면 안 됨", h.onMotion(0.95f, showing = true)) }
+        assertTrue(h.isLost)
     }
 
-    @Test fun `믿을 만한 움직임이 다시 오면 바로 정상`() {
+    @Test fun `새 위치가 오면 다시 믿고 옮긴다`() {
         val h = TrackingHealth()
-        h.feed(0, 2_000, 0.1f)
-        assertTrue(h.isLost(2_000))
-        h.onMotion(0.8f, 2_033)
-        assertFalse(h.isLost(2_033))
+        h.onMotion(0.0f, showing = true)
+        h.onAnchor()
+        assertFalse(h.isLost)
+        assertTrue(h.onMotion(0.8f, showing = true))
     }
 
-    @Test fun `새 위치(OCR)가 오면 바로 정상`() {
+    @Test fun `놓침 알림은 놓칠 때마다 한 번씩`() {
         val h = TrackingHealth()
-        h.feed(0, 2_000, 0.1f)
-        h.onTargetUpdated(2_010)
-        assertFalse(h.isLost(2_020))
-    }
-
-    @Test fun `움직임 정보가 끊기면 판단하지 않는다`() {
-        val h = TrackingHealth()
-        h.feed(0, 1_500, 0.1f)
-        assertTrue(h.isLost(1_500))
-        assertFalse("0.5초 넘게 정보가 없음 (카메라 멈춤)", h.isLost(2_100))
-    }
-
-    @Test fun `실패 알림은 바뀐 순간 한 번만`() {
-        val h = TrackingHealth()
-        h.feed(0, 1_100, 0.1f)
-        assertTrue(h.takeLostEvent(1_100))
-        assertFalse(h.takeLostEvent(1_133))
-        h.onMotion(0.9f, 1_166)                                           // 회복했다가
-        h.feed(1_199, 2_300, 0.1f)                                       // 다시 실패
-        assertTrue(h.takeLostEvent(2_300))
+        assertFalse("놓치기 전에는 없음", h.takeLostEvent())
+        h.onMotion(0.1f, showing = true)
+        assertTrue(h.takeLostEvent())
+        assertFalse(h.takeLostEvent())
+        h.onAnchor()
+        h.onMotion(0.1f, showing = true)
+        assertTrue("다시 놓치면 또 한 번", h.takeLostEvent())
     }
 
     // ---------------------------------------------------------------- RenderStats

@@ -88,6 +88,43 @@ class MotionTrackingTest {
         assertTrue("범위 밖인데 믿을 만하다고 함: ${r.confidence} dx=${r.dx * cols}", r.confidence < 0.5f || abs(r.dx * cols - 30f) < 1f)
     }
 
+    @Test fun `아주 크게 흔들면 (프레임 폭의 40%) 믿을 수 없다 — 이때 위치를 놓친 것으로 본다`() {
+        for ((sx, sy) in listOf(40f to 0f, 0f to 50f, -38f to 30f)) {
+            val r = estimator.estimate(grid(0f, 0f), grid(sx, sy, seed = 15), cols, rows)
+            assertTrue("($sx, $sy) 범위 밖인데 믿을 만하다고 함: ${r.confidence}", r.confidence < 0.5f)
+        }
+    }
+
+    /** 3×3 평균으로 흐리게 (초점이 잠깐 나간 프레임) */
+    private fun blur(g: FloatArray): FloatArray = FloatArray(g.size) { i ->
+        val x = i % cols; val y = i / cols
+        var s = 0f; var n = 0
+        for (dy in -1..1) for (dx in -1..1) {
+            val xx = x + dx; val yy = y + dy
+            if (xx in 0 until cols && yy in 0 until rows) { s += g[yy * cols + xx]; n++ }
+        }
+        s / n
+    }
+
+    @Test fun `가만히 있는데 흐려지기만 하면 움직임 없음을 믿을 만하게 낸다 (위치를 놓치지 않게)`() {
+        val sharp = grid(0f, 0f, seed = 11)
+        val r = estimator.estimate(sharp, blur(grid(0f, 0f, seed = 12)), cols, rows)
+        assertTrue("흐리기만 했는데 놓친 것으로 보면 안 됨: ${r.confidence}", r.confidence >= 0.6f)
+        assertEquals(0f, r.dx, 0.5f / cols)
+        assertEquals(0f, r.dy, 0.5f / rows)
+    }
+
+    @Test fun `흐려지면서 조금 움직이면 움직인 만큼 낸다`() {
+        val r = estimator.estimate(grid(0f, 0f), blur(grid(2f, 1f, seed = 13)), cols, rows)
+        assertMotion(2f, 1f, r, 0.5f)
+    }
+
+    @Test fun `손으로 카메라를 가리면 믿을 수 없다`() {
+        val hand = { _: Float, _: Float -> 30f }
+        val r = estimator.estimate(grid(0f, 0f), grid(0f, 0f, f = hand, noise = 1f, seed = 14), cols, rows)
+        assertTrue("가렸는데 믿을 만하다고 함: ${r.confidence}", r.confidence < 0.5f)
+    }
+
     // ---------------------------------------------------------------- LumaGrid: 회전 보정
 
     /** 센서 기준 40×30 이미지, 왼쪽 위 10×10만 밝음. rowStride에 여백, pixelStride 2 (다른 값이 끼어 있는 형식) */
