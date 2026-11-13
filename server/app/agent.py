@@ -25,7 +25,7 @@ from typing import Dict, List, Optional, Protocol
 from . import privacy
 from .cache import ResponseCache, request_key
 from .jamo import dice, normalize
-from . import elder, expectation, kiosk, menu_info, progress, screen_guide, screen_type
+from . import elder, expectation, hidden_button, kiosk, menu_info, progress, screen_guide, screen_type
 from .screen_memory import ScreenMemory
 from .llm import LlmClient, LlmRateLimited, LlmTimeout, LlmUpstream
 from .models import (MAX_GOAL, MAX_HISTORY, ActionType, ElementKind, GuideAction, GuideRequest, GuideResponse,
@@ -313,6 +313,12 @@ class LlmGuideAgent:
             if close is not None:
                 return self._finish(GuideResponse(goal=goal, action=GuideAction.tap(close.id, close.text), source="rule"), meta, t0)
             return self._finish(GuideResponse(goal=goal, action=GuideAction.unknown(MSG_LOYALTY_NO_CLOSE), source="rule"), meta, t0)
+
+        # 2-0b) 하려는 일의 버튼(담기 · 결제하기)이 화면에 아예 안 보이면 지어내지 않고 카메라를 조정하게 한다
+        hidden = hidden_button.missing_button(req.utterance, els) if stype not in (screen_type.ScreenType.LOYALTY,) else None
+        if hidden:
+            meta.update(source="rule", candidates=0, hidden=hidden)
+            return self._finish(GuideResponse(goal=goal, action=GuideAction.unknown(hidden_button.message(hidden)), source="rule"), meta, t0)
 
         # 2-1) 질문: "라떼가 뭐야?" → 사전에 있으면 LLM 없이 설명 (goal은 그대로: 질문이 목표에 섞이면 안 된다)
         asking = menu_info.is_info_question(req.utterance)

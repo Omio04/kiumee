@@ -106,6 +106,17 @@ def match_score(text: str, query: str) -> float:
     return min(1.0, s)
 
 
+# 버튼이 아니라 안내 · 요약 줄 ("선택된 옵션" 띠, "선택하신 상품의 옵션상품을 모두 선택해주세요"). 비전이 BUTTON_LIKE로 내보낼 때가 있어
+# 서버가 이것을 눌러 보라고 안내했다 (2026-11-13 실기기: "그대로 담을게"에 "선택된 옵션 버튼을 누르세요").
+_NOT_BUTTON_LEAD = tuple(normalize(w) for w in ("선택된", "선택하신", "선택한"))
+_NOT_BUTTON_ANY = tuple(normalize(w) for w in ("모두선택", "해주세요", "하세요", "입니다"))
+
+
+def is_not_a_button(text: str) -> bool:
+    n = normalize(text)
+    return n.startswith(_NOT_BUTTON_LEAD) or any(w in n for w in _NOT_BUTTON_ANY)
+
+
 MAX_LABEL = 12      # 버튼 글자로 볼 수 있는 최대 길이 (문장은 제외)
 # 제목 · 안내 문구의 끝말 ("아메리카노 옵션 선택", "결제 수단을 선택해주세요", "주문 내역"). 글자가 4자 이하면 버튼일 수 있어 남긴다
 _TITLE_END = tuple(normalize(w) for w in ("선택", "주세요", "하세요", "내역", "입니다", "안내", "확인해"))
@@ -119,7 +130,7 @@ def candidate_pool(elements: Sequence[ScreenElement]) -> List[ScreenElement]:
     서버가 "버튼을 찾지 못했어요"로 끝나 버려서 아메리카노를 누른 다음 옵션 화면에서 앱이 막혔다 (2026-11-13 실기기).
     그런 화면에서는 짧은 글자 줄(HOT · ICE · 담기 …)을 후보로 쓴다. 가격(PRICE)과 긴 문장은 뺀다.
     LLM이 고르는 것은 여전히 이 후보 안으로 제한된다(화이트리스트)."""
-    buttons = [e for e in elements if e.kind == ElementKind.BUTTON_LIKE]
+    buttons = [e for e in elements if e.kind == ElementKind.BUTTON_LIKE and not is_not_a_button(e.text)]
     if buttons:
         return buttons
     def label(e: ScreenElement) -> bool:
