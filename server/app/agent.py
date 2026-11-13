@@ -522,10 +522,7 @@ class LlmGuideAgent:
             say = _clean_message(action.message, "", 80)
             if say and (_waiting_talk_text(say) or any(w in normalize(say) for w in _APP_CLAIMS)):
                 say = ""                                                      # 앱이 뭔가 하는 듯한 말은 읽지 않는다
-        if a.type == ActionType.TAP and say and "먼저" in say and a.guideText and f"'{a.guideText}'" in say:
-            # "옵션을 먼저 골라야 해요. 다 고르면 '담기'를 누르세요"인데 칸은 '담기'를 가리키면 지금 누르면 안 되는 버튼을 누르게 된다 → 칸 없이 설명만 한다
-            resp = GuideResponse(goal=prev_goal, action=GuideAction.ask_user(help_mode.with_follow_up(say)), source=resp.source)
-        elif a.type == ActionType.TAP:
+        if a.type == ActionType.TAP:
             resp = resp.model_copy(update={"say": say or None})
         elif a.type == ActionType.DONE:
             resp = GuideResponse(goal=prev_goal, action=GuideAction.done(help_mode.MSG_BYE), source=resp.source)
