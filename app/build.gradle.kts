@@ -31,6 +31,7 @@ android {
         // 말 끊기(안내를 읽는 중 사람이 말하면 멈추고 듣기). 기본은 끔(2026-11-13): local.properties 에 kl.bargeIn=true 로 켠다
         // 도움 모드(기본): 어르신이 물어볼 때만 그 순간의 화면을 보고 답하고, 버튼 없이 계속 듣는다. 예전 방식은 local.properties 에 kl.helpMode=false
         buildConfigField("boolean", "HELP_MODE", (prop("kl.helpMode") != "false").toString())
+        buildConfigField("boolean", "SEND_IMAGE", (prop("kl.sendImage") != "false").toString())   // 질문 때 카메라 사진을 AI에 보낼지 (기본 켬)
         buildConfigField("boolean", "BARGE_IN", (prop("kl.bargeIn") == "true").toString())
         buildConfigField("boolean", "SHOW_RECOGNITION", (prop("kl.showRecognition") == "true").toString())
     }

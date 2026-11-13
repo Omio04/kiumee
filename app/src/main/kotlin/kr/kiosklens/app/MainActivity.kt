@@ -172,7 +172,7 @@ class MainActivity : AppCompatActivity() {
         graph = g
         if (BuildConfig.HELP_MODE) g.greet()
 
-        camera = CameraController(this, g.frameSink, logger, onMotion = overlay::onFrameMotion) { w, h ->   // 흔들림만큼 노란 테두리를 옮긴다 (P5)
+        camera = CameraController(this, g.frameSink, logger, jpeg = g.frameJpeg, onMotion = overlay::onFrameMotion) { w, h ->   // 흔들림만큼 노란 테두리를 옮긴다 (P5)
             runOnUiThread { overlay.setAnalysisSize(w, h); recognition?.setAnalysisSize(w, h) }
         }.also { it.start(this, preview) }
         // 오버레이 측정 · 상태 (P5): 그리기 속도는 KL_PERF로, 추적 실패(1초 넘게 흔들림을 못 따라감 → 테두리 흐려짐)는 기록만.

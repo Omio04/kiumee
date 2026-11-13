@@ -47,5 +47,7 @@ def sanitize(req: GuideRequest) -> Tuple[GuideRequest, int]:
         goal=_mask_opt(req.goal),
         snapshot=req.snapshot.model_copy(update={"elements": kept}),
         history=history,
+        # 사진은 글자처럼 가릴 수 없다: 카드번호 같은 민감한 글자가 화면에 하나라도 읽혔으면 사진은 LLM에 보내지 않는다
+        image=req.image if dropped == 0 else None,
     )
     return clean, dropped

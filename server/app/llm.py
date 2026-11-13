@@ -78,7 +78,7 @@ class LlmRateLimited(LlmError):
 class LlmClient(Protocol):
     """target_ids: 이번 요청의 후보 버튼 번호. 주면 응답의 targetId를 그 안에서만 고르게 형식을 강제한다."""
     async def complete(self, system: str, user: str, timeout_s: float,
-                       target_ids: Optional[Sequence[str]] = None) -> str: ...
+                       target_ids: Optional[Sequence[str]] = None, image: Optional[str] = None) -> str: ...
 
 
 class AnthropicLlmClient:
@@ -92,7 +92,7 @@ class AnthropicLlmClient:
         self._http = http or httpx.AsyncClient()
 
     async def _post(self, system: str, user: str, timeout_s: float,
-                    target_ids: Optional[Sequence[str]] = None) -> httpx.Response:
+                    target_ids: Optional[Sequence[str]] = None, image: Optional[str] = None) -> httpx.Response:
         return await self._http.post(
             ANTHROPIC_URL,
             headers={"x-api-key": self.api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
@@ -102,7 +102,7 @@ class AnthropicLlmClient:
                 # temperature는 보내지 않는다: 기본 모델 claude-haiku-5-5는 1이 아닌 값(0 포함)을 400으로 거절한다.
                 # 출력 모양은 아래 도구 강제(decide · enum 스키마)가 잡는다.
                 "system": system,
-                "messages": [{"role": "user", "content": user}],
+                "messages": [{"role": "user", "content": ([{"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": image}}, {"type": "text", "text": user}] if image else user)}],
                 "tools": [{"name": "decide", "description": "다음에 어르신이 할 행동 하나를 정한다.",
                            "input_schema": action_schema(target_ids)}],
                 "tool_choice": {"type": "tool", "name": "decide"},
@@ -114,9 +114,9 @@ class AnthropicLlmClient:
         )
 
     async def complete(self, system: str, user: str, timeout_s: float,
-                       target_ids: Optional[Sequence[str]] = None) -> str:
+                       target_ids: Optional[Sequence[str]] = None, image: Optional[str] = None) -> str:
         try:
-            r = await asyncio.wait_for(self._post(system, user, timeout_s, target_ids), timeout=timeout_s)
+            r = await asyncio.wait_for(self._post(system, user, timeout_s, target_ids, image), timeout=timeout_s)
         except (asyncio.TimeoutError, httpx.TimeoutException) as e:
             raise LlmTimeout("llm timeout") from e
         except httpx.HTTPError as e:
@@ -182,13 +182,13 @@ class GeminiLlmClient:
         self._http = http or httpx.AsyncClient()
 
     async def _post(self, system: str, user: str, timeout_s: float,
-                    target_ids: Optional[Sequence[str]] = None) -> httpx.Response:
+                    target_ids: Optional[Sequence[str]] = None, image: Optional[str] = None) -> httpx.Response:
         return await self._http.post(
             self.URL.format(model=self.model),
             headers={"x-goog-api-key": self.api_key, "content-type": "application/json"},
             json={
                 "systemInstruction": {"parts": [{"text": system}]},
-                "contents": [{"role": "user", "parts": [{"text": user}]}],
+                "contents": [{"role": "user", "parts": ([{"inline_data": {"mime_type": "image/jpeg", "data": image}}] if image else []) + [{"text": user}]}],
                 # temperature는 보내지 않는다 (기본값 1.0): Gemini 3 계열은 낮추면 출력이 망가질 수 있다 —
                 # 0으로 보냈을 때 번호 칸에 문장이 섞여 나왔다 (2026-11-12 시험). 모양은 responseSchema가 잡는다.
                 "generationConfig": {"maxOutputTokens": self.max_tokens, "responseMimeType": "application/json",
@@ -198,9 +198,9 @@ class GeminiLlmClient:
         )
 
     async def complete(self, system: str, user: str, timeout_s: float,
-                       target_ids: Optional[Sequence[str]] = None) -> str:
+                       target_ids: Optional[Sequence[str]] = None, image: Optional[str] = None) -> str:
         try:
-            r = await asyncio.wait_for(self._post(system, user, timeout_s, target_ids), timeout=timeout_s)
+            r = await asyncio.wait_for(self._post(system, user, timeout_s, target_ids, image), timeout=timeout_s)
         except (asyncio.TimeoutError, httpx.TimeoutException) as e:
             raise LlmTimeout("llm timeout") from e
         except httpx.HTTPError as e:
@@ -239,8 +239,8 @@ class ScriptedFakeLlmClient:
         self.calls: List[dict] = []
 
     async def complete(self, system: str, user: str, timeout_s: float,
-                       target_ids: Optional[Sequence[str]] = None) -> str:
-        self.calls.append({"system": system, "user": user, "timeout_s": timeout_s, "target_ids": target_ids})
+                       target_ids: Optional[Sequence[str]] = None, image: Optional[str] = None) -> str:
+        self.calls.append({"system": system, "user": user, "timeout_s": timeout_s, "target_ids": target_ids, "image": image})
         step = self.responses.pop(0) if len(self.responses) > 1 else self.responses[0]
         if isinstance(step, Exception):
             raise step
@@ -255,7 +255,7 @@ class HeuristicFakeLlmClient:
     UNKNOWN_BELOW = 0.30
 
     async def complete(self, system: str, user: str, timeout_s: float,
-                       target_ids: Optional[Sequence[str]] = None) -> str:
+                       target_ids: Optional[Sequence[str]] = None, image: Optional[str] = None) -> str:
         goal, cands, in_cands, chosen = "", [], False, []
         for line in user.splitlines():
             if line.startswith("목표(어르신 말):"):

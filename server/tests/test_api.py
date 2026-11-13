@@ -71,8 +71,8 @@ async def test_400_does_not_echo_input(snaps):
 async def test_400_not_json_and_image_field(snaps):
     async with client() as c:
         assert (await c.post("/v1/guide/next", content=b"nope", headers=H)).status_code == 400
-        d = make_req(snaps, "s01_dine"); d["image"] = "AAAA"
-        assert (await c.post("/v1/guide/next", json=d, headers=H)).status_code == 400
+        d = make_req(snaps, "s01_dine"); d["image"] = "not base64 !!"
+        assert (await c.post("/v1/guide/next", json=d, headers=H)).status_code == 400       # 사진은 선택이지만 base64가 아니면 거절
 
 
 async def test_oversize(snaps):

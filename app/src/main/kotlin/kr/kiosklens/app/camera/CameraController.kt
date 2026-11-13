@@ -46,6 +46,8 @@ class CameraController(
     private val context: Context,
     private val sink: FrameSink,
     private val logger: Logger,
+    /** 질문 때 AI에게 보여 줄 사진 보관함 (없으면 사진을 만들지 않는다) */
+    private val jpeg: FrameJpegCache? = null,
     /** 프레임마다의 카메라 움직임. 분석 스레드에서 불린다 (`ViewOverlay.onFrameMotion`은 어느 스레드든 안전). */
     private val onMotion: (FrameMotion) -> Unit = {},
     private val onAnalysisSize: (width: Int, height: Int) -> Unit,
@@ -87,6 +89,7 @@ class CameraController(
                         val moved = trackMotion(proxy, id, rot)                       // sink에 넘기기 전에 (넘긴 뒤에는 닫혔을 수 있음)
                         val now = System.currentTimeMillis()
                         if (shakeGate.allow(moved, now)) {
+                            jpeg?.offer(proxy)                                                // 선명한 프레임만, 넘기기 전에
                             sink.submit(ImageProxyFrame(proxy, id, now))                  // 닫는 책임은 sink
                         } else {
                             proxy.close()                                                  // 흔들려 번진 프레임은 읽지 않는다 (ShakeGate)

@@ -86,11 +86,15 @@ def test_privacy_drops_card_number(snaps):
     assert clean.snapshot.frameId == snap["frameId"] and clean.sessionId == "s"
 
 
-def test_request_forbids_image(snaps):
+def test_request_image_is_optional_base64(snaps):
     ok = {"sessionId": "s", "utterance": "", "snapshot": snaps["s01_dine"]}
-    GuideRequest.model_validate(ok)                                   # 이미지가 없으면 통과
+    assert GuideRequest.model_validate(ok).image is None              # 사진이 없어도 통과, 내보낼 때도 필드가 없다
+    assert "image" not in GuideRequest.model_validate(ok).model_dump(mode="json")
+    assert GuideRequest.model_validate({**ok, "image": "AAAA"}).image == "AAAA"
     with pytest.raises(Exception):
-        GuideRequest.model_validate({**ok, "image": "AAAA"})
+        GuideRequest.model_validate({**ok, "image": "<script>"})      # base64가 아니면 거절
+    with pytest.raises(Exception):
+        GuideRequest.model_validate({**ok, "image": "A" * 700_001})   # 상한
 
 
 def test_ratelimit():

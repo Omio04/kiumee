@@ -8,7 +8,7 @@ import kr.kiosklens.core.model.ScreenSnapshot
 import kr.kiosklens.core.model.ScrollDir
 import kr.kiosklens.core.model.UiElement
 
-/** 계약 v1 (docs/contract.md 3장) 의 JSON ↔ :core-model 변환. 이미지는 어디에도 없다. */
+/** 계약 v1 (docs/contract.md 3장) 의 JSON ↔ :core-model 변환. 사진은 선택 필드(image)로만 간다 — 앱 설정으로 끄면 없다. */
 object DtoMapper {
 
     /** 서버가 400으로 거절하는 기준에 맞춰 보내기 전에 정리한다 (3.6). */
@@ -28,7 +28,7 @@ object DtoMapper {
         )
     }
 
-    fun requestJson(raw: GuideRequest): String {
+    fun requestJson(raw: GuideRequest, imageBase64: String? = null): String {
         val r = sanitize(raw)
         val sb = StringBuilder(512)
         sb.append('{')
@@ -59,7 +59,9 @@ object DtoMapper {
             sb.append(",\"action\":").append(Json.quote(h.action.name))
             sb.append(",\"targetText\":").append(h.targetText?.let { Json.quote(it) } ?: "null").append('}')
         }
-        sb.append("]}")
+        sb.append("]")
+        if (!imageBase64.isNullOrEmpty()) sb.append(",\"image\":").append(Json.quote(imageBase64))      // 선택: 지금 카메라 사진 (계약 v1 확장)
+        sb.append("}")
         return sb.toString()
     }
 

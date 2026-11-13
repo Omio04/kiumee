@@ -123,6 +123,13 @@ class RemoteGuideAgentTest {
         assertEquals(setOf("sessionId", "utterance", "goal", "snapshot", "history"), keys)
     }
 
+    @Test fun `사진은 켠 경우에만 image 필드로 간다`() {
+        val withPhoto = Json.parse(DtoMapper.requestJson(requestFrom("request_first.json"), "QUJD/+=")) as Map<String, Any?>
+        assertEquals("QUJD/+=", withPhoto["image"])
+        val without = Json.parse(DtoMapper.requestJson(requestFrom("request_first.json"), null)) as Map<String, Any?>
+        assertTrue("image" !in without.keys)
+    }
+
     @Test fun `401은 다시 시도하지 않고 failure`() = runBlocking {
         val s = stub { _, _, _ -> Triple(401, contract("error_401.json"), emptyMap()) }
         val r = agent(s).next(requestFrom("request_first.json"))

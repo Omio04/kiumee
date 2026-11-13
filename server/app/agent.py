@@ -494,6 +494,8 @@ class LlmGuideAgent:
                                     kiosk=kiosk_hint, change=_change_line(change))
         meta["help"] = True
         meta["candidates"] = len(candidates)
+        if self.s.debug_prompts:
+            log.info("KL_DEBUG 사진=%s", f"{len(req.image) // 1024}KB" if req.image else "없음")        # 크기만 (내용은 남기지 않는다)
         action = None
         deadline = t0 + self.s.total_budget_s
         for attempt in range(2):
@@ -501,7 +503,7 @@ class LlmGuideAgent:
             if attempt > 0 and remaining < self.s.min_retry_s:
                 break
             raw = await self._complete(user if attempt == 0 else user + RETRY_NOTE, max(0.5, min(self.s.llm_timeout_s, remaining)),
-                                       list(by_id), meta, system=help_mode.HELP_SYSTEM)
+                                       list(by_id), meta, system=help_mode.HELP_SYSTEM, image=req.image)
             meta["llm_calls"] = int(meta["llm_calls"]) + 1
             if self.s.debug_prompts:
                 log.info("KL_DEBUG 도움 원답=%s", raw)
@@ -538,14 +540,14 @@ class LlmGuideAgent:
         meta["source"] = "help"
         return self._finish(resp, meta, t0)
 
-    async def _complete(self, user: str, timeout: float, ids: List[str], meta: Dict[str, object], system: str = SYSTEM) -> str:
+    async def _complete(self, user: str, timeout: float, ids: List[str], meta: Dict[str, object], system: str = SYSTEM, image: Optional[str] = None) -> str:
         """LLM 한 번 부르기 (버튼 번호는 후보 안에서만 고르게 형식 강제).
 
         겹쳐 보내기: hedge_after_s 안에 답이 없거나 그 전에 일시 오류(혼잡 503 · 시간 초과 등)로 실패하면
         같은 요청을 하나 더 보내고 먼저 온 답을 쓴다. Gemini 무료 한도는 보통 1초인데 가끔 4초를 넘겨서
         서버 시간 초과 → 앱 오류가 잦았다 (2026-11-12 평가: LLM 판단 12건 중 5건 시간 초과).
         사용량 제한(429) · 인증 오류는 다시 보내지 않는다."""
-        call = lambda t: asyncio.ensure_future(self.llm.complete(system, user, t, target_ids=ids))
+        call = lambda t: asyncio.ensure_future(self.llm.complete(system, user, t, target_ids=ids, **({"image": image} if image else {})))
         t0 = time.perf_counter()
         tasks = [call(timeout)]
         hedge = self.s.hedge_after_s

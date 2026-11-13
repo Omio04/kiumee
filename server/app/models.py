@@ -12,7 +12,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import List, Optional
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_serializer, model_validator
 
 MAX_ELEMENTS = 300
 MAX_HISTORY = 5          # 서버가 참고하는 최근 이력 개수 (앱도 최근 5개만 보냄)
@@ -89,14 +89,25 @@ class HistoryItem(BaseModel):
 
 
 class GuideRequest(BaseModel):
-    """POST /v1/guide/next 요청. 이미지는 받지 않습니다 (설계서 2.2)."""
+    """POST /v1/guide/next 요청. 사진은 선택(image): 앱이 켠 경우에만 오며, 서버는 저장하지 않고 LLM에만 보여 줍니다."""
     sessionId: str = Field(min_length=1, max_length=64)
     utterance: Optional[str] = Field(default=None, max_length=MAX_GOAL)   # 이번에 새로 들은 말. 화면만 바뀐 경우 null
     goal: Optional[str] = Field(default=None, max_length=MAX_GOAL)        # 직전 응답의 goal을 앱이 그대로 돌려줌. 첫 요청은 null
     snapshot: ScreenSnapshot
     history: List[HistoryItem] = Field(default_factory=list, max_length=20)   # 앱은 5개 보냄. 서버는 마지막 5개만 사용
 
-    model_config = {"extra": "forbid"}   # 모르는 필드(예: image)가 오면 400 — 실수로 이미지가 섞여 들어오는 것을 막음
+    # 지금 카메라 화면 사진 (JPEG을 base64로). 글자 읽기(OCR)가 틀리거나 빠뜨려도 AI가 실제 화면을 보고 답하게 한다 (2026-11-13 실기기).
+    # 저장 · 로그 금지. 작게 줄여 보낸다(긴 변 약 960px) → 상한 700K자.
+    image: Optional[str] = Field(default=None, max_length=700_000, pattern=r"^[A-Za-z0-9+/=\s]*$")
+
+    model_config = {"extra": "forbid"}   # 모르는 필드가 오면 400
+
+    @model_serializer(mode="wrap")
+    def _drop_empty_image(self, handler):                                  # 사진이 없으면 필드 자체를 내보내지 않는다 (계약 예시와 같은 모양)
+        d = handler(self)
+        if d.get("image") is None:
+            d.pop("image", None)
+        return d
 
 
 # type별로 반드시 있어야 하는 필드. 나머지 필드는 없어야 합니다.

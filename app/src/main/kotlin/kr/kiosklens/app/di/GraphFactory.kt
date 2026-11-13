@@ -13,6 +13,7 @@ import kr.kiosklens.overlay.ViewOverlay
 import kr.kiosklens.vision.createVisionScreenAnalyzer
 import kotlinx.coroutines.launch
 import kr.kiosklens.voice.EchoGuard
+import kr.kiosklens.app.camera.FrameJpegCache
 import kr.kiosklens.voice.barge.BargeInMonitor
 import kr.kiosklens.voice.stt.AndroidSpeechInput
 import kr.kiosklens.app.ui.UiTexts
@@ -34,7 +35,10 @@ object GraphFactory {
         var caption: (String) -> Unit = {}
         val speechOut = CaptionSpeechOutput(tts) { caption(it) }
         val speechIn = AndroidSpeechInput(app, echo, logger)
-        val agent = RemoteGuideAgent(AgentConfig(BuildConfig.SERVER_URL, BuildConfig.APP_KEY), logger)
+        val frameJpeg = FrameJpegCache()
+        // 사진을 서버(AI)에 보낼지: local.properties kl.sendImage (기본 켬). 끄면 예전처럼 글자만 보낸다
+        val agent = RemoteGuideAgent(AgentConfig(BuildConfig.SERVER_URL, BuildConfig.APP_KEY), logger,
+            imageProvider = { if (BuildConfig.SEND_IMAGE) frameJpeg.latestBase64() else null })
 
         val runner = SessionRunner(scope, SessionStateMachine(helpMode = BuildConfig.HELP_MODE, handsFree = BuildConfig.HANDS_FREE), vision, speechIn, speechOut, agent, overlay, clock, logger)
         // 읽는 중 사람이 말하면 "말하기" 버튼을 누른 것과 같게: 읽던 안내를 끊고 듣는다 (상태머신은 그대로)
@@ -42,6 +46,7 @@ object GraphFactory {
         return object : Graph {
             override val runner = runner
             override fun greet() { scope.launch { speechOut.speak(UiTexts.GREETING, false) } }
+            override val frameJpeg: FrameJpegCache = frameJpeg
             override val frameSink: FrameSink = vision
             override val snapshots = vision.snapshots
             override val scanStatus = vision.status

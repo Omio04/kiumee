@@ -45,6 +45,8 @@ class RemoteGuideAgent(
     private val config: AgentConfig,
     private val logger: Logger,
     private val nowMs: () -> Long = System::currentTimeMillis,
+    /** 질문 순간의 카메라 사진(base64 JPEG). 없으면 null (글자만 보낸다). 서버는 저장하지 않는다 */
+    private val imageProvider: () -> String? = { null },
 ) : GuideAgent {
 
     /** 네트워크 읽기 전용. 시간이 다 된 읽기는 여기서 혼자 끝나게 두고 기다리지 않는다 ([postWithin]). */
@@ -52,7 +54,7 @@ class RemoteGuideAgent(
 
     override suspend fun next(request: GuideRequest): Result<GuideResponse> {
         val sent = DtoMapper.sanitize(request)
-        val body = DtoMapper.requestJson(sent).toByteArray(Charsets.UTF_8)
+        val body = DtoMapper.requestJson(sent, imageProvider()).toByteArray(Charsets.UTF_8)
         var last: Throwable? = null
         for (attempt in 0..config.retries) {
             val t0 = nowMs()

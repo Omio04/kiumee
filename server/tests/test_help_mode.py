@@ -115,3 +115,29 @@ async def test_unparseable_answer_still_gets_a_friendly_reply(snaps):
     llm = ScriptedFakeLlmClient(["이상한 글", "또 이상한 글"])
     r = await agent(llm).next(req(snaps, "s03_options", "이거 뭐예요"))
     assert r.response.action.type.value == "ASK_USER" and "옵션을 고르는 화면이에요" in r.response.action.question
+
+
+# ---- 사진: 글자 읽기가 틀려도 AI가 실제 화면을 본다 (2026-11-13 실기기: 결제하기 버튼이 글자에 없어 엉뚱한 답)
+async def test_photo_reaches_the_llm_in_help_mode(snaps):
+    llm = ScriptedFakeLlmClient([answer("화면 맨 아래 초록색 칸이에요.")])
+    d = make_req(snaps, "s01_dine", "결제 버튼이 어디야?", history=[])
+    d["image"] = "QUJD"
+    r = await agent(llm).next(GuideRequest.model_validate(d))
+    assert llm.calls[0]["image"] == "QUJD"
+    assert "사진" in llm.calls[0]["system"]
+    assert r.response.action.question.startswith("화면 맨 아래")
+
+
+async def test_no_photo_means_text_only_as_before(snaps):
+    llm = ScriptedFakeLlmClient([answer("결제 수단을 고르는 화면이에요.")])
+    await agent(llm).next(req(snaps, "s01_dine", "여기가 뭐 하는 화면이야?"))
+    assert llm.calls[0]["image"] is None
+
+
+async def test_photo_is_dropped_when_a_card_number_was_read(snaps):
+    llm = ScriptedFakeLlmClient([answer("카드를 넣는 화면이에요.")])
+    d = make_req(snaps, "s01_dine", "여기서 뭐 해?", history=[])
+    d["image"] = "QUJD"
+    d["snapshot"]["elements"].append({"id": "x9", "text": "1234 5678 9012 3456", "rect": {"left": 0.1, "top": 0.1, "right": 0.5, "bottom": 0.2}, "confidence": 0.9, "kind": "TEXT"})
+    await agent(llm).next(GuideRequest.model_validate(d))
+    assert llm.calls[0]["image"] is None                    # 글자는 걸렀어도 사진에는 번호가 남아 있을 수 있다

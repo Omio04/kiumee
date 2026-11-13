@@ -2,6 +2,7 @@ package kr.kiosklens.app.di
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+import kr.kiosklens.app.camera.FrameJpegCache
 import kr.kiosklens.core.model.ScreenSnapshot
 import kr.kiosklens.core.port.FrameSink
 import kr.kiosklens.domain.runner.SessionRunner
@@ -12,6 +13,8 @@ interface Graph {
     val runner: SessionRunner
     /** 앱을 켠 뒤 한 번 인사를 읽는다 */
     fun greet()
+    /** 질문 때 AI에게 보여 줄 최신 카메라 사진 보관함 (카메라가 채운다) */
+    val frameJpeg: FrameJpegCache
     /** 카메라 프레임을 받는 쪽 */
     val frameSink: FrameSink
     /** 확인용(디버그 빌드): 카메라가 인식한 화면. `SessionRunner`가 받는 것과 같은 흐름이다 (여럿이 구독해도 서로 빼앗지 않음) */
