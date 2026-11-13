@@ -260,3 +260,27 @@ async def test_history_is_cleared_when_the_kiosk_changes(snaps):
 async def test_history_is_kept_when_only_the_tab_changes(snaps):
     llm, r = await _two_requests(snaps, CAFE_COFFEE, CAFE_FOOD, [answer("가요."), answer("치즈케이크가 보여요.")])
     assert "[이전 대화]" in llm.calls[1]["user"] and not r.meta.get("history_reset")
+
+
+# ---- 실기기 로그 (2026-11-13 19:48): AI는 사진에서 '주문담기'를 읽어 말했는데, 글자 읽기는 '주문달기'로 깨뜨려 칸이 안 쳐졌다
+def test_garbled_ocr_name_is_matched_to_the_name_the_ai_read_from_the_photo():
+    from app.agent import _pressed_candidate
+    from app.models import ScreenElement
+    mk = lambda i, t: ScreenElement.model_validate({"id": i, "text": t, "rect": {"left": 0.1, "top": 0.1, "right": 0.3, "bottom": 0.2}, "confidence": 0.9, "kind": "BUTTON_LIKE"})
+    cands = {"a": mk("a", "주문달기"), "b": mk("b", "초기화|"), "c": mk("c", "텀블러 선택"), "d": mk("d", "저당 스테비아 슈가 추가")}
+    # 먼저 + 지금 누를 칸: "결제하시려면 먼저 '주문담기'를 눌러야 해요" (예전에는 "먼저" 때문에 포기했다)
+    assert _pressed_candidate("결제하시려면 먼저 '주문담기'를 눌러야 해요. 화면 하단 주황색 칸이에요.", cands).id == "a"
+    # 깨진 글자라도 전혀 다른 칸은 가리키지 않는다
+    assert _pressed_candidate("결제하시려면 먼저 '장바구니 조회'를 눌러야 해요.", cands) is None
+    # 나중 단계는 여전히 가리키지 않는다
+    assert _pressed_candidate("옵션을 먼저 골라야 해요. 다 고르면 '주문담기'를 누르세요.", cands) is None
+
+
+def test_fuzzy_match_needs_a_clear_winner():
+    from app.agent import _pressed_candidate
+    from app.models import ScreenElement
+    mk = lambda i, t: ScreenElement.model_validate({"id": i, "text": t, "rect": {"left": 0.1, "top": 0.1, "right": 0.3, "bottom": 0.2}, "confidence": 0.9, "kind": "BUTTON_LIKE"})
+    cands = {"a": mk("a", "주문담기"), "b": mk("b", "주문달기")}                          # 둘 다 비슷하다 → 어느 칸인지 모른다
+    assert _pressed_candidate("'주문담기'를 눌러 주세요.", cands).id == "a"                  # 정확히 같은 칸이 있으면 그쪽
+    cands2 = {"a": mk("a", "주문담기X"), "b": mk("b", "주문담7")}
+    assert _pressed_candidate("'주문담기'를 눌러 주세요.", cands2) is None

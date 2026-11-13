@@ -171,14 +171,55 @@ def _generic_unknown(resp: GuideResponse) -> bool:
     return not reason or any(normalize(w) in reason for w in ("버튼을 찾", "화면이 잘 보이게", "정면에서 비춰", "찾지 못했"))
 
 
-_SEQUENCE_WORDS = ("먼저", "다음", "그다음", "뒤에", "후에", "준비되면", "끝나면", "고르면", "넣으면", "대면", "한 뒤", "하신 뒤", "한 후", "하면")
+_AFTER_WORDS = ("그다음", "그 다음", "뒤에", "후에", "준비되면", "끝나면", "고르면", "넣으면", "대면", "한 뒤", "하신 뒤", "한 후", "한 다음", "마치면")   # 지금이 아니라 나중에 누르는 칸
+_PRESS_RE = re.compile(r"눌러|누르|누를|터치|선택해")
+_FUZZY_MIN = 0.65            # 깨진 글자(주문담기 → 주문달기 0.71)도 맞추되, 다른 칸(0.1 이하)은 맞추지 않는다
+_FUZZY_MARGIN = 0.15         # 두 번째로 비슷한 칸과 이만큼 차이 나야 믿는다
+
+
+def _press_sentence(message: str) -> Optional[str]:
+    for sent in re.split(r"(?<=[.!?])\s+", message or ""):
+        if _PRESS_RE.search(sent):
+            return sent
+    return None
+
+
+def _named_phrases(sentence: str) -> List[str]:
+    """누르라는 문장에서 버튼 이름 후보: 따옴표로 묶은 것, "<이름>을/를 눌러"의 이름."""
+    quoted = re.findall(r"['\"‘“]([^'\"’”]{2,20})['\"’”]", sentence)
+    before_verb = re.findall(r"([가-힣A-Za-z0-9]{2,12})\s*(?:버튼|칸|메뉴)?\s*[을를]?\s*(?:눌러|누르|누를|터치)", sentence)
+    return [q for q in quoted + before_verb if q.strip()]
+
+
+def _fuzzy_named_candidate(sentence: str, candidates: dict):
+    """AI가 사진에서 읽은 정확한 이름("주문담기")과 글자 읽기가 깨뜨린 후보("주문달기")를 자모 유사도로 맞춘다."""
+    scored = {}
+    for ph in _named_phrases(sentence):
+        np_ = normalize(ph)
+        if len(np_) < 2:
+            continue
+        for c in candidates.values():
+            nt = normalize(c.text)
+            if len(nt) < 2:
+                continue
+            sc = 1.0 if np_ == nt else dice(np_, nt)
+            if sc > scored.get(c.id, (0.0, None))[0]:
+                scored[c.id] = (sc, c)
+    if not scored:
+        return None
+    ranked = sorted(scored.values(), key=lambda x: -x[0])
+    best = ranked[0]
+    second = ranked[1][0] if len(ranked) > 1 else 0.0
+    return best[1] if best[0] >= _FUZZY_MIN and best[0] - second >= _FUZZY_MARGIN else None
 
 
 def _pressed_candidate(message: str, candidates: dict):
     """AI가 말로 "~을 누르세요"라고 했는데 칸을 안 가리킨 경우, 그 칸을 찾는다 (말과 표시를 맞춘다).
-    조건: 후보 중 정확히 하나만 "<글자>을/를 누르"로 말했고, "먼저 · 다음 · ~하면" 같은 순서 말이 없어 지금 누를 칸일 때만."""
+    누르라는 문장에 "고르면 · 준비되면 · ~한 뒤" 같은 나중 말이 있으면(= 지금 누를 칸이 아니면) 하지 않는다.
+    칸을 찾는 순서: ① 글자가 정확히 "<글자>을 누르" ② 깨진 글자까지 자모 유사도로 ③ 누르라는 말 바로 앞에서 가장 가까이 말한 칸."""
     m = (message or "")
-    if not m or any(w in m for w in _SEQUENCE_WORDS):
+    sent = _press_sentence(m)
+    if not m or sent is None or any(w in sent for w in _AFTER_WORDS):
         return None
     flat = m.replace(" ", "")
     hits = [c for c in candidates.values()
@@ -187,9 +228,12 @@ def _pressed_candidate(message: str, candidates: dict):
         return hits[0]
     if hits:
         return None                                                       # 둘 이상이 직접 눌러라는 말을 받았다 → 모호
+    fuzzy = _fuzzy_named_candidate(sent, candidates)
+    if fuzzy is not None:
+        return fuzzy
     # "'푸드' 탭에 있을 것 같아요. 그곳을 눌러 볼까요?"처럼 칸 이름과 "누르" 사이에 다른 말이 있는 경우:
     # 누르라는 말 바로 앞에서 가장 가까이 말한 칸(2글자 이상)을 가리킨다. 40자보다 멀면 믿지 않는다.
-    verb = re.search(r"눌러|누르|누를|터치|선택해", m)
+    verb = _PRESS_RE.search(m)
     if not verb:
         return None
     best, best_end = None, -1
@@ -204,7 +248,7 @@ def _pressed_candidate(message: str, candidates: dict):
 
 
 _NEW_KIOSK_OVERLAP = 0.12     # 직전 화면과 글자 겹침이 이보다 낮으면 다른 키오스크로 본다 (같은 키오스크 안 탭 이동은 머리글 · 메뉴 글자가 남아 높다)
-_MIN_LABELS = 4              # 비교할 글자가 이보다 적으면(글자 읽기가 거의 안 된 화면) 판단하지 않는다
+_MIN_LABELS = 4               # 비교할 글자가 이보다 적으면(글자 읽기가 거의 안 된 화면) 판단하지 않는다
 _PRESS_SENTENCE = re.compile(r"눌러|누르|누를|터치")
 _REPEAT_NOTE = ("\n[주의] 어르신이 방금 안내받은 '{t}' 칸은 이미 눌렀을 가능성이 큽니다(화면이 바뀌었을 수 있음). "
                 "같은 칸을 또 가리키지 마세요. 사진과 글자를 다시 보고 **지금 화면에서** 어르신 질문에 맞는 다음 칸을 고르세요.")
