@@ -34,6 +34,8 @@ class VisionScreenAnalyzer(
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
     private val tracker = ScreenTracker(builder = builder)
     private val sampler = FrameSampler()
+    /** 기준 화면(마지막으로 새 화면이 확정된 프레임)의 밝기 지문. 이미지 차이 진단용 */
+    private var referenceGrid: IntArray? = null
     private val frames = Channel<CameraFrame>(1, BufferOverflow.DROP_OLDEST, ::release)
     override val snapshots = SnapshotStream()
     private val changes = MutableSharedFlow<String>(
@@ -54,7 +56,11 @@ class VisionScreenAnalyzer(
                 currentCoroutineContext().ensureActive()
                 sampler.analyzed(grid, frame.rotationDegrees, start)
                 val update = tracker.update(lines, frame.frameId, frame.timestampMs)
+                // 진단: 새 화면 후보가 된 프레임은 이유와 이미지 차이(기준 화면 대비)를 남긴다. img는 0~255, 작을수록 같은 모습
+                val imageDiff = ImageDiff.blocks(referenceGrid, grid)
+                tracker.lastTrace?.let { trace -> log { logger.d("KL_TRACK", "candidate img=${"%.1f".format(imageDiff)} $trace") } }
                 if (update != null) {
+                    if (update.changed || referenceGrid == null) referenceGrid = grid
                     snapshots.publish(update.snapshot)
                     if (update.changed) changes.tryEmit(update.snapshot.screenId)
                 }
@@ -65,7 +71,7 @@ class VisionScreenAnalyzer(
                 }
                 // 화면 번호 · 새 화면 여부도 남긴다: 시험 기록만으로 "누른 뒤 화면 전환을 잡았는지" 확인하려고 (2026-11-12)
                 log { logger.d("KL_PERF", "ocr ms=${clock.nowMs() - start} lines=${lines.size} published=${update != null}" +
-                    " screen=${update?.snapshot?.screenId ?: "-"}${if (update?.changed == true) " NEW" else ""}") }
+                    " screen=${update?.snapshot?.screenId ?: "-"}${if (update?.changed == true) " NEW" else ""} img=${"%.1f".format(imageDiff)}") }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
