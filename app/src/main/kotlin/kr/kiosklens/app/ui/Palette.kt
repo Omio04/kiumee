@@ -17,8 +17,6 @@ object Palette {
     const val SIGNAL = 0xFFFFD600.toInt()
     /** 아침: 로딩 화면 바탕 */
     const val MORNING = 0xFFF4FAFE.toInt()
-    /** 아침 아래쪽 (로딩 화면 바탕이 아래로 갈수록 살짝 하늘빛) */
-    const val MORNING_LOW = 0xFFE1F1FB.toInt()
     /** 깊은 바다: 로딩 화면 글자 */
     const val DEEP = 0xFF14344D.toInt()
     /** 깊은 바다 옅게: 로딩 화면 보조 글자 */

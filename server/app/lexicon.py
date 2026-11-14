@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import re
 from functools import lru_cache
-from typing import Optional
 
 from .jamo import normalize, to_jamo
 
@@ -74,7 +73,3 @@ def correct(text: str) -> str:
         return raw                                      # 없거나 똑같이 가까운 낱말이 둘 → 고치지 않는다
     return hits[0][1]
 
-
-def correct_or_none(text: str) -> Optional[str]:
-    c = correct(text)
-    return c if c != (text or "").strip() else None

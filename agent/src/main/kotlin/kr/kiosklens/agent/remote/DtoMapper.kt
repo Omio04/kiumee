@@ -1,6 +1,5 @@
 package kr.kiosklens.agent.remote
 
-import kr.kiosklens.core.model.ElementKind
 import kr.kiosklens.core.model.GuideAction
 import kr.kiosklens.core.model.GuideRequest
 import kr.kiosklens.core.model.GuideResponse
@@ -103,6 +102,4 @@ object DtoMapper {
     /** 오류 본문에서 code만 꺼낸다 (message는 개발자용이라 어르신께 읽지 않는다). */
     fun errorCode(body: String): String? =
         (((Json.parseOrNull(body) as? Map<*, *>)?.get("error")) as? Map<*, *>)?.get("code") as? String
-
-    fun hasKind(e: UiElement, k: ElementKind) = e.kind == k
 }

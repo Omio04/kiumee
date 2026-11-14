@@ -49,8 +49,6 @@ object BorderStyle {
     const val BAND_DP = RING_DP + 2 * EDGE_DP
     /** 버튼 네모에서 노란 선 가운데까지 거리 */
     const val PAD_DP = GAP_DP + BAND_DP / 2f
-    /** 버튼 네모 밖으로 테두리가 나가는 최대 거리 (옆 버튼 글씨를 덮는 정도) */
-    const val OUTER_DP = GAP_DP + BAND_DP
 
     /** 어두운 선 진하기 (0~1) */
     const val EDGE_ALPHA = 0.7f

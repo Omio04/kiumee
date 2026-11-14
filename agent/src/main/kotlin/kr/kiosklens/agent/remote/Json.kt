@@ -18,28 +18,6 @@ object Json {
 
     fun parseOrNull(s: String): Any? = try { parse(s) } catch (e: Exception) { null }
 
-    /** 문자열 안에서 처음 나오는 JSON 객체({...})를 꺼내 파싱한다. 앞뒤 설명이 붙어도 된다. */
-    @Suppress("UNCHECKED_CAST")
-    fun firstObject(raw: String): Map<String, Any?>? {
-        var start = raw.indexOf('{')
-        while (start != -1) {
-            var depth = 0; var inStr = false; var esc = false
-            for (i in start until raw.length) {
-                val c = raw[i]
-                if (inStr) { if (esc) esc = false else if (c == '\\') esc = true else if (c == '"') inStr = false; continue }
-                if (c == '"') inStr = true
-                else if (c == '{') depth++
-                else if (c == '}') { depth--; if (depth == 0) {
-                    val v = parseOrNull(raw.substring(start, i + 1))
-                    if (v is Map<*, *>) return v as Map<String, Any?>
-                    break
-                } }
-            }
-            start = raw.indexOf('{', start + 1)
-        }
-        return null
-    }
-
     fun quote(s: String): String {
         val sb = StringBuilder("\"")
         for (c in s) when (c) {

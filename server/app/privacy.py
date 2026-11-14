@@ -14,8 +14,6 @@ from .models import MAX_HISTORY, GuideRequest, HistoryItem, ScreenElement
 _CARD = re.compile(r"(?<!\d)(?:\d[ \-]?){13,19}(?!\d)")
 # 주민등록번호 / 외국인등록번호 형태
 _RRN = re.compile(r"(?<!\d)\d{6}[ \-]?[1-8]\d{6}(?!\d)")
-# 말로 읽은 긴 숫자 (예: "일이삼사 오육칠팔 ..." 은 못 잡지만, 숫자로 받아쓴 경우는 잡음)
-_LONG_DIGITS = re.compile(r"\d[\d ,\-]{6,}\d")
 
 
 def is_sensitive(text: str) -> bool:
