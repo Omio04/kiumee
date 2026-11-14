@@ -491,6 +491,65 @@ def _repeat_guard(req: GuideRequest, resp: GuideResponse) -> GuideResponse:
         "아직 잘 모르겠어요. 하고 싶은 것을 짧게 한 번 더 말씀해 주세요."))
 
 
+MSG_CONSENT = "안내 사항을 확인하는 화면이에요. 내용을 읽어 보시고 괜찮으시면 동의를 눌러 주세요."
+
+
+
+
+def _is_consent(text: str) -> bool:
+    """동의 · 약관 버튼인가 ("동의하지 않음" · "비동의"는 아니다)."""
+    n = normalize(text)
+    return any(w in n for w in ("동의", "약관")) and not any(w in n for w in ("않", "비동의", "거부"))
+
+
+def _unasked_choice(resp: GuideResponse, candidates, user_choice: Optional[str]) -> bool:
+    """AI가 어르신이 말하지 않은 선택(예약번호 ↔ 여권 · 항공사 · 결제 수단 …)을 대신 골랐는가 (2026-11-14 실기기).
+    판단은 모델이 직접 적은 userChoice(not_stated)를 따른다: 낱말 목록으로 "말했는지"를 추측하면 어미 · 표현 · 언어가 바뀔 때 깨진다.
+    서버는 결정적인 부분만 본다 — 고를 수 있는 버튼이 둘 이상인 화면이고, 고른 버튼이 진행 · 동의 버튼이 아닐 때."""
+    a = resp.action
+    if user_choice != "not_stated" or a.type != ActionType.TAP or resp.source not in ("llm", "photo", "help"):
+        return False
+    target = a.guideText or ""
+    if len(normalize(target)) < 2 or is_flow_button(target) or _is_consent(target):
+        return False
+    peers: List[str] = []
+    for c in candidates:
+        if c.kind != ElementKind.BUTTON_LIKE or len(normalize(c.text)) < 2:
+            continue
+        if is_flow_button(c.text) or _is_consent(c.text) or any(same_item(c.text, p) for p in peers):
+            continue
+        peers.append(c.text)
+    if len(peers) < 2:
+        return False
+    return user_choice == "not_stated"
+
+
+def _say_from(action) -> str:
+    """AI가 GUIDE와 함께 쓴 설명 한 문장(이유만). 앱이 이걸 먼저 읽고 이어서 버튼 위치를 알려 준다.
+    2026-11-14: 기본 안내 경로는 이 문장을 응답에 싣지 않아서, 프롬프트가 설명을 쓰게 해도 어르신께 전달되지 않았다."""
+    say = _reason_only(_clean_message(getattr(action, "message", None), "", 80))
+    if say and (_waiting_talk_text(say) or any(w in normalize(say) for w in _APP_CLAIMS)):
+        return ""
+    return say
+
+
+def _ask_instead(user_choice: Optional[str], resp: GuideResponse, candidates, els, new_screen, stype, change, meta) -> GuideResponse:
+    """어르신 몫인 선택을 AI가 대신 골랐으면 가리키지 않고, 고를 수 있는 것을 읽어 주며 되묻는다."""
+    if not _unasked_choice(resp, candidates, user_choice):
+        return resp
+    meta["unasked_choice"] = True
+    text = screen_guide.describe(els, changed=new_screen, label=screen_type.label(stype), change=change)
+    return GuideResponse(goal=resp.goal, action=GuideAction.ask_user(text or MSG_ASK), source="rule")
+
+
+def _consent_note(resp: GuideResponse) -> GuideResponse:
+    """동의 · 약관 버튼을 설명 없이 누르라고 하지 않는다 (2026-11-14 실기기: "동의를 누르세요"만 나왔다)."""
+    a = resp.action
+    if a.type == ActionType.TAP and not resp.say and _is_consent(a.guideText or ""):
+        return resp.model_copy(update={"say": MSG_CONSENT})
+    return resp
+
+
 # 옵션 줄마다 반복되는 뜻 없는 버튼 글자: 빠른 길로 고르면 엉뚱한 줄의 버튼을 안내한다
 _GENERIC_LABELS = frozenset(normalize(w) for w in ("선택", "추가", "선택안함", "+", "-"))
 
@@ -743,8 +802,10 @@ class LlmGuideAgent:
             if photo is not None:
                 box, name = photo
                 meta.update(source="photo", photo_box=True)
-                resp = _repeat_guard(req, _scrub_claims(GuideResponse(goal=goal, action=GuideAction.tap("photo", name),
-                                                                      box=box, source="photo")))
+                resp = _scrub_claims(GuideResponse(goal=goal, action=GuideAction.tap("photo", name),
+                                                   box=box, say=_say_from(action) or None, source="photo"))
+                resp = _ask_instead(action.userChoice, resp, candidates, els, new_screen, stype, change, meta)
+                resp = _consent_note(_repeat_guard(req, resp))
                 return self._finish(resp, meta, t0)
 
         # 6) 검증 (+ LLM 형식 GUIDE… → 앱 계약 TAP…)
@@ -766,6 +827,10 @@ class LlmGuideAgent:
                 resp = GuideResponse(goal=goal, action=GuideAction.unknown(MSG_UNKNOWN), source="fallback")
         if action.action == LlmKind.GUIDE and resp.action.type == ActionType.UNKNOWN:
             meta["rejected"] = True                    # LLM이 후보에 없는 버튼을 말함
+        if resp.action.type == ActionType.TAP and action.action == LlmKind.GUIDE and not resp.say:
+            resp = resp.model_copy(update={"say": _say_from(action) or None})      # 설명 한 문장도 어르신께 전달한다
+        if resp.action.type == ActionType.TAP:
+            resp = _ask_instead(action.userChoice, resp, candidates, els, new_screen, stype, change, meta)
         # 6-1) 종료(DONE)는 끝났다는 증거가 있을 때만: 카드 결제/완료 화면이거나 결제 수단을 이미 눌렀을 때.
         #      증거 없이 AI가 DONE이라 하면(기차표 시뮬레이션 T2: 도착역을 고르자마자 "다음 화면에서 안내를 따라 주세요") 끝내지 않고 화면을 설명한다.
         if (resp.action.type == ActionType.DONE and action.action == LlmKind.DONE and not _done_is_justified(req, stype)
@@ -783,7 +848,7 @@ class LlmGuideAgent:
                 and _premature_checkout(req, goal, chosen, resp.action.guideText)):
             meta["rejected"] = True
             resp = GuideResponse(goal=goal, action=GuideAction.unknown(MSG_NOT_SEEN), source="rule")
-        resp = _repeat_guard(req, _scrub_claims(resp))
+        resp = _consent_note(_repeat_guard(req, _scrub_claims(resp)))
         # 9) 노란 칸을 버튼 전체에: 글자 칸으로 고른 버튼도 AI가 사진에서 본 버튼 전체 상자를 같이 보낸다 (앱이 글자에 붙여 따라간다)
         if use_photo and resp.box is None and resp.action.type == ActionType.TAP:
             btn = _button_box(action, by_id.get(resp.action.targetId or ""), photo_size)

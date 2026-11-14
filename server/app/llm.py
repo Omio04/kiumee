@@ -39,6 +39,9 @@ ACTION_SCHEMA = {
         # 픽셀 좌표 (2026-11-13): 예전 [위, 왼쪽, 아래, 오른쪽] 0~1000(Gemini 방식)은 Claude가 자주 빗나갔다 (decisions.md 11장)
         "box": {"type": "array", "items": {"type": "integer"}, "description": "사진이 있을 때 GUIDE: 누를 버튼 전체(글자만이 아니라 테두리 · 배경까지)를 딱 감싸는 사진 픽셀 좌표 [왼쪽, 위, 오른쪽, 아래] (사진 크기는 질문에 있음)"},
         "boxText": {"type": "string", "description": "box 칸에 적힌 글자 (문장 아님)"},
+        "userChoice": {"type": "string", "enum": ["named", "delegated", "not_stated"],
+                       "description": "GUIDE일 때: 고른 버튼을 어르신이 말로 정했으면 named(진행 · 확인처럼 누구에게나 같은 버튼도 named), "
+                                      "고르는 일을 맡겼으면(아무거나 · 알아서) delegated, 어르신이 말한 적 없는데 선택지 중 하나를 모델이 골랐으면 not_stated"},
     },
     "required": ["screenAsks", "action"],
 }
@@ -170,7 +173,7 @@ class AnthropicLlmClient:
         await self._http.aclose()
 
 
-_GEMINI_ORDER = ["action", "message", "targetId", "guideText", "direction", "box", "boxText"]
+_GEMINI_ORDER = ["action", "message", "targetId", "guideText", "userChoice", "direction", "box", "boxText"]
 
 
 def _gemini_schema(target_ids: Optional[Sequence[str]] = None) -> dict:

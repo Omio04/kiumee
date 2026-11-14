@@ -216,6 +216,15 @@ class LlmAction(BaseModel):
         except (TypeError, ValueError):
             return None
     screenAsks: Optional[str] = None       # 진단용: 모델이 적은 "이 화면이 묻는 것" (앱에는 나가지 않음)
+    # GUIDE일 때 고른 버튼을 누가 정했나: named(어르신이 말로 정함 · 누구에게나 같은 진행 버튼) · delegated(맡김) · not_stated(말한 적 없는데 모델이 고름).
+    # not_stated이고 선택지가 여럿이면 서버가 가리키지 않고 되묻는다. 낱말 목록이 아니라 모델이 직접 판단해 적는다 (어미 · 표현 · 언어에 상관없다)
+    userChoice: Optional[str] = None
+
+    @field_validator("userChoice", mode="before")
+    @classmethod
+    def _user_choice(cls, v):
+        s = str(v).strip().lower() if isinstance(v, str) else ""
+        return s if s in ("named", "delegated", "not_stated") else None
 
     @field_validator("targetId", "guideText", "message", "direction", mode="before")
     @classmethod
