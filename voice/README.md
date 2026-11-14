@@ -79,11 +79,11 @@ cd server && pip install -r requirements-dev.txt && KL_SKIP_APP_INIT=1 pytest -q
 - [x] 오류 매핑 · 재시도 · 후보 선택 · 에코 방지 · 문장 나누기 테스트 (5개, JVM). 한국어 모델 없음 폴백 판단: 신규 테스트 2개 추가, SDK 환경에서 통과 확인 전. `FakeSpeechInput` · `FakeSpeechOutput`과 그 계약 테스트는 2026-11-10에 지움 (Fake 없이 실구현으로)
 - **기기에서 확인 필요:** 실제 STT/TTS 동작 전부 (`SpeechRecognizer` · `TextToSpeech`는 JVM에서 돌릴 수 없음), 기기별 한국어 음성 데이터 설치 여부
 
-## 알려진 문제 — 한국어 음성 모델이 없으면 STT가 아예 안 됨 (P3: 수정안 작성, 검증 대기)
+## 한국어 음성 모델이 없는 기기 — 일반 인식기로 대신한다 (구현됨, main 병합)
 
 2026-11-10 P1이 에뮬레이터(Android 17 · API 37 Google Play 이미지, 소리 · 마이크 끔)에서 앱을 실행해 찾았다. [decisions.md](../docs/decisions.md) 6장 U7.
 
-**수정안 작성, 검증 대기 (2026-11-11, `feat/p3-stt-fallback`)** — 결정 #3 확정 (2026-11-11, 팀 동의): 온디바이스 우선, 없으면 일반 인식기. `:voice` JVM 테스트와 아래 기기 확인 4번은 아직 하지 않았다
+**구현됨 (2026-11-11, `feat/p3-stt-fallback` → main)** — 결정 #3 확정 (2026-11-11, 팀 동의): 온디바이스 우선, 없으면 일반 인식기. `:voice` JVM 테스트와 아래 기기 확인 4번은 아직 하지 않았다
 - 온디바이스 인식기가 12 · 13을 내면 `SttMapping.next()`가 `FALL_BACK_TO_STANDARD`를 골라, **1회 자동 재시도를 쓰지 않고** 일반 인식기(`createSpeechRecognizer` + `EXTRA_PREFER_OFFLINE`)로 다시 듣는다. 듣기 전에 바로 나는 오류라 어르신의 말을 잃지 않는다
 - 한 번 12 · 13을 겪으면 같은 `AndroidSpeechInput` 인스턴스는 이후 처음부터 일반 인식기를 쓴다
 - 로그: `ko-KR on-device model missing (error=13), falling back to standard recognizer` · 인식 서비스 자체가 없으면 `recognition service unavailable`

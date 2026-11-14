@@ -7,12 +7,17 @@
 ## 실행
 ```
 pip install -r requirements-dev.txt
-KL_SKIP_APP_INIT=1 pytest -q                       # 테스트 410개 (키·네트워크 불필요)
+KL_SKIP_APP_INIT=1 pytest -q                       # 테스트 439개 (키·네트워크 불필요)
 APP_KEY=dev LLM_PROVIDER=fake uvicorn app.main:app --port 8080     # 키 없이 연동 연습 (Android가 바로 붙일 수 있음)
 APP_KEY=... ANTHROPIC_API_KEY=... uvicorn app.main:app             # 실제 LLM
 docker build -t kl-agent . && docker run -p 8080:8080 -e APP_KEY=... -e ANTHROPIC_API_KEY=... kl-agent
 ```
-클라우드 1곳(Cloud Run/Fly/Render 등 컨테이너 가능한 곳)에는 이 Docker 이미지를 올리고 환경변수 `APP_KEY`, `ANTHROPIC_API_KEY`만 설정하면 됩니다. `PORT` 환경변수를 따릅니다.
+클라우드 1곳(Cloud Run/Fly/Render 등 컨테이너 가능한 곳)에는 이 Docker 이미지를 올리고 환경변수 `APP_KEY`, `ANTHROPIC_API_KEY`만 설정하면 됩니다. `PORT` 환경변수를 따릅니다. **Google Cloud Run(서울) 배포는 스크립트 한 줄로 됩니다: [deploy/README.md](deploy/README.md)**
+
+## 기본 동작 (2026-11-14)
+- **도움 모드가 기본**입니다 (`HELP_MODE=true`, 앱 `kl.helpMode`와 같아야 함). 어르신이 물어볼 때만 그 순간의 사진을 보고 답합니다. 예전 자동 안내는 `HELP_MODE=false`.
+- LLM 응답의 `userChoice`(`named` · `delegated` · `not_stated`)로 모델이 "고른 버튼을 어르신이 말했는가"를 직접 적습니다. `not_stated`이고 선택지가 여럿이면(진행 · 동의 버튼 제외) 서버가 가리키지 않고 선택지를 읽어 주며 되묻습니다.
+- AI가 쓴 설명 한 문장은 응답의 `say`로 앱에 전달됩니다. **동의 · 약관 버튼은 설명 문장 없이 안내하지 않습니다** (모든 응답이 지나는 `_finish`에서 보장).
 
 ## API (계약 v1)
 **정본은 저장소 루트의 [docs/contract.md](../docs/contract.md) 3장**입니다. 예시 JSON은 `testdata/contract/`에 있고, `tests/test_contract.py`가 모델과 정확히 맞는지 검사합니다.
@@ -97,14 +102,13 @@ uvicorn app.main:app --port 8000
 - SCROLL `guideText`는 **찾는 대상 이름**이다 (앱: "화면을 아래로 밀어서 {guideText} 찾아 주세요"). LLM의 `guideText`를 쓰고, 문장 · 20자 초과 · 개인정보로 보이면 "원하시는 메뉴". 프롬프트 · `ACTION_SCHEMA` 설명도 맞춤
 - 짧은 대답("네" · "좋아요" · "다 됐어요" · "끝" · "아니요" · "그만")은 **이번 발화 전체가 대답일 때만** 버튼 글자로 바꾼다(`ranker.ANSWERS`). "들어 있으면 붙이기"로는 "끝까지 시원한 걸로 하나 더요" → 결제하기를 골랐다 (`tests/test_answers.py`)
 | 지연 측정 | `scripts/loadtest.py` (HTTP로 p50/p95/p99, `--fail-over-ms 2000`) | 4일차 p95 2초 합격 기준 |
-| 배포 | `render.yaml` · Dockerfile `HEALTHCHECK` | 3일차 클라우드 배포 |
+| 배포 | `deploy/` (Cloud Run 스크립트) · `render.yaml` · Dockerfile `HEALTHCHECK` | 서울 리전 배포 후 폰에서 USB 없이 동작 확인 (2026-11-14) |
 
-배포(Cloud Run 예): `gcloud run deploy kiosk-lens-agent --source server --region asia-northeast3 --set-env-vars LLM_PROVIDER=gemini --set-secrets APP_KEY=app-key:latest,GEMINI_API_KEY=gemini-key:latest`
-(키는 Secret Manager에. 요청 하나가 6초 안에 끝나야 하므로 `--min-instances 1`로 콜드 스타트를 피하는 것을 권장.) **실제 배포는 이 환경에서 해보지 않았다.**
+배포: [deploy/README.md](deploy/README.md)의 `deploy-cloud-run.ps1`이 Cloud Run(서울)에 올립니다. 키는 Secret Manager에만 두고, 요청 하나가 6초 안에 끝나야 하므로 `--min-instances 1`로 콜드 스타트를 피합니다. Cloud Run 앞단이 `/healthz`를 가로채 404를 주므로 서버 확인은 키 없는 `POST /v1/guide/next`가 401인지로 합니다.
 
-### 이 작업에서 확인하지 못한 것
-- 실제 Anthropic · Gemini 호출 (키 없음): 요청 모양은 MockTransport 테스트로만 확인했다. 도구 호출/`responseSchema`가 실제 API에서 받아들여지는지, 실제 정확도(85%)와 p95(2초)는 키를 넣고 `evaluate.py` · `loadtest.py`로 재야 한다.
-- Docker 빌드, 클라우드 배포.
+### 실제 호출로 확인한 것 (2026-11-14)
+- 실제 Claude(`claude-haiku-5-5`)로 `evaluate.py`: 개발용 평가셋 22건 정확도 19~20/22, 지연 p50 약 1.2초 · p95 약 1.7초 (메인 [README](../README.md)의 "평가" 참고).
+- Cloud Run 배포 서버에 실제 요청: 키 없음/틀린 키 401, 정상 요청 200.
 
 ## 음식 설명 · 새 화면 안내 (2026-11-13, feat/p4-explain-and-screen-guide)
 

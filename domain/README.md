@@ -15,7 +15,7 @@
 | `session/` | `SessionEffect` · `Transition` | 할 일 9가지 (듣기 · 말하기 · 서버 요청 · 하이라이트 · 타이머) |
 | `policy/` | `PositionPhraser` | 버튼 좌표 → "화면 오른쪽 아래" (가로 · 세로 3등분, 둘 다 가운데면 "화면 가운데") |
 | `policy/` | `GuideTextComposer` | 어르신께 읽는 문장 전부. 예: "화면 왼쪽 위 깜빡이는 아메리카노 버튼을 누르세요" |
-| `policy/` | `TimeoutPolicy` | 무음 8초 · SCANNING 10초 · WAIT_CHANGE 15초 |
+| `policy/` | `TimeoutPolicy` | 무음 8초 · SCANNING 10초 · WAIT_CHANGE 15초 (놓친 화면 전환 확인용) |
 | `runner/` | `SessionRunner` | (2일차) 할 일을 포트 호출로 실행하고, 결과를 이벤트로 돌려 넣는다. **서버 호출은 여기서만** |
 
 ## 상태 10개 (설계서 6장)
@@ -26,9 +26,9 @@
 | `LISTENING` | 음성 인식 중 | 인식 → PLANNING (화면이 없으면 SCANNING) / 무음 8초 · 말 없음 → IDLE (안내) / 그 밖의 인식 오류 → ERROR |
 | `PLANNING` | 서버에 묻는 중 | TAP · SCROLL · WAIT · UNKNOWN → GUIDING / ASK_USER → ASKING / DONE → DONE / 실패 → ERROR / 그 사이 화면이 바뀜 → 다시 묻기 |
 | `SCANNING` | 화면을 찾는 중 | 스냅샷 → PLANNING / 10초간 없음 → LOST |
-| `GUIDING` | 하이라이트 + 안내 문장 읽는 중 | 다 읽음 → WAIT_CHANGE / 화면 바뀜 → 다시 묻기 |
-| `WAIT_CHANGE` | 어르신이 누르길 기다림 | 화면 바뀜 → 다시 묻기 / 15초 → 다시 읽기 (UNKNOWN 뒤에는 최신 화면으로 다시 묻기) |
-| `ASKING` | 되묻는 질문 읽는 중 | 다 읽음 → LISTENING (**다 읽은 뒤에야 듣기 시작 — 에코 방지**) |
+| `GUIDING` | 하이라이트 + 안내 문장 읽는 중 | 다 읽음 → WAIT_CHANGE / 화면 바뀜 → 다시 묻기 / (도움 모드) 구슬 누름 → 음성 끊고 WAIT_CHANGE |
+| `WAIT_CHANGE` | 어르신이 누르길 기다림 | 화면 바뀜 → 다시 묻기 / 15초 → 놓친 화면 전환이면(UNKNOWN 뒤 포함) 최신 화면으로 다시 묻기, 아니면 **조용히 기다림(같은 안내를 다시 읽지 않는다)** |
+| `ASKING` | 되묻는 질문 읽는 중 | 다 읽음 → LISTENING (**다 읽은 뒤에야 듣기 시작 — 에코 방지**) / (도움 모드) 구슬 누름 → 음성 끊고 WAIT_CHANGE |
 | `DONE` | 마무리 안내 읽는 중 | 다 읽음 → IDLE |
 | `LOST` | "화면이 잘 보이게 비춰 주세요" 읽는 중 | 다 읽음 → SCANNING / 그 사이 화면 보임 → 바로 묻기 |
 | `ERROR` | 오류 안내 읽는 중 | 다 읽음 → IDLE |
@@ -68,3 +68,12 @@
 ## 구현 현황 (이 PR)
 
 - [x] `runner/SessionRunner`: 이벤트를 한 줄로 모아 한 번에 하나씩 `reduce` · 효과를 포트 호출로 실행 · 포트 예외는 이벤트로 변환 · 종료 시 정리. 테스트 9개(가짜 포트 + 실제 코루틴).
+
+## 도움 모드 (앱 기본, 2026-11-14)
+`SessionStateMachine(helpMode = true)`가 앱 기본이다 (`kl.helpMode`). 어르신이 물어볼 때만 서버에 묻는다.
+- 화면이 바뀌어도 서버에 다시 묻지 않고 **하이라이트만 따라간다** (`helpFollow`).
+- **안내 음성을 읽는 중(GUIDING · ASKING)에 말하기 구슬을 누르면** `StopSpeaking`하고, 끝까지 읽은 것과 같은 다음 상태(WAIT_CHANGE)로 간다. 노란 칸은 지우지 않고 듣기도 시작하지 않는다. 서버 답을 기다리는 중(PLANNING)에는 무시한다 (`interruptSpeech`).
+- 안내를 다 읽은 뒤 15초가 지나도 **같은 문장을 다시 읽지 않는다.** 놓친 화면 전환이 의심될 때만 다시 묻는다 (`missedChange`).
+- 서버가 사진에서 본 버튼 전체 칸은 글자 상자의 가로 · 세로 **2배까지만** 그린다 (`HighlightArea.BUTTON_MAX_RATIO`).
+- 예전 방식(화면 전환마다 자동 안내)은 `helpMode = false`.
+- 상태 머신 단위 테스트 94개 (`:domain`, 2026-11-14).
