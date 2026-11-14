@@ -18,6 +18,7 @@ import kr.kiosklens.domain.session.SessionEvent.SpeechRecognized
 import kr.kiosklens.domain.session.SessionEvent.StartPressed
 import kr.kiosklens.domain.session.SessionEvent.TimedOut
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -107,16 +108,37 @@ class SessionClickModeTest {
         assertTrue(press.effects.any { it is ClearHighlight })
     }
 
-    @Test fun `앱이 말하는 중에는 말하기를 눌러도 끼어들 수 없다`() {
+    @Test fun `앱이 말하는 중에 파란 구슬을 누르면 음성을 끊는다 - 듣기를 시작하지는 않고 다시 누르면 물어볼 수 있다`() {
         val d = asked()
         d.send { GuideReceived(it, GuideResponse("", GuideAction.AskUser("길게 설명해요. 또 도움이 필요하세요?"))) }
         assertEquals(Phase.ASKING, d.phase)
         val tr = d.send(StartPressed("s2"))
-        assertEquals(Phase.ASKING, d.phase)
-        assertTrue(tr.effects.none { it is StopSpeaking || it is StartListening })
-        d.send { SpeechFinished(it) }
+        assertTrue("읽던 음성을 멈춘다", tr.effects.contains(StopSpeaking))
+        assertTrue("듣기를 시작하지 않는다", tr.effects.none { it is StartListening })
+        assertEquals(Phase.WAIT_CHANGE, d.phase)                                   // 끝까지 읽은 것과 같은 다음 상태
+        val late = d.send { SpeechFinished(it) }                                   // 멈춘 뒤 늦게 오는 "읽기 끝" 신호는 무시된다
+        assertTrue(late.effects.isEmpty())
         d.send(StartPressed("s3"))
-        assertEquals(Phase.LISTENING, d.phase)                                     // 다 읽은 뒤에는 누를 수 있다
+        assertEquals(Phase.LISTENING, d.phase)                                     // 이제 빨간 구슬: 눌러서 물어볼 수 있다
+    }
+
+    @Test fun `버튼 안내를 읽는 중 끊어도 노란 칸은 그대로 둔다`() {
+        val d = asked()
+        d.send { GuideReceived(it, GuideResponse("", GuideAction.Tap("e4", "아메리카노"))) }
+        assertEquals(Phase.GUIDING, d.phase)
+        val tr = d.send(StartPressed("s2"))
+        assertTrue(tr.effects.contains(StopSpeaking))
+        assertTrue("노란 칸을 지우지 않는다", tr.effects.none { it is ClearHighlight })
+        assertEquals(Phase.WAIT_CHANGE, d.phase)
+        assertNotNull(d.state.guide)
+    }
+
+    @Test fun `서버 답을 기다리는 중(생각 중)에는 눌러도 반응하지 않는다`() {
+        val d = asked()
+        assertEquals(Phase.PLANNING, d.phase)
+        val tr = d.send(StartPressed("s2"))
+        assertEquals(Phase.PLANNING, d.phase)
+        assertTrue(tr.effects.none { it is StopSpeaking || it is StartListening })
     }
 
     @Test fun `버튼을 가리킬 때 이유를 먼저 읽고 노란색 칸을 말한다`() {

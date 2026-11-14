@@ -103,3 +103,13 @@ def test_user_choice_is_in_every_provider_schema_and_parsed_strictly():
     assert "userChoice" in _gemini_schema()["required"]                       # Gemini는 모든 칸을 채우게 한다
     assert LlmAction.model_validate({"action": "GUIDE", "userChoice": "NOT_STATED"}).userChoice == "not_stated"
     assert LlmAction.model_validate({"action": "GUIDE", "userChoice": "아무말"}).userChoice is None   # 모르는 값은 없는 것으로
+
+
+async def test_consent_is_explained_in_help_mode_too():
+    """도움 모드(물어볼 때만 답함)에서도 동의 버튼을 설명 없이 가리키지 않는다: 모든 응답이 지나는 공통 출구에서 보장한다."""
+    consent = [el("e0", "기내 반입 제한 물품 안내", 0.05, "TEXT"), el("e2", "동의하지 않음", 0.7), el("e3", "동의합니다", 0.8)]
+    raw = json.dumps({"screenAsks": "동의", "action": "GUIDE", "targetId": "e3", "guideText": "동의합니다", "userChoice": "named"}, ensure_ascii=False)
+    ag = LlmGuideAgent(ScriptedFakeLlmClient([raw]), S(help_mode=True))
+    r = await ag.next(req("뭐 해야 돼", consent, utterance="뭐 해야 돼"))
+    assert r.response.action.type.value == "TAP" and r.response.action.guideText == "동의합니다"
+    assert r.response.say                                  # 설명이 붙는다

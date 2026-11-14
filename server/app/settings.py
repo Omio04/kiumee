@@ -97,7 +97,7 @@ class Settings:
             candidate_k=int(e("CANDIDATE_K", "8")),
             progress_hint=_env_bool(env, "PROGRESS_HINT", True),
             expectation_check=_env_bool(env, "EXPECTATION_CHECK", True),
-            help_mode=_env_bool(env, "HELP_MODE", False),
+            help_mode=_env_bool(env, "HELP_MODE", True),         # 운영 기본: 도움 모드 (앱 kl.helpMode 기본과 맞춘다). 코드의 Settings() 기본값은 False라 예전 방식 테스트는 그대로
             photo_guide=_env_bool(env, "PHOTO_GUIDE", True),
             som_marks=_env_bool(env, "SOM_MARKS", False),
             lexicon_fix=_env_bool(env, "LEXICON_FIX", False),

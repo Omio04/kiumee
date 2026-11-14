@@ -1119,6 +1119,7 @@ class LlmGuideAgent:
         alias = meta.pop("_alias", None)                                     # 사진에 그린 짧은 번호 → 앱이 아는 원래 칸 번호
         if alias and resp.action.targetId in alias:
             resp = resp.model_copy(update={"action": resp.action.model_copy(update={"targetId": alias[resp.action.targetId]})})
+        resp = _consent_note(resp)                                           # 기본 · 도움 모드 모든 경로의 공통 출구: 동의 버튼은 설명 없이 안내하지 않는다
         meta["total_ms"] = round((time.perf_counter() - t0) * 1000, 1)
         if self.s.debug_prompts:
             a = resp.action

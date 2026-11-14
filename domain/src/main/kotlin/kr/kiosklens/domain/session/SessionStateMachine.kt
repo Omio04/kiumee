@@ -81,7 +81,19 @@ class SessionStateMachine(
      *   읽던 안내를 끊고 듣는다. 목표 · 이력은 그대로 두고, 들은 말은 다음 요청의 utterance가 되어 서버가 목표에 붙인다.
      * - 이미 듣는 중이면 무시한다.
      */
-    private fun onStart(state: SessionState, sessionId: String): Transition = clearSeek(onStartInner(state, sessionId))
+    private fun onStart(state: SessionState, sessionId: String): Transition =
+        if (helpMode && !handsFree && state.phase in SPEAKING_PHASES) interruptSpeech(state)
+        else clearSeek(onStartInner(state, sessionId))
+
+    /**
+     * 도움 모드(버튼 방식): 앱이 말하는 중(파란 구슬)에 구슬을 누르면 읽던 음성 안내를 끊는다 (2026-11-14 요청).
+     * 끝까지 읽은 것과 같은 다음 상태로 간다 — 노란 칸 · 찾는 중인 칸은 그대로 두고, 듣기를 시작하지는 않는다.
+     * 끊은 뒤 다시 누르면(빨간 구슬) 그때 물어볼 수 있다. 생각 중(PLANNING)에는 끊을 소리가 없어서 예전처럼 무시한다.
+     */
+    private fun interruptSpeech(state: SessionState): Transition {
+        val finished = onSpeechFinished(state)
+        return finished.copy(effects = listOf(StopSpeaking) + finished.effects)
+    }
 
     private fun clearSeek(tr: Transition): Transition = if (tr.next.seek == null) tr else tr.copy(next = tr.next.copy(seek = null))
 
@@ -507,6 +519,8 @@ class SessionStateMachine(
 
         /** 앱이 말하거나 생각 중이라 "말하기"를 눌러도 소용없는 단계 (도움 모드 · 버튼 방식) */
         val BUSY_PHASES = setOf(Phase.ASKING, Phase.GUIDING, Phase.PLANNING, Phase.LOST, Phase.DONE, Phase.ERROR)
+        /** 앱이 안내 문장을 읽는 단계: 도움 모드에서도 구슬을 눌러 끊을 수 있다 */
+        val SPEAKING_PHASES = setOf(Phase.ASKING, Phase.GUIDING)
 
         /** 화면 전환을 놓쳤다고 볼 "처음 보는 글자" 수 (옵션 창: 제목 · 옵션 · 취소 · 담기 …) */
         const val MISSED_CHANGE_NEW_TEXTS = 3

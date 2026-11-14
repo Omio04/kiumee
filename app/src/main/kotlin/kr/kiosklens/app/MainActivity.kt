@@ -210,7 +210,7 @@ class MainActivity : AppCompatActivity() {
         val orb = OrbState.of(phase)
         micButton.state = orb                                                      // 자막 대신 구슬의 색 · 움직임으로 상태를
         viewfinder.look = ViewfinderLook.of(lastScan == ScanStatus.READY, orb)   // 키오스크를 찾았는지는 조준 모서리로
-        val description = UiTexts.micDescription(phase)                          // 자막 대신 TalkBack이 읽는 설명
+        val description = UiTexts.micDescription(phase, BuildConfig.HELP_MODE)                          // 자막 대신 TalkBack이 읽는 설명
         if (micButton.contentDescription != description) micButton.contentDescription = description
         val line = UiTexts.hint(phase, BuildConfig.HELP_MODE)
         hint.text = line.orEmpty()
