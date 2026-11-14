@@ -1,0 +1,13 @@
+# Cloud Run 배포(gcloud run deploy --source)로 올라가는 파일에서 뺄 것.
+# 비밀 값(.env)이 빌드 저장소에 올라가면 안 되고, 컨테이너는 app/ 과 requirements.txt 만 쓴다.
+.env
+.env.*
+!.env.example
+tests/
+scripts/
+testdata/
+deploy/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.pdf
