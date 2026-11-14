@@ -1,7 +1,64 @@
-# kiumee — AI 키오스크 렌즈 (Android MVP)
+# 키우미 (kiumee) — 키오스크 앞에서 말로 묻는 AI 안내
 
-스마트폰 카메라로 키오스크 화면을 비추고 원하는 것을 말하면, **눌러야 할 버튼을 하이라이트와 음성으로 안내**하는 앱.
-앱은 키오스크를 대신 누르지 않고 안내만 한다.
+> **"어? 이제 뭐 해야 되는 거야?"**
+> 무인 키오스크 앞에서 막막해하는 어르신이, **폰 카메라로 키오스크 화면을 비추고 말로 물으면** AI가 지금 화면을 보고 **쉬운 말과 노란 테두리로 안내**하는 Android 앱입니다.
+
+## 왜 만들었나
+- 키오스크가 빠르게 늘었지만, 화면이 낯선 어르신은 **어디를 눌러야 할지 몰라** 주문을 포기하거나 뒤 사람 눈치를 봅니다 (디지털 소외).
+- 키오스크 회사가 접근성 기능을 넣기를 기다리는 대신, **어떤 키오스크든 폰 하나로** 쓸 수 있게 했습니다. 키오스크를 바꾸거나 설치할 것이 없습니다.
+
+## 설계 원칙 (사용자의 자율성을 지킨다)
+1. **물어볼 때만 답한다.** 화면이 바뀌어도 앱이 혼자 떠들지 않습니다. 빨간 구슬을 눌러 물어볼 때만 그 순간의 화면을 보고 답합니다.
+2. **대신 결정하지 않는다.** 메뉴, 방법, 결제 수단처럼 사용자가 정할 일은 말하지 않았으면 **선택지를 읽어 주며 되묻습니다.**
+3. **대신 눌러 주지 않는다.** 앱은 키오스크를 조작하지 않고 **안내만** 합니다.
+4. **끊을 수 있다.** 안내 음성 중에 구슬을 누르면 바로 멈춥니다.
+
+## 한눈에 보기
+```mermaid
+flowchart LR
+    U["어르신: 빨간 구슬을 누르고 질문"] --> STT["폰: 음성 → 글자 (온디바이스)"]
+    CAM["폰: 카메라 프레임"] --> OCR["폰: 글자 + 좌표 인식 (ML Kit)"]
+    STT --> REQ["서버로: 질문 글자 + 사진 1장 + 글자 목록"]
+    OCR --> REQ
+    REQ --> SRV["서버: 규칙 + Claude AI<br/>(후보 번호 안에서만 선택)"]
+    SRV --> RES["응답: 번호(id) + 읽을 문장"]
+    RES --> OUT["폰: 최신 위치에 노란 칸 + 음성 안내"]
+```
+- **서버는 좌표가 아니라 번호만 돌려줍니다.** 폰이 흔들려도 앱이 최신 프레임에서 같은 칸을 다시 찾아 칸이 따라갑니다. AI가 목록에 없는 번호를 말하면 서버가 걸러 냅니다.
+- 음성과 글자 인식은 **폰 안**에서 하므로 소리는 서버로 가지 않습니다. 서버로 가는 것은 질문 글자, 그 순간의 사진 한 장, 글자 목록입니다.
+
+## 사용한 기술
+| 영역 | 기술 |
+|---|---|
+| 앱 | Kotlin 2.2, 코루틴, CameraX, **Google ML Kit 한국어 OCR**, 안드로이드 음성 인식(STT) · 음성 합성(TTS), 직접 만든 View 오버레이 |
+| 앱 구조 | 7개 모듈(순수 Kotlin 상태 머신 `domain` + 어댑터), 순수 함수 `reduce(상태, 이벤트) → (다음 상태, 할 일)` |
+| 서버 | Python 3.12, **FastAPI**, Pydantic v2, httpx, Pillow |
+| AI | **Anthropic Claude Haiku 5.5**(사진 + 글자 목록 + 질문 → 정해진 응답 종류 중 선택, 구조화 출력), 오류 시 Gemini 대체 |
+| 알고리즘 | 한글 자모 n-그램 유사도, 편집 거리, 지속 글자 창 기반 화면 구분, 중앙값 기반 움직임 추정, LRU 캐시, 헤지 요청, 화이트리스트 검증 |
+| 배포 | Docker, **Google Cloud Run**(서울), Secret Manager |
+| 검증 | JUnit(Android/JVM 345개), pytest(서버 439개), 합성 잡음 회귀 시험, 실제 손떨림 녹화 재생 |
+
+## 실행해 보기
+필요한 것: **JDK 17**, **Android SDK 37**, Python 3.10 이상, 카메라가 있는 **Android 8.0(API 26) 이상 폰**(USB 디버깅), 인터넷, Claude API 키(서버용).
+
+**1) 서버** — 둘 중 하나를 고릅니다.
+- **클라우드(권장, 폰만으로 동작)**: [server/deploy/README.md](server/deploy/README.md)의 스크립트 한 줄로 Google Cloud Run에 올립니다. 서버 주소와 앱 키가 `local.properties`에 자동으로 기록됩니다.
+- **내 PC에서**:
+  ```bash
+  cd server && pip install -r requirements.txt
+  APP_KEY=dev ANTHROPIC_API_KEY=sk-ant-... LLM_PROVIDER=anthropic uvicorn app.main:app --port 8080
+  adb reverse tcp:8080 tcp:8080     # 폰이 PC 서버로 붙게 (USB 연결)
+  ```
+  Windows PowerShell이면 환경변수를 이렇게 줍니다: `$env:APP_KEY="dev"; $env:ANTHROPIC_API_KEY="sk-ant-..."; $env:LLM_PROVIDER="anthropic"; uvicorn app.main:app --port 8080`
+
+**2) 앱** — [local.properties.example](local.properties.example)을 `local.properties`로 복사해 `sdk.dir`, `kl.serverUrl`, `kl.appKey`를 채웁니다(서버를 PC에서 돌리면 `http://127.0.0.1:8080`, 앱 키는 서버의 `APP_KEY`와 같은 값).
+```bash
+./gradlew :app:installDebug
+```
+
+**3) 사용법** — 키오스크 화면을 비추고 **아래 빨간 구슬을 누른 뒤 말합니다.** ("여기서 뭐를 눌러야 돼?", "블루베리 베이글 어딘지 알려줘", "이게 어떤 메뉴야?") 구슬이 하얀 호로 돌면 찾는 중이고, 파란 막대가 나오면 안내 음성입니다. 음성 중에 파란 구슬을 누르면 멈춥니다.
+
+**테스트만 돌려 보려면** 키 없이도 됩니다: [빌드 · 테스트](#빌드--테스트) 참고 (`./gradlew test…`, `cd server && KL_SKIP_APP_INIT=1 pytest -q`).
 
 ## 동작 방식 (도움 모드가 기본, 2026-11-14)
 
