@@ -196,11 +196,11 @@ class SessionStateMachineTest {
         assertEquals("발화는 아직 기다리는 중", "아메리카노", d.state.pendingUtterance)
     }
 
-    @Test fun `15초 동안 화면이 안 바뀌면 같은 안내를 다시 읽는다`() {
+    @Test fun `15초 동안 화면이 안 바뀌어도 같은 안내를 다시 읽지 않는다 - 어르신이 다시 물을 때만 답한다`() {
         val d = waitingOnMenu()
         val tr = d.send { TimedOut(it) }
-        assertEquals(Phase.GUIDING, d.phase)
-        assertEquals(listOf(Speak(guideAmericano, d.ticket)), tr.effects)
+        assertEquals(Phase.WAIT_CHANGE, d.phase)
+        assertTrue(tr.effects.none { it is Speak || it is RequestGuide })
     }
 
     // ---------------------------------------------------------------- ⑦ UNKNOWN
@@ -458,11 +458,12 @@ class SessionStateMachineTest {
         d.send { TimedOut(it) }
         assertEquals(Phase.PLANNING, d.phase)
 
-        // 손가락이 버튼을 가린 것뿐이면(처음 보는 글자 없음) 다시 읽기만 한다
+        // 손가락이 버튼을 가린 것뿐이면(처음 보는 글자 없음) 다시 묻지 않고 말도 하지 않는다
         val covered = menu.copy(frameId = 12, elements = menu.elements.filter { it.id != "e4" })
         val f = waitingOnMenu().apply { send(SnapshotReceived(covered)) }
-        f.send { TimedOut(it) }
-        assertEquals(Phase.GUIDING, f.phase)
+        val tr = f.send { TimedOut(it) }
+        assertEquals(Phase.WAIT_CHANGE, f.phase)
+        assertTrue(tr.effects.none { it is Speak || it is RequestGuide })
     }
 
     // ---------------------------------------------------------------- 서버 답을 기다리는 동안

@@ -46,7 +46,23 @@ object HighlightArea {
         if (!box.isValid) return null
         val s = BUTTON_SLACK
         if (text.centerX !in (box.left - s)..(box.right + s) || text.centerY !in (box.top - s)..(box.bottom + s)) return null
-        return NormRect(min(box.left, text.left), min(box.top, text.top), max(box.right, text.right), max(box.bottom, text.bottom))
+        val l = min(box.left, text.left)
+        val t = min(box.top, text.top)
+        val r = max(box.right, text.right)
+        val b = max(box.bottom, text.bottom)
+        // 2026-11-14 요청: 버튼 칸이 글자의 5배를 넘게 커 보임 → 글자 상자의 가로 · 세로 BUTTON_MAX_RATIO배까지만. 글자 가운데를 기준으로 줄이되 원래 칸 밖으로는 안 나간다
+        val (cl, cr) = capAxis(l, r, text.left, text.right)
+        val (ct, cb) = capAxis(t, b, text.top, text.bottom)
+        return NormRect(cl, ct, cr, cb)
+    }
+
+    /** [lo]~[hi] 구간을 글자 구간 길이의 BUTTON_MAX_RATIO배 이하로 줄인다. 글자 구간은 항상 안에 남는다. */
+    private fun capAxis(lo: Float, hi: Float, textLo: Float, textHi: Float): Pair<Float, Float> {
+        val maxLen = (textHi - textLo) * BUTTON_MAX_RATIO
+        if (hi - lo <= maxLen) return lo to hi
+        val center = (textLo + textHi) / 2f
+        val newLo = (center - maxLen / 2f).coerceIn(lo, hi - maxLen)
+        return newLo to (newLo + maxLen)
     }
 
     /**
@@ -61,6 +77,7 @@ object HighlightArea {
     }
 
     private const val BUTTON_SLACK = 0.01f
+    private const val BUTTON_MAX_RATIO = 2f
     private const val MIN_SCALE = 0.6f
     private const val MAX_SCALE = 1.7f
 

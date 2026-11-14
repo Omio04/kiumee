@@ -417,7 +417,7 @@ class SessionStateMachine(
                 // 도움 모드: 물어볼 때만 답한다. 안내를 다시 읽지 않는다 (서버가 실패해 못 답한 질문을 다시 묻는 경우만 예외)
                 if (helpMode && !(g.retryOnTimeout && state.pendingUtterance != null)) return stay(state)
                 if (g.retryOnTimeout || missedChange(state, g)) requestOrScan(state.copy(guide = null), listOf(ClearHighlight))   // 최신 화면으로 다시 묻기
-                else Transition(state.copy(phase = Phase.GUIDING, ticket = t), listOf(Speak(g.spokenText, t)))   // 다시 읽기
+                else stay(state)   // 2026-11-14: 같은 안내를 15초마다 다시 읽지 않는다. 어르신이 다시 물으면(말하기) 그때 답한다
             }
             else -> stay(state)
         }

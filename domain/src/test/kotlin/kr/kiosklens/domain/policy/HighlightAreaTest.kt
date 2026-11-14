@@ -56,11 +56,21 @@ class HighlightAreaTest {
 
     @Test fun `버튼 전체 칸은 글자 상자까지 품고, 글자와 어긋난 칸은 버린다`() {
         val text = NormRect(0.75f, 0.87f, 0.90f, 0.90f)                      // "결제하기" 글자
-        val whole = HighlightArea.button(NormRect(0.70f, 0.85f, 0.94f, 0.95f), text)
-        assertEquals(NormRect(0.70f, 0.85f, 0.94f, 0.95f), whole)
-        val cut = HighlightArea.button(NormRect(0.70f, 0.88f, 0.85f, 0.95f), text)   // 글자 일부만 덮음 → 글자까지 넓힌다
-        assertEquals(NormRect(0.70f, 0.87f, 0.90f, 0.95f), cut)
+        val whole = HighlightArea.button(NormRect(0.70f, 0.85f, 0.94f, 0.95f), text)!!   // 높이 0.10은 글자(0.03)의 3배 → 2배(0.06)로 줄고 글자 가운데 기준
+        assertRect(NormRect(0.70f, 0.855f, 0.94f, 0.915f), whole)
+        val cut = HighlightArea.button(NormRect(0.70f, 0.88f, 0.85f, 0.95f), text)!!    // 글자 일부만 덮음 → 글자까지 넓힌다 (높이는 2배 상한, 원래 칸 안에서)
+        assertRect(NormRect(0.70f, 0.87f, 0.90f, 0.93f), cut)
         assertNull(HighlightArea.button(NormRect(0.10f, 0.10f, 0.30f, 0.20f), text))  // 엉뚱한 곳 (휴대폰이 움직였거나 AI가 빗나감)
+    }
+
+    @Test fun `버튼 전체 칸은 글자 상자의 가로 세로 2배를 넘지 않고 글자는 항상 안에 있다`() {
+        val text = NormRect(0.45f, 0.50f, 0.55f, 0.52f)                       // 가로 0.10, 세로 0.02
+        val big = HighlightArea.button(NormRect(0.10f, 0.30f, 0.90f, 0.80f), text)!!   // 글자의 8배 · 25배
+        assertEquals(0.20f, big.right - big.left, 1e-4f)
+        assertEquals(0.04f, big.bottom - big.top, 1e-4f)
+        assertTrue(big.left <= text.left && big.right >= text.right && big.top <= text.top && big.bottom >= text.bottom)
+        val small = NormRect(0.41f, 0.495f, 0.59f, 0.525f)                     // 이미 2배 이내면 그대로
+        assertRect(small, HighlightArea.button(small, text)!!)
     }
 
     private fun assertRect(expected: NormRect, actual: NormRect) {
